@@ -428,7 +428,6 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                 className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none"
               >
                 <option value="importante">Aviso oficial</option>
-                <option value="agenda">Agenda</option>
                 <option value="estudos">Estudos</option>
                 <option value="apoio">Apoio</option>
               </select>
@@ -1427,7 +1426,6 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                               <td className="py-6 pl-4">
                                 <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
                                   rec.category === 'importante' ? 'bg-red-500/10 text-red-500' :
-                                  rec.category === 'agenda' ? 'bg-orange-500/10 text-orange-500' :
                                   rec.category === 'estudos' ? 'bg-blue-500/10 text-blue-500' :
                                   'bg-brand-primary/10 text-brand-primary'
                                 }`}>
@@ -1483,7 +1481,6 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                           <div className="flex justify-between items-start mb-4">
                             <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
                               rec.category === 'importante' ? 'bg-red-500/10 text-red-500' :
-                              rec.category === 'agenda' ? 'bg-orange-500/10 text-orange-500' :
                               rec.category === 'estudos' ? 'bg-blue-500/10 text-blue-500' :
                               'bg-brand-primary/10 text-brand-primary'
                             }`}>
@@ -1557,7 +1554,7 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                     : showModal === 'material'
                     ? 'Cadastre conteúdos de apoio para a biblioteca do aluno, sem bagunçar a tela.'
                     : showModal === 'recado'
-                    ? 'Use só para comunicados curtos, agenda da semana e avisos institucionais.'
+                    ? 'Use para comunicados importantes, orientações de estudo e avisos institucionais.'
                     : 'Preencha os campos abaixo para atualizar a plataforma.'
                   }
                 </p>

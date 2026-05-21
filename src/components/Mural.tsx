@@ -17,7 +17,7 @@ import { ptBR } from 'date-fns/locale';
 import { muralService } from '../services/muralService';
 import { Notice } from '../types';
 
-type NoticeCategory = 'tudo' | 'importante' | 'agenda' | 'estudos' | 'apoio';
+type NoticeCategory = 'tudo' | 'importante' | 'estudos' | 'apoio';
 
 export default function Mural() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -54,13 +54,7 @@ export default function Mural() {
       icon: <Bell size={18} />,
       longDesc: 'Fique por dentro de prazos críticos, editais e atualizações importantes da coordenação.'
     },
-    { 
-      id: 'agenda', 
-      label: 'Agenda', 
-      description: 'Simulados, aulas ao vivo e entregas da semana.', 
-      icon: <CalendarIcon size={18} />,
-      longDesc: 'Planeje sua semana com as datas de eventos síncronos e prazos de atividades.'
-    },
+
     { 
       id: 'estudos', 
       label: 'Estudos', 

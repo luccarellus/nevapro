@@ -41,7 +41,7 @@ export interface Notice {
   content: string;
   date: string;
   sender: string;
-  category: 'importante' | 'geral' | 'dica' | 'agenda' | 'estudos' | 'apoio';
+  category: 'importante' | 'geral' | 'dica' | 'estudos' | 'apoio';
   tag?: string;
 }
 

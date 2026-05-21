@@ -236,7 +236,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                                 onChange={(e) => setSchool(e.target.value)}
                                 required
                                 className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
-                                placeholder="Colégio Estadual NEVA"
+                                placeholder="Colégio Neva Pro"
                               />
                             </div>
                           </div>

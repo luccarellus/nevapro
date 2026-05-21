@@ -9,7 +9,8 @@ import {
   ChevronDown,
   CheckCircle2,
   Loader2,
-  Check
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
@@ -437,33 +438,45 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                   Salvar Preferências de Privacidade
                 </button>
 
-                <div className="pt-12 border-t border-border-color mt-12">
-                   <h4 className="text-red-500 font-bold text-sm mb-4">Usuário</h4>
+                <div className="pt-12 border-t border-border-color mt-12 space-y-6">
+                   <h4 className="text-red-500 font-black text-xs uppercase tracking-widest">Usuário</h4>
+                   
                    {/* Consent Reset */}
-                   <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-orange-500/5 rounded-2xl border border-orange-500/10">
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-orange-500/10 rounded-2xl border border-orange-500/25 shadow-md shadow-orange-500/5 hover:bg-orange-500/15 hover:border-orange-500/40 transition-all">
                       <div>
-                        <p className="text-text-main font-bold text-[10px] mb-1">Preferências de consentimento</p>
-                        <p className="text-text-secondary text-[11px] font-bold opacity-70">Redefinir todas as permissões de rastreamento e cookies.</p>
+                        <p className="text-text-main font-black text-xs uppercase tracking-wider mb-1">Preferências de consentimento</p>
+                        <p className="text-text-secondary text-xs font-semibold opacity-90 leading-relaxed">Redefinir todas as permissões de rastreamento e cookies.</p>
                       </div>
                       <button 
                         onClick={() => (window as any).showCookiePreferences?.()}
-                        className="bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white px-6 py-3 rounded-xl font-bold text-[9px] transition-all"
+                        className="bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-wider transition-all shadow-sm hover:shadow-orange-500/20 active:scale-95 whitespace-nowrap"
                       >
                         Gerenciar cookies
                       </button>
                    </div>
 
-                   <p className="text-text-secondary text-xs font-bold mb-6 opacity-70">
-                     Ao excluir seu perfil, você perderá todo o seu progresso, XP e conquistas. Esta ação não pode ser desfeita.
-                   </p>
-                   <button 
-                    onClick={handleDeleteProfile}
-                    disabled={isDeleting}
-                    className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-8 py-4 rounded-2xl font-bold text-[10px] transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                   >
-                     {isDeleting ? <Loader2 size={14} className="animate-spin" /> : null}
-                     Excluir meu perfil
-                   </button>
+                   {/* Danger Zone Container */}
+                   <div className="p-6 bg-red-500/10 rounded-2xl border border-red-500/25 shadow-md shadow-red-500/5 hover:bg-red-500/15 hover:border-red-500/40 transition-all space-y-6">
+                      <div className="flex items-start gap-4">
+                         <div className="p-3 bg-red-500/15 rounded-2xl text-red-500 flex-shrink-0">
+                            <AlertTriangle size={20} className="animate-pulse" />
+                         </div>
+                         <div>
+                            <h5 className="text-red-500 font-black text-xs uppercase tracking-widest mb-1.5">Aviso Importante</h5>
+                            <p className="text-text-secondary text-xs font-semibold opacity-90 leading-relaxed">
+                               Ao excluir seu perfil, você perderá permanentemente todo o seu progresso de estudos, XP acumulado e conquistas. Esta ação não poderá ser desfeita de forma alguma.
+                            </p>
+                         </div>
+                      </div>
+                      <button 
+                       onClick={handleDeleteProfile}
+                       disabled={isDeleting}
+                       className="bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2.5 disabled:opacity-50 w-full md:w-auto shadow-sm hover:shadow-red-500/25"
+                      >
+                        {isDeleting && <Loader2 size={14} className="animate-spin" />}
+                        Excluir meu perfil
+                      </button>
+                   </div>
                 </div>
               </div>
             </motion.div>
