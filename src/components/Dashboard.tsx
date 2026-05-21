@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
+import { calculateLevelAndProgression } from '../utils/xpUtils';
 import { 
   TrendingUp, Award, Flame, CheckCircle2, X, BookOpen, MessageSquare, 
   Zap, Trophy, MapPin, Users, ArrowRight, Star, FileText, Lightbulb
@@ -126,9 +127,13 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   }, [user.email, user.name, user.city, user.xp, user.level]);
   
   // Safe defaults if user metadata is missing
-  const nextLevelXp = user?.nextLevelXp || 1000;
   const currentXp = user?.xp || 0;
-  const xpPercentage = Math.min((currentXp / nextLevelXp) * 100, 100);
+  const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(currentXp);
+  const xpInCurrentLevel = currentXp - currentLevelMinXp;
+  const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+  const xpPercentage = xpNeededInCurrentLevel > 0 
+    ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+    : 0;
   const userName = user?.name?.split(' ')[0] || 'Estudante';
   const streak = user?.streak || 0;
   const answeredQuestions = user?.answeredQuestions || 0;

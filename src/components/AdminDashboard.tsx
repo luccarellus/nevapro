@@ -33,6 +33,7 @@ import { eventService } from '../services/eventService';
 import { adminService, AdminActivity, ProductionStat } from '../services/adminService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
+import { calculateLevelAndProgression } from '../utils/xpUtils';
 
 interface AdminDashboardProps {
   user: UserProfile;
@@ -1348,10 +1349,20 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                               <td className="py-6">
                                 <div className="flex items-center gap-3">
                                   <div className="w-32 h-1.5 bg-text-main/5 rounded-full overflow-hidden">
-                                     <div 
-                                      className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
-                                      style={{ width: `${Math.min(((student.xp || 0) / (student.nextLevelXp || 1000)) * 100, 100)}%` }}
-                                     />
+                                     {(() => {
+                                       const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
+                                       const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
+                                       const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+                                       const xpPercentage = xpNeededInCurrentLevel > 0 
+                                         ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+                                         : 0;
+                                       return (
+                                         <div 
+                                          className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
+                                          style={{ width: `${xpPercentage}%` }}
+                                         />
+                                       );
+                                     })()}
                                   </div>
                                   <span className="text-[10px] font-black text-text-secondary opacity-60 uppercase">{student.xp} XP</span>
                                 </div>
@@ -1396,10 +1407,20 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                               <div className="text-[9px] font-black text-text-secondary uppercase tracking-[0.2em] opacity-40 mb-2">Progresso</div>
                               <div className="flex items-center gap-3">
                                  <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
-                                   <div 
-                                     className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
-                                     style={{ width: `${Math.min(((student.xp || 0) / (student.nextLevelXp || 1000)) * 100, 100)}%` }}
-                                   />
+                                   {(() => {
+                                     const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
+                                     const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
+                                     const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+                                     const xpPercentage = xpNeededInCurrentLevel > 0 
+                                       ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+                                       : 0;
+                                     return (
+                                       <div 
+                                         className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
+                                         style={{ width: `${xpPercentage}%` }}
+                                       />
+                                     );
+                                   })()}
                                  </div>
                                  <span className="text-[9px] font-black text-text-secondary opacity-60 uppercase shrink-0">{student.xp} XP</span>
                               </div>

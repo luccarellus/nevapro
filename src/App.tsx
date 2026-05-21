@@ -25,20 +25,7 @@ import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen } from 'lucide-react
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { supabase } from './lib/supabase';
-
-const calculateLevelAndProgression = (totalXp: number): { level: number; nextLevelXp: number } => {
-  let level = 1;
-  let xpNeededForNext = 500;
-  let accumulatedXpThreshold = 500;
-
-  while (totalXp >= accumulatedXpThreshold) {
-    level++;
-    xpNeededForNext = Math.floor(xpNeededForNext * 1.5);
-    accumulatedXpThreshold += xpNeededForNext;
-  }
-
-  return { level, nextLevelXp: accumulatedXpThreshold };
-};
+import { calculateLevelAndProgression } from './utils/xpUtils';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -100,8 +87,8 @@ export default function App() {
     try {
       const profile = await userService.getProfile(email);
       if (profile) {
-        const { nextLevelXp } = calculateLevelAndProgression(profile.xp || 0);
-        const profileWithNextLevel = { ...profile, nextLevelXp };
+        const { nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(profile.xp || 0);
+        const profileWithNextLevel = { ...profile, nextLevelXp, currentLevelMinXp };
         setUser(prev => ({ ...prev, ...profileWithNextLevel }));
         // If they are a student, update the local cache too
         if (profile.role === 'student' || !profile.role) {
@@ -147,7 +134,7 @@ export default function App() {
     const newXp = currentXp + amount;
     
     // Dynamically calculate level and cumulative XP limit
-    const { level, nextLevelXp } = calculateLevelAndProgression(newXp);
+    const { level, nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(newXp);
     
     // Use explicit increments or default gracefully
     const corrInc = correctIncrement !== undefined ? correctIncrement : (amount > 0 ? 1 : 0);
@@ -158,6 +145,7 @@ export default function App() {
       xp: newXp,
       level: level,
       nextLevelXp: nextLevelXp,
+      currentLevelMinXp: currentLevelMinXp,
       correctAnswers: (user.correctAnswers || 0) + corrInc,
       answeredQuestions: (user.answeredQuestions || 0) + ansInc,
       isFlashQuizUpdate: isFlashQuiz

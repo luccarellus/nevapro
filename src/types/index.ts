@@ -18,6 +18,7 @@ export interface UserProfile {
   level: number;
   xp: number;
   nextLevelXp: number;
+  currentLevelMinXp?: number;
   rank: number;
   answeredQuestions?: number;
   correctAnswers?: number;
