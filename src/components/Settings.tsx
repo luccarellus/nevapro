@@ -40,6 +40,58 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    setPasswordStatus('idle');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Todos os campos são obrigatórios.');
+      setPasswordStatus('error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('A nova senha deve ter pelo menos 6 caracteres.');
+      setPasswordStatus('error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('A nova senha e a confirmação não coincidem.');
+      setPasswordStatus('error');
+      return;
+    }
+
+    setPasswordStatus('loading');
+    try {
+      const response = await userService.changePassword({
+        email: user.email,
+        currentPassword,
+        newPassword
+      });
+
+      if (response.success) {
+        setPasswordStatus('success');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setPasswordStatus('idle'), 4000);
+      } else {
+        setPasswordError(response.message || 'Erro ao alterar a senha.');
+        setPasswordStatus('error');
+      }
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Falha ao alterar senha. Verifique os dados informados.');
+      setPasswordStatus('error');
+    }
+  };
+
   // Sync with user prop if it changes externally
   const handleReset = () => {
     setDisplayName(user?.name || '');
@@ -425,6 +477,67 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                         animate={{ x: showInLeaderboard ? 24 : 4 }}
                         className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-sm"
                       />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Alterar Senha de Acesso */}
+                <div className="bg-bg-card border border-border-color p-8 rounded-[32px] space-y-6">
+                  <div>
+                    <h4 className="font-black text-text-main uppercase tracking-widest text-xs">Alterar Senha de Acesso</h4>
+                    <p className="text-text-secondary text-[11px] font-bold opacity-70 mt-1">Troque sua senha de acesso periodicamente para maior segurança.</p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-text-secondary tracking-widest uppercase ml-1 opacity-50">Senha Atual</label>
+                      <input 
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full bg-input-bg rounded-2xl px-6 py-4 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner text-sm"
+                        placeholder="Digite sua senha atual"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-text-secondary tracking-widest uppercase ml-1 opacity-50">Nova Senha</label>
+                        <input 
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-input-bg rounded-2xl px-6 py-4 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner text-sm"
+                          placeholder="Mínimo 6 caracteres"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-text-secondary tracking-widest uppercase ml-1 opacity-50">Confirmar Nova Senha</label>
+                        <input 
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full bg-input-bg rounded-2xl px-6 py-4 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner text-sm"
+                          placeholder="Confirme a nova senha"
+                        />
+                      </div>
+                    </div>
+
+                    {passwordError && (
+                      <p className="text-red-500 font-bold text-xs uppercase tracking-wider ml-1">{passwordError}</p>
+                    )}
+
+                    {passwordStatus === 'success' && (
+                      <p className="text-brand-primary font-bold text-xs uppercase tracking-wider ml-1">Senha atualizada com sucesso!</p>
+                    )}
+                    
+                    <button 
+                      onClick={handleChangePassword}
+                      disabled={passwordStatus === 'loading'}
+                      className="bg-brand-primary hover:bg-[#00d1b0] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-brand-primary/20 transition-all active:scale-95 flex items-center justify-center gap-2.5 disabled:opacity-50"
+                    >
+                      {passwordStatus === 'loading' && <Loader2 size={14} className="animate-spin" />}
+                      Atualizar Senha
                     </button>
                   </div>
                 </div>

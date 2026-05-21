@@ -82,5 +82,22 @@ export const userService = {
       console.error('Error fetching leaderboard:', error);
       return [];
     }
+  },
+
+  async changePassword(data: { email: string; currentPassword?: string; newPassword?: string }): Promise<{ success: boolean; message?: string }> {
+    const response = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      let errorMsg = 'Falha ao alterar senha';
+      try {
+        const error = await response.json();
+        errorMsg = error.error || errorMsg;
+      } catch (e) {}
+      throw new Error(errorMsg);
+    }
+    return response.json();
   }
 };

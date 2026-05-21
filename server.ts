@@ -319,6 +319,82 @@ export const app = express();
     }
   });
 
+  app.post('/api/auth/change-password', async (req, res) => {
+    const { email, currentPassword, newPassword } = req.body;
+    if (!email || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    try {
+      // 1. Administrador (Supabase Auth)
+      if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail)) {
+        const { data: authData, error: authError } = await supabaseAuthVerifier.auth.signInWithPassword({
+          email: cleanEmail,
+          password: currentPassword,
+        });
+
+        if (authError || !authData.user) {
+          return res.status(401).json({ error: 'Senha atual incorreta.' });
+        }
+
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authData.user.id, {
+          password: newPassword
+        });
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+      }
+
+      // 2. Estudante (Tabela public.users)
+      const { data: student, error: studentError } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (studentError) throw studentError;
+      if (!student) {
+        return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const dbPassword = student.password_hash || student.password || student.pasword;
+      if (!dbPassword) {
+        return res.status(400).json({ error: 'Conta sem senha definida.' });
+      }
+
+      let isValid = false;
+      if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
+        isValid = await bcrypt.compare(currentPassword, dbPassword);
+      } else {
+        isValid = dbPassword === currentPassword;
+      }
+
+      if (!isValid) {
+        return res.status(401).json({ error: 'Senha atual incorreta.' });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const { error: updateError } = await supabaseAdmin
+        .from('users')
+        .update({ password_hash: hashedPassword })
+        .eq('id', student.id);
+
+      if (updateError) throw updateError;
+
+      return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+    } catch (err: any) {
+      console.error('[Change Password] Error:', err.message);
+      res.status(500).json({ error: 'Erro interno ao alterar a senha.', details: err?.message });
+    }
+  });
+
   // PROFILE
   app.get('/api/user/profile', async (req, res) => {
     const email = req.query.email as string;
