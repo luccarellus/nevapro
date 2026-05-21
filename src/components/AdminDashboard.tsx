@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
@@ -47,6 +47,37 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
   const [liveActivities, setLiveActivities] = useState<AdminActivity[]>([]);
   const [productionStats, setProductionStats] = useState<ProductionStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const nextEvent = useMemo(() => {
+    if (!eventos || eventos.length === 0) return null;
+    const now = new Date();
+    
+    const futureEvents = eventos
+      .map(evt => {
+        if (!evt.date) return null;
+        const dateOnly = evt.date.includes('T') ? evt.date.split('T')[0] : evt.date;
+        const dateParts = dateOnly.split('-');
+        const timeParts = (evt.time || '00:00').split(':');
+        
+        let eventDate: Date;
+        if (dateParts.length === 3) {
+          const year = parseInt(dateParts[0], 10);
+          const month = parseInt(dateParts[1], 10) - 1;
+          const day = parseInt(dateParts[2], 10);
+          const hour = parseInt(timeParts[0] || '0', 10);
+          const minute = parseInt(timeParts[1] || '0', 10);
+          eventDate = new Date(year, month, day, hour, minute);
+        } else {
+          eventDate = new Date(evt.date);
+        }
+        return { evt, eventDate };
+      })
+      .filter((item): item is { evt: StudyEvent; eventDate: Date } => item !== null && item.eventDate >= now)
+      .sort((a, b) => a.eventDate.getTime() - b.eventDate.getTime());
+
+    return futureEvents[0]?.evt || null;
+  }, [eventos]);
+
   const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos'>('panorama');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
@@ -817,9 +848,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
             />
             <StatCard 
               label="Próxima ação" 
-              value="--" 
-              icon={<Clock className="text-text-secondary opacity-40" size={20} />} 
-              tag="Sem agendamento"
+              value={nextEvent ? nextEvent.title : "--"} 
+              icon={<Clock className={nextEvent ? "text-pink-500" : "text-text-secondary opacity-40"} size={20} />} 
+              tag={nextEvent ? `Ação: ${formatDateToBR(nextEvent.date)} às ${nextEvent.time}` : "Sem agendamento"}
             />
           </div>
 
@@ -1655,6 +1686,8 @@ function SidebarItem({
 }
 
 function StatCard({ label, value, icon, tag }: { label: string; value: string | number; icon: React.ReactNode; tag: string }) {
+  const isLongValue = typeof value === 'string' && value.length > 10;
+  
   return (
     <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[40px] p-8 group transition-all hover:shadow-lg">
       <div className="flex justify-between items-start mb-8">
@@ -1667,13 +1700,20 @@ function StatCard({ label, value, icon, tag }: { label: string; value: string | 
       </div>
       <div className="mb-8">
         <div className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-1 leading-none opacity-60">{label}</div>
-        <div className="text-4xl font-black text-text-main leading-none tracking-tight">{value}</div>
+        <div className={`font-black text-text-main leading-tight tracking-tight ${
+          isLongValue 
+            ? value.length > 18 ? 'text-lg' : 'text-xl'
+            : 'text-4xl'
+        }`}>
+          {value}
+        </div>
       </div>
       <div className="flex">
         <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
            tag.includes('Agenda') ? 'bg-brand-primary/10 text-brand-primary' : 
            tag.includes('Biblio') ? 'bg-blue-500/10 text-blue-500' :
            tag.includes('Mural') ? 'bg-orange-500/10 text-orange-500' :
+           tag.includes('Ação') ? 'bg-pink-500/10 text-pink-500' :
            'bg-text-main/5 text-text-secondary opacity-40'
         }`}>
           {tag}
