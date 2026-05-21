@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
-import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import helmet from 'helmet';
 import multer from 'multer';
@@ -25,8 +24,70 @@ export const app = express();
     'lucassantos.-@outlook.com',
   ];
 
-  const UPLOADS_DIR = process.env.VERCEL ? '/tmp/uploads' : path.join(process.cwd(), 'uploads');
+  const ensureAdminInDb = async (email: string, name?: string, preferredId?: string) => {
+    try {
+      const cleanEmail = email.toLowerCase().trim();
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('email', cleanEmail)
+        .maybeSingle();
 
+      if (existingUser) {
+        if (existingUser.role !== 'admin') {
+          await supabaseAdmin.from('users').update({ role: 'admin' }).eq('id', existingUser.id);
+          existingUser.role = 'admin';
+        }
+        return existingUser;
+      }
+
+      let userId = preferredId;
+      if (!userId) {
+        try {
+          const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+          const target = authUsers?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
+          if (target) {
+            userId = target.id;
+          }
+        } catch (authErr) {
+          console.warn('[ensureAdminInDb] Falha ao listar usuários no auth:', authErr);
+        }
+      }
+
+      if (!userId) {
+        userId = crypto.randomUUID();
+      }
+
+      const newAdmin = {
+        id: userId,
+        email: cleanEmail,
+        name: name || cleanEmail.split('@')[0],
+        role: 'admin',
+        password_hash: 'managed_by_auth',
+        level: 1,
+        total_xp: 0,
+        current_streak: 0,
+        questions_attempted: 0,
+        questions_resolved: 0,
+        created_at: new Date().toISOString()
+      };
+
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from('users')
+        .insert([newAdmin])
+        .select()
+        .single();
+
+      if (insertErr) {
+        console.error('[ensureAdminInDb] Falha ao inserir administrador:', insertErr);
+        return null;
+      }
+      return inserted;
+    } catch (err) {
+      console.error('[ensureAdminInDb] Erro inesperado:', err);
+      return null;
+    }
+  };
   const isFlashQuizCompleted = async (email: string, userId: string): Promise<boolean> => {
     if (userId) {
       try {
@@ -141,6 +202,7 @@ export const app = express();
       });
 
       if (!authError && authData.user) {
+        await ensureAdminInDb(cleanEmail, authData.user.user_metadata?.full_name, authData.user.id);
         const adminProfile = {
           id: authData.user.id,
           email: cleanEmail,
@@ -264,15 +326,13 @@ export const app = express();
     
     try {
       const cleanEmail = email.toLowerCase().trim();
-      if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail)) {
-        const adminProfile = {
-          id: 'admin-synth-' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'),
-          email: cleanEmail,
-          name: cleanEmail.split('@')[0],
-          role: 'admin',
-          created_at: new Date().toISOString()
-        };
-        return res.json(getUserWithRole(adminProfile));
+      const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail);
+
+      if (isAdmin) {
+        const dbAdmin = await ensureAdminInDb(cleanEmail);
+        if (dbAdmin) {
+          return res.json(getUserWithRole(dbAdmin));
+        }
       }
 
       const { data, error } = await supabaseAdmin.from('users').select('*').eq('email', cleanEmail).maybeSingle();
@@ -289,15 +349,9 @@ export const app = express();
     const email = (updateData.email || '').toLowerCase().trim();
     if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
     
-    if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === email)) {
-      const adminProfile = {
-        id: updateData.id || 'admin-synth-' + email.replace(/[^a-zA-Z0-9]/g, '_'),
-        email,
-        name: updateData.name || email.split('@')[0],
-        role: 'admin',
-        created_at: new Date().toISOString()
-      };
-      return res.json({ success: true, user: getUserWithRole(adminProfile) });
+    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email);
+    if (isAdmin) {
+      await ensureAdminInDb(email, updateData.name);
     }
 
     const supabaseUpdate: any = { email };

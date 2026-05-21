@@ -6,11 +6,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/uploads/(.*)",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/((?!api|uploads|assets|.*\\.).*)",
+      "source": "/((?!api|assets|.*\\.).*)",
       "destination": "/index.html"
     }
   ]
