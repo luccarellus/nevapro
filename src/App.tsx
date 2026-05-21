@@ -100,10 +100,8 @@ export default function App() {
         const { nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(profile.xp || 0);
         const profileWithNextLevel = { ...profile, nextLevelXp, currentLevelMinXp };
         setUser(prev => ({ ...prev, ...profileWithNextLevel }));
-        // If they are a student, update the local cache too
-        if (profile.role === 'student' || !profile.role) {
-          localStorage.setItem('neva_student_session', JSON.stringify({ ...user, ...profileWithNextLevel }));
-        }
+        // Atualiza a sessão no localStorage para ambos os perfis (aluno e admin) para persistir no F5
+        localStorage.setItem('neva_student_session', JSON.stringify(profileWithNextLevel));
       }
     } catch (error) {
       console.error('Failed to fetch user:', error);
@@ -126,10 +124,8 @@ export default function App() {
     setIsLoggedIn(true);
     setUser(loggedUser);
     
-    // Persist if student
-    if (loggedUser.role === 'student') {
-      localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
-    }
+    // Persiste a sessão local para ambos os perfis (aluno e admin)
+    localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
   };
 
   const handleLogout = async () => {
