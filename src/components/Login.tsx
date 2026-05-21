@@ -66,7 +66,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
           school,
           gremio
         });
-        
+
         if (res.success) {
           // Automatic Login
           onLogin(res.user);
@@ -167,25 +167,25 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">E-mail</label>
                       <div className="relative group">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                        <input 
-                          type="email" 
+                        <input
+                          type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          required 
-                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                          placeholder="seu@email.com" 
+                          required
+                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                          placeholder="seu@email.com"
                         />
                       </div>
                     </div>
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       disabled={isLoading}
                       className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-5 rounded-3xl font-black uppercase tracking-[0.3em] text-xs transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
                     >
                       {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Enviar link de recuperação'}
                     </button>
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setIsResettingPassword(false)}
                       className="w-full text-[10px] font-black text-text-secondary uppercase tracking-widest hover:text-brand-primary transition-colors"
                     >
@@ -200,13 +200,13 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                           <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Nome Completo</label>
                           <div className="relative group">
                             <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
-                              required 
-                              className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                              placeholder="Ex: João da Silva" 
+                              required
+                              className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                              placeholder="Informe o seu Nome"
                             />
                           </div>
                         </div>
@@ -216,13 +216,13 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                             <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Cidade</label>
                             <div className="relative group">
                               <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                              <input 
-                                type="text" 
+                              <input
+                                type="text"
                                 value={city}
                                 onChange={(e) => setCity(e.target.value)}
-                                required 
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                                placeholder="Parnaíba" 
+                                required
+                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                                placeholder="Imperatriz"
                               />
                             </div>
                           </div>
@@ -230,13 +230,13 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                             <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Escola</label>
                             <div className="relative group">
                               <School className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                              <input 
-                                type="text" 
+                              <input
+                                type="text"
                                 value={school}
                                 onChange={(e) => setSchool(e.target.value)}
-                                required 
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                                placeholder="Liceu Parnaibano" 
+                                required
+                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                                placeholder="Colégio Estadual NEVA"
                               />
                             </div>
                           </div>
@@ -246,12 +246,12 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                           <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Grêmio Estudantil <span className="opacity-50">(Opcional)</span></label>
                           <div className="relative group">
                             <Flag className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={gremio}
                               onChange={(e) => setGremio(e.target.value)}
-                              className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                              placeholder="Nome do seu grêmio" 
+                              className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                              placeholder="Informe o seu Grêmio Estudantil"
                             />
                           </div>
                         </div>
@@ -262,13 +262,13 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">E-mail</label>
                       <div className="relative group">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                        <input 
-                          type="email" 
+                        <input
+                          type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          required 
-                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                          placeholder="seu@email.com" 
+                          required
+                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                          placeholder="seu@email.com"
                         />
                       </div>
                     </div>
@@ -277,21 +277,21 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Senha</label>
                       <div className="relative group">
                         <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                        <input 
-                          type="password" 
+                        <input
+                          type="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          required 
-                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner" 
-                          placeholder="••••••••" 
+                          required
+                          className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
+                          placeholder="••••••••"
                         />
                       </div>
                     </div>
 
                     {!isRegistering && (
                       <div className="flex items-center justify-between px-2">
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => setRememberMe(!rememberMe)}
                           className="flex items-center gap-2 group cursor-pointer"
                         >
@@ -300,9 +300,9 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                           </div>
                           <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest group-hover:text-brand-primary transition-colors">Lembrar-me</span>
                         </button>
-                        
-                        <button 
-                          type="button" 
+
+                        <button
+                          type="button"
                           onClick={() => setIsResettingPassword(true)}
                           className="text-[10px] font-black text-brand-primary uppercase tracking-widest hover:underline"
                         >
@@ -311,8 +311,8 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       </div>
                     )}
 
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       disabled={isLoading}
                       className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-5 mt-4 rounded-3xl font-black uppercase tracking-[0.3em] text-xs transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 group active:scale-95 disabled:opacity-50 disabled:cursor-wait"
                     >
@@ -335,7 +335,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
             <p className="text-xs text-text-secondary font-bold uppercase tracking-widest">
               {isResettingPassword ? '' : isRegistering ? 'Já tem uma conta?' : 'Ainda não é membro?'}
               {!isResettingPassword && (
-                <button 
+                <button
                   onClick={() => setIsRegistering(!isRegistering)}
                   className="ml-2 text-brand-primary font-black hover:underline"
                 >
@@ -348,13 +348,13 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
         <div className="mt-10 text-center space-y-4">
           <div className="flex justify-center gap-6">
-            <button 
+            <button
               onClick={() => onTabChange('privacidade')}
               className="text-[9px] font-black uppercase text-text-secondary hover:text-brand-primary tracking-widest transition-colors"
             >
               Privacidade
             </button>
-            <button 
+            <button
               onClick={() => onTabChange('cookies')}
               className="text-[9px] font-black uppercase text-text-secondary hover:text-brand-primary tracking-widest transition-colors"
             >

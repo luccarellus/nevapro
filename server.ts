@@ -45,7 +45,7 @@ export const app = express();
       if (!userId) {
         try {
           const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-          const target = authUsers?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
+          const target = (authUsers as any)?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
           if (target) {
             userId = target.id;
           }

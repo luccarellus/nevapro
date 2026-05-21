@@ -309,35 +309,6 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                     Restaurar padrões
                   </button>
                 </div>
-
-                <div className="pt-12 border-t border-border-color mt-12">
-                   <h4 className="text-red-500 font-bold text-sm mb-4">Usuário</h4>
-                   {/* Consent Reset */}
-                   <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-orange-500/5 rounded-2xl border border-orange-500/10">
-                      <div>
-                        <p className="text-text-main font-bold text-[10px] mb-1">Preferências de consentimento</p>
-                        <p className="text-text-secondary text-[11px] font-bold opacity-70">Redefinir todas as permissões de rastreamento e cookies.</p>
-                      </div>
-                      <button 
-                        onClick={() => (window as any).showCookiePreferences?.()}
-                        className="bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white px-6 py-3 rounded-xl font-bold text-[9px] transition-all"
-                      >
-                        Gerenciar cookies
-                      </button>
-                   </div>
-
-                   <p className="text-text-secondary text-xs font-bold mb-6 opacity-70">
-                     Ao excluir seu perfil, você perderá todo o seu progresso, XP e conquistas. Esta ação não pode ser desfeita.
-                   </p>
-                   <button 
-                    onClick={handleDeleteProfile}
-                    disabled={isDeleting}
-                    className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-8 py-4 rounded-2xl font-bold text-[10px] transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                   >
-                     {isDeleting ? <Loader2 size={14} className="animate-spin" /> : null}
-                     Excluir meu perfil
-                   </button>
-                </div>
               </div>
             </motion.div>
           )}
@@ -455,13 +426,6 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                       />
                     </button>
                   </div>
-                  
-                  <div className="h-px bg-border-color" />
-
-                  <div>
-                    <h4 className="font-black text-text-main opacity-30 uppercase tracking-widest text-xs">Modo Incógnito</h4>
-                    <p className="text-text-secondary text-[10px] font-bold opacity-30 mt-1 italic">Disponível em breve para usuários premium.</p>
-                  </div>
                 </div>
 
                 <button 
@@ -472,6 +436,35 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                   {isSaving && <Loader2 size={16} className="animate-spin" />}
                   Salvar Preferências de Privacidade
                 </button>
+
+                <div className="pt-12 border-t border-border-color mt-12">
+                   <h4 className="text-red-500 font-bold text-sm mb-4">Usuário</h4>
+                   {/* Consent Reset */}
+                   <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-orange-500/5 rounded-2xl border border-orange-500/10">
+                      <div>
+                        <p className="text-text-main font-bold text-[10px] mb-1">Preferências de consentimento</p>
+                        <p className="text-text-secondary text-[11px] font-bold opacity-70">Redefinir todas as permissões de rastreamento e cookies.</p>
+                      </div>
+                      <button 
+                        onClick={() => (window as any).showCookiePreferences?.()}
+                        className="bg-orange-500/10 hover:bg-orange-500 text-orange-500 hover:text-white px-6 py-3 rounded-xl font-bold text-[9px] transition-all"
+                      >
+                        Gerenciar cookies
+                      </button>
+                   </div>
+
+                   <p className="text-text-secondary text-xs font-bold mb-6 opacity-70">
+                     Ao excluir seu perfil, você perderá todo o seu progresso, XP e conquistas. Esta ação não pode ser desfeita.
+                   </p>
+                   <button 
+                    onClick={handleDeleteProfile}
+                    disabled={isDeleting}
+                    className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-8 py-4 rounded-2xl font-bold text-[10px] transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                   >
+                     {isDeleting ? <Loader2 size={14} className="animate-spin" /> : null}
+                     Excluir meu perfil
+                   </button>
+                </div>
               </div>
             </motion.div>
           )}
