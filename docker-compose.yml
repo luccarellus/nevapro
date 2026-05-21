@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Reverse Proxy & Load Balancer
+  nginx:
+    image: nginx:stable-alpine
+    container_name: neva_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro # Caminho SSL Certbot
+    networks:
+      - neva_network
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
+
+  # Backend NestJS (Múltiplas instâncias)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: neva-api:latest
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - NODE_ENV=production
+    networks:
+      - neva_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    expose:
+      - "3000"
+
+networks:
+  neva_network:
+    driver: bridge

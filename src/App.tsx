@@ -1,0 +1,255 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import Navigation from './components/Navigation';
+import Dashboard from './components/Dashboard';
+import Questions from './components/Questions';
+import Header from './components/Header';
+import Leaderboard from './components/Leaderboard';
+import Calendar from './components/Calendar';
+import AdminDashboard from './components/AdminDashboard';
+import Login from './components/Login';
+import Simulados from './components/Simulados';
+import Materiais from './components/Materiais';
+import Mural from './components/Mural';
+import Settings from './components/Settings';
+import CookieBanner from './components/CookieBanner';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import CookiePolicy from './components/CookiePolicy';
+import { UserProfile } from './types';
+import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen } from 'lucide-react';
+import { userService } from './services/userService';
+import { initConsentMode } from './lib/consentManager';
+import { supabase } from './lib/supabase';
+
+const calculateLevelAndProgression = (totalXp: number): { level: number; nextLevelXp: number } => {
+  let level = 1;
+  let xpNeededForNext = 500;
+  let accumulatedXpThreshold = 500;
+
+  while (totalXp >= accumulatedXpThreshold) {
+    level++;
+    xpNeededForNext = Math.floor(xpNeededForNext * 1.5);
+    accumulatedXpThreshold += xpNeededForNext;
+  }
+
+  return { level, nextLevelXp: accumulatedXpThreshold };
+};
+
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [user, setUser] = useState<UserProfile>({
+    id: 'loading',
+    name: 'Carregando...',
+    email: '',
+    level: 1,
+    xp: 0,
+    nextLevelXp: 500,
+    rank: 0,
+    streak: 0,
+    role: 'student'
+  });
+
+  useEffect(() => {
+    initConsentMode();
+    
+    // Recovery session for non-Supabase students
+    const savedUser = localStorage.getItem('neva_student_session');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setIsLoggedIn(true);
+        setUser(parsedUser);
+        fetchUser(parsedUser.email);
+      } catch (e) {
+        localStorage.removeItem('neva_student_session');
+      }
+    }
+
+    // Check active session (Admins via Supabase)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && session.user.email) {
+        setIsLoggedIn(true);
+        fetchUser(session.user.email);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && session.user.email) {
+        setIsLoggedIn(true);
+        fetchUser(session.user.email);
+      } else if (!localStorage.getItem('neva_student_session')) {
+        if (event === 'SIGNED_OUT') {
+           setIsLoggedIn(false);
+           setActiveTab('dashboard');
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUser = async (email?: string) => {
+    if (!email) return;
+    try {
+      const profile = await userService.getProfile(email);
+      if (profile) {
+        const { nextLevelXp } = calculateLevelAndProgression(profile.xp || 0);
+        const profileWithNextLevel = { ...profile, nextLevelXp };
+        setUser(prev => ({ ...prev, ...profileWithNextLevel }));
+        // If they are a student, update the local cache too
+        if (profile.role === 'student' || !profile.role) {
+          localStorage.setItem('neva_student_session', JSON.stringify({ ...user, ...profileWithNextLevel }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+  
+  const handleLogin = async (loggedUser: UserProfile) => {
+    setIsLoggedIn(true);
+    setUser(loggedUser);
+    
+    // Persist if student
+    if (loggedUser.role === 'student') {
+      localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('neva_student_session');
+    setIsLoggedIn(false);
+    setActiveTab('dashboard');
+  };
+
+  const handleEarnXp = async (amount: number, correctIncrement?: number, answeredIncrement?: number, isFlashQuiz?: boolean) => {
+    const currentXp = user.xp || 0;
+    const newXp = currentXp + amount;
+    
+    // Dynamically calculate level and cumulative XP limit
+    const { level, nextLevelXp } = calculateLevelAndProgression(newXp);
+    
+    // Use explicit increments or default gracefully
+    const corrInc = correctIncrement !== undefined ? correctIncrement : (amount > 0 ? 1 : 0);
+    const ansInc = answeredIncrement !== undefined ? answeredIncrement : (amount > 0 ? 1 : 0);
+
+    const updatedUser = {
+      ...user,
+      xp: newXp,
+      level: level,
+      nextLevelXp: nextLevelXp,
+      correctAnswers: (user.correctAnswers || 0) + corrInc,
+      answeredQuestions: (user.answeredQuestions || 0) + ansInc,
+      isFlashQuizUpdate: isFlashQuiz
+    };
+
+    // Update locally
+    setUser(updatedUser);
+
+    // Persist to server
+    try {
+      await userService.updateProfile(updatedUser);
+    } catch (error) {
+      console.error('Failed to sync XP with server:', error);
+    }
+  };
+
+  const renderContent = () => {
+    if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => setActiveTab('dashboard')} />;
+    if (activeTab === 'cookies') return <CookiePolicy onBack={() => setActiveTab('dashboard')} />;
+
+    if (!isLoggedIn) {
+      return <Login onLogin={handleLogin} onTabChange={setActiveTab} />;
+    }
+
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard user={user} onTabChange={setActiveTab} onEarnXp={handleEarnXp} />;
+      case 'questions':
+        return <Questions onEarnXp={handleEarnXp} user={user} />;
+      case 'simulados':
+        return <Simulados onEarnXp={handleEarnXp} user={user} />;
+      case 'ranking':
+        return <Leaderboard user={user} />;
+      case 'materiais':
+        return <Materiais />;
+      case 'mural':
+        return <Mural />;
+      case 'calendar':
+        return <Calendar />;
+      case 'admin':
+        return user.role === 'admin' ? <AdminDashboard user={user} onBackToApp={() => setActiveTab('dashboard')} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
+      case 'profile':
+        return <Settings user={user} onUpdateUser={setUser} onClose={() => setActiveTab('dashboard')} />;
+      default:
+        return <Dashboard user={user} onEarnXp={handleEarnXp} />;
+    }
+  };
+
+  const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab);
+
+  return (
+    <div className="min-h-screen bg-bg-main transition-colors duration-300">
+      {isLoggedIn && !isFullPageTab && (
+        <>
+          <Header 
+            isDarkMode={isDarkMode} 
+            toggleDarkMode={toggleDarkMode} 
+            isAdmin={user.role === 'admin'} 
+            onTabChange={setActiveTab}
+            userEmail={user.email}
+          />
+          <Navigation 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            isAdmin={user.role === 'admin'} 
+            onLogout={handleLogout}
+          />
+        </>
+      )}
+
+      <main className={`transition-all duration-300 ${isLoggedIn && !isFullPageTab ? 'lg:pl-64' : ''}`}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={isLoggedIn ? activeTab : 'login'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {renderContent()}
+            
+            {/* Footer / Cookie Button */}
+            {isLoggedIn && !isFullPageTab && (
+               <footer className="max-w-6xl mx-auto px-6 py-12 border-t border-border-color/50 mt-12 mb-20 md:mb-12 flex flex-col md:flex-row justify-center items-center gap-6">
+                  <p className="text-[9px] font-black uppercase text-text-secondary/30 tracking-[0.3em]">Neva • Educando com Inteligência</p>
+               </footer>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+      
+      <CookieBanner />
+    </div>
+  );
+}

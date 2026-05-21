@@ -1,0 +1,6 @@
+{
+  "name": "Olhar Jovem",
+  "description": "Uma plataforma web inovadora do Instituto Olhar Jovem que transforma a preparação para o ENEM em uma experiência dinâmica e gamificada.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
