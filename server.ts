@@ -26,63 +26,20 @@ export const app = express();
   ];
 
   const UPLOADS_DIR = process.env.VERCEL ? '/tmp/uploads' : path.join(process.cwd(), 'uploads');
-  const PREFERENCES_FILE = process.env.VERCEL ? '/tmp/user_preferences.json' : path.join(UPLOADS_DIR, 'user_preferences.json');
-
-  const readPreferences = (): Record<string, { showInLeaderboard?: boolean; languagePreference?: string; flashQuizCompleted?: boolean }> => {
-    try {
-      if (fs.existsSync(PREFERENCES_FILE)) {
-        const content = fs.readFileSync(PREFERENCES_FILE, 'utf8');
-        return JSON.parse(content);
-      }
-    } catch (err) {
-      console.error('Error reading preferences:', err);
-    }
-    return {};
-  };
-
-  const writePreferences = (prefs: Record<string, { showInLeaderboard?: boolean; languagePreference?: string; flashQuizCompleted?: boolean }>) => {
-    try {
-      const dir = path.dirname(PREFERENCES_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(PREFERENCES_FILE, JSON.stringify(prefs, null, 2), 'utf8');
-    } catch (err) {
-      console.error('Error writing preferences:', err);
-    }
-  };
-
-  const getUserPreferences = (email: string) => {
-    const prefs = readPreferences();
-    const userPref = prefs[email.toLowerCase().trim()] || {};
-    return {
-      showInLeaderboard: userPref.showInLeaderboard !== false, // default true
-      languagePreference: userPref.languagePreference || 'ingles',
-      flashQuizCompleted: !!userPref.flashQuizCompleted
-    };
-  };
-
-  const saveUserPreferences = (email: string, showInLeaderboard?: boolean, languagePreference?: string, flashQuizCompleted?: boolean) => {
-    const prefs = readPreferences();
-    const cleanEmail = email.toLowerCase().trim();
-    if (!prefs[cleanEmail]) {
-      prefs[cleanEmail] = {};
-    }
-    if (showInLeaderboard !== undefined) {
-      prefs[cleanEmail].showInLeaderboard = showInLeaderboard;
-    }
-    if (languagePreference !== undefined) {
-      prefs[cleanEmail].languagePreference = languagePreference;
-    }
-    if (flashQuizCompleted !== undefined) {
-      prefs[cleanEmail].flashQuizCompleted = flashQuizCompleted;
-    }
-    writePreferences(prefs);
-  };
 
   const isFlashQuizCompleted = async (email: string, userId: string): Promise<boolean> => {
-    const prefs = getUserPreferences(email);
-    if (prefs.flashQuizCompleted) return true;
+    if (userId) {
+      try {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('flash_quiz_completed')
+          .eq('id', userId)
+          .maybeSingle();
+        if (data?.flash_quiz_completed) return true;
+      } catch (e) {
+        console.error('Error checking flash_quiz_completed in users:', e);
+      }
+    }
 
     if (userId) {
       try {
@@ -93,7 +50,10 @@ export const app = express();
           .eq('reason', 'Flash Quiz: Maranhão')
           .limit(1);
         if (data && data.length > 0) {
-          saveUserPreferences(email, undefined, undefined, true);
+          await supabaseAdmin
+            .from('users')
+            .update({ flash_quiz_completed: true })
+            .eq('id', userId);
           return true;
         }
       } catch (e) {
@@ -109,14 +69,13 @@ export const app = express();
     const email = (user.email || '').toLowerCase().trim();
     const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || user.role === 'admin';
     
-    const prefs = getUserPreferences(email);
-    
     return {
       ...user,
       id: user.id || crypto.randomUUID(),
       role: isAdmin ? 'admin' : 'student',
-      showInLeaderboard: prefs.showInLeaderboard,
-      languagePreference: prefs.languagePreference
+      showInLeaderboard: user.show_in_leaderboard !== false, // default true
+      languagePreference: user.language_preference || 'ingles',
+      flashQuizCompleted: !!user.flash_quiz_completed
     };
   };
 
@@ -341,11 +300,6 @@ export const app = express();
       return res.json({ success: true, user: getUserWithRole(adminProfile) });
     }
 
-    // Save client preferences (showInLeaderboard and languagePreference) to local JSON on the server
-    if (updateData.showInLeaderboard !== undefined || updateData.languagePreference !== undefined) {
-      saveUserPreferences(email, updateData.showInLeaderboard, updateData.languagePreference);
-    }
-
     const supabaseUpdate: any = { email };
     const allowedFields = [
       'name', 'xp', 'level', 'city', 'school', 'gremio', 
@@ -355,6 +309,13 @@ export const app = express();
     allowedFields.forEach(field => {
       if (updateData[field] !== undefined) supabaseUpdate[field] = updateData[field];
     });
+
+    if (updateData.showInLeaderboard !== undefined) {
+      supabaseUpdate.show_in_leaderboard = updateData.showInLeaderboard;
+    }
+    if (updateData.languagePreference !== undefined) {
+      supabaseUpdate.language_preference = updateData.languagePreference;
+    }
 
     const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;
 
@@ -392,8 +353,8 @@ export const app = express();
         supabaseUpdate.total_xp = oldXp;
         xpDiff = 0;
       } else {
-        // First completion: mark in the file preferences so subsequent checks are instant first-level cache
-        saveUserPreferences(email, undefined, undefined, true);
+        // First completion: mark in database
+        supabaseUpdate.flash_quiz_completed = true;
       }
     }
     
@@ -572,7 +533,7 @@ export const app = express();
     try {
       const { data, error } = await supabaseAdmin
         .from('users')
-        .select('name, email, city, xp, level, role');
+        .select('name, email, city, xp, level, role, show_in_leaderboard');
       
       if (error) throw error;
 
@@ -583,9 +544,7 @@ export const app = express();
           const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || u.role === 'admin';
           if (isAdmin) return false;
           
-          // Recupera a preferência do usuário de forma segura a partir de arquivo servidor
-          const prefs = getUserPreferences(email);
-          if (prefs.showInLeaderboard === false) return false;
+          if (u.show_in_leaderboard === false) return false;
           return true;
         })
         .map(({ name, city, xp, level }) => ({
@@ -726,39 +685,43 @@ export const app = express();
     }
   });
 
-  // UPLOAD DE AQUIVOS (PDF, ETC)
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-  
-  // Servir arquivos de uploads estaticamente
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  // UPLOAD DE ARQUIVOS (PDF, ETC) COM SUPABASE STORAGE
+  const upload = multer({ storage: multer.memoryStorage() });
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, UPLOADS_DIR);
-    },
-    filename: (req, file, cb) => {
-      const fileExt = path.extname(file.originalname);
-      const baseName = path.basename(file.originalname, fileExt)
-        .replace(/[^a-zA-Z0-9]/g, '_');
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      cb(null, `${baseName}-${uniqueSuffix}${fileExt}`);
-    }
-  });
-
-  const upload = multer({ storage: storage });
-
-  app.post('/api/upload', upload.single('file'), (req, res) => {
+  app.post('/api/upload', upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'Nenhum arquivo enviado' });
       }
-      const fileUrl = `/uploads/${req.file.filename}`;
-      res.json({ url: fileUrl });
-    } catch (error) {
+
+      const file = req.file;
+      const fileExt = path.extname(file.originalname);
+      const baseName = path.basename(file.originalname, fileExt)
+        .replace(/[^a-zA-Z0-9]/g, '_');
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const filename = `${baseName}-${uniqueSuffix}${fileExt}`;
+
+      const { data, error } = await supabaseAdmin.storage
+        .from('materials')
+        .upload(filename, file.buffer, {
+          contentType: file.mimetype,
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('[Supabase Storage] Upload error:', error);
+        return res.status(500).json({ error: 'Erro ao fazer upload no Supabase Storage: ' + error.message });
+      }
+
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from('materials')
+        .getPublicUrl(filename);
+
+      res.json({ url: publicUrl });
+    } catch (error: any) {
       console.error('[POST /api/upload] Error:', error);
-      res.status(500).json({ error: 'Erro ao fazer upload do arquivo' });
+      res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + error.message });
     }
   });
 
