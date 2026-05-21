@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Trophy, Medal, Crown, Loader2 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
+import { calculateLevelAndProgression } from '../utils/xpUtils';
 
 interface LeaderboardProps {
   user: UserProfile;
@@ -201,7 +202,7 @@ export default function Leaderboard({ user }: LeaderboardProps) {
                     </div>
                     <div>
                       <p className={`font-bold tracking-tight ${isMe ? 'text-brand-primary' : 'text-text-main'}`}>{entry.name || 'Estudante'} {isMe && '(Você)'}</p>
-                      <p className="text-[10px] font-bold text-text-secondary opacity-50 mt-0.5">Nível {entry.level || 0}</p>
+                      <p className="text-[10px] font-bold text-text-secondary opacity-50 mt-0.5">Nível {calculateLevelAndProgression(entry.xp || 0).level}</p>
                     </div>
                   </div>
                   <div className="text-right">

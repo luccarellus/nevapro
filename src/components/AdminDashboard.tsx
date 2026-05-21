@@ -1368,7 +1368,7 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                                 </div>
                               </td>
                               <td className="py-6 text-right pr-4">
-                                <span className="text-xl font-black text-text-main">{student.level}</span>
+                                <span className="text-xl font-black text-text-main">{calculateLevelAndProgression(student.xp || 0).level}</span>
                               </td>
                             </tr>
                           ))}
@@ -1427,7 +1427,7 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                            </div>
                            <div className="text-right shrink-0">
                               <div className="text-[9px] font-black text-text-secondary uppercase tracking-[0.2em] opacity-40 mb-1 leading-none">Nível</div>
-                              <div className="text-2xl font-black text-text-main leading-none">{student.level}</div>
+                              <div className="text-2xl font-black text-text-main leading-none">{calculateLevelAndProgression(student.xp || 0).level}</div>
                            </div>
                          </div>
                          

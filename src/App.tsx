@@ -42,6 +42,16 @@ export default function App() {
     streak: 0,
     role: 'student'
   });
+  const [isSimulationActive, setIsSimulationActive] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  const handleTabChange = (newTab: string) => {
+    if (isSimulationActive) {
+      setPendingTab(newTab);
+    } else {
+      setActiveTab(newTab);
+    }
+  };
 
   useEffect(() => {
     initConsentMode();
@@ -123,6 +133,10 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    if (isSimulationActive) {
+      setPendingTab('logout');
+      return;
+    }
     await supabase.auth.signOut();
     localStorage.removeItem('neva_student_session');
     setIsLoggedIn(false);
@@ -163,20 +177,28 @@ export default function App() {
   };
 
   const renderContent = () => {
-    if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => setActiveTab('dashboard')} />;
-    if (activeTab === 'cookies') return <CookiePolicy onBack={() => setActiveTab('dashboard')} />;
+    if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => handleTabChange('dashboard')} />;
+    if (activeTab === 'cookies') return <CookiePolicy onBack={() => handleTabChange('dashboard')} />;
 
     if (!isLoggedIn) {
-      return <Login onLogin={handleLogin} onTabChange={setActiveTab} />;
+      return <Login onLogin={handleLogin} onTabChange={handleTabChange} />;
     }
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard user={user} onTabChange={setActiveTab} onEarnXp={handleEarnXp} />;
+        return <Dashboard user={user} onTabChange={handleTabChange} onEarnXp={handleEarnXp} />;
       case 'questions':
         return <Questions onEarnXp={handleEarnXp} user={user} />;
       case 'simulados':
-        return <Simulados onEarnXp={handleEarnXp} user={user} />;
+        return (
+          <Simulados 
+            onEarnXp={handleEarnXp} 
+            user={user} 
+            onSimulationActiveChange={setIsSimulationActive}
+            pendingTab={pendingTab}
+            onCancelExit={() => setPendingTab(null)}
+          />
+        );
       case 'ranking':
         return <Leaderboard user={user} />;
       case 'materiais':
@@ -186,9 +208,9 @@ export default function App() {
       case 'calendar':
         return <Calendar />;
       case 'admin':
-        return user.role === 'admin' ? <AdminDashboard user={user} onBackToApp={() => setActiveTab('dashboard')} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
+        return user.role === 'admin' ? <AdminDashboard user={user} onBackToApp={() => handleTabChange('dashboard')} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
       case 'profile':
-        return <Settings user={user} onUpdateUser={setUser} onClose={() => setActiveTab('dashboard')} />;
+        return <Settings user={user} onUpdateUser={setUser} onClose={() => handleTabChange('dashboard')} />;
       default:
         return <Dashboard user={user} onEarnXp={handleEarnXp} />;
     }
@@ -204,12 +226,12 @@ export default function App() {
             isDarkMode={isDarkMode} 
             toggleDarkMode={toggleDarkMode} 
             isAdmin={user.role === 'admin'} 
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             userEmail={user.email}
           />
           <Navigation 
             activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
+            setActiveTab={handleTabChange} 
             isAdmin={user.role === 'admin'} 
             onLogout={handleLogout}
           />
