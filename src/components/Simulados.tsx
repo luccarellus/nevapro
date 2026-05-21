@@ -14,6 +14,7 @@ interface SimuladosProps {
   onSimulationActiveChange?: (isActive: boolean) => void;
   pendingTab?: string | null;
   onCancelExit?: () => void;
+  onConfirmExit?: () => void;
 }
 
 export default function Simulados({ 
@@ -21,7 +22,8 @@ export default function Simulados({
   user,
   onSimulationActiveChange,
   pendingTab,
-  onCancelExit
+  onCancelExit,
+  onConfirmExit
 }: SimuladosProps) {
   const [view, setView] = useState<'selection' | 'simulation' | 'result'>('selection');
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -172,6 +174,56 @@ export default function Simulados({
     }
     setView('result');
   };
+
+  const renderExitConfirmModal = () => (
+    <AnimatePresence>
+      {(showExitConfirm || pendingTab !== null) && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-[#111827] border border-border-color rounded-[32px] p-8 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
+          >
+            <div className="w-16 h-16 bg-red-500/15 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-text-main mb-3 uppercase tracking-tight">
+              Deseja mesmo sair do simulado?
+            </h3>
+            <p className="text-text-secondary text-xs font-bold leading-relaxed mb-8">
+              Se você sair agora, o simulado será finalizado. Suas respostas atuais serão computadas e as não respondidas ficarão em branco. Você poderá ver o seu progresso final de acertos e erros.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  handleFinishSimulation();
+                  setShowExitConfirm(false);
+                  if (pendingTab && onConfirmExit) {
+                    onConfirmExit();
+                  } else if (onCancelExit) {
+                    onCancelExit();
+                  }
+                }}
+                className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-[0.98]"
+              >
+                Finalizar e ver resultados
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  if (onCancelExit) onCancelExit();
+                }}
+                className="w-full bg-text-main/5 hover:bg-text-main/10 text-text-secondary py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all"
+              >
+                Continuar respondendo
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
 
   if (loading) {
     return (
@@ -449,7 +501,8 @@ export default function Simulados({
 
   if (view === 'simulation' && currentQuestion) {
     return (
-      <div className="max-w-4xl mx-auto pt-10 md:pt-24 pb-32 px-4 md:px-6">
+      <>
+        <div className="max-w-4xl mx-auto pt-10 md:pt-24 pb-32 px-4 md:px-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div className="flex flex-wrap items-center gap-3">
              <div className="flex items-center gap-2 bg-brand-primary/10 px-4 py-2 rounded-full ring-1 ring-brand-primary/20">
@@ -650,8 +703,10 @@ export default function Simulados({
           />
         </div>
       </div>
-    );
-  }
+      {renderExitConfirmModal()}
+    </>
+  );
+}
 
   return (
     <>
@@ -775,49 +830,7 @@ export default function Simulados({
         </motion.div>
       </div>
 
-      <AnimatePresence>
-        {(showExitConfirm || pendingTab !== null) && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#111827] border border-border-color rounded-[32px] p-8 max-w-md w-full shadow-2xl relative overflow-hidden text-center"
-            >
-              <div className="w-16 h-16 bg-red-500/15 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle size={32} />
-              </div>
-              <h3 className="text-xl font-black text-text-main mb-3 uppercase tracking-tight">
-                Deseja mesmo sair do simulado?
-              </h3>
-              <p className="text-text-secondary text-xs font-bold leading-relaxed mb-8">
-                Se você sair agora, o simulado será finalizado. Suas respostas atuais serão computadas e as não respondidas ficarão em branco. Você poderá ver o seu progresso final de acertos e erros.
-              </p>
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => {
-                    handleFinishSimulation();
-                    setShowExitConfirm(false);
-                    if (onCancelExit) onCancelExit();
-                  }}
-                  className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-[0.98]"
-                >
-                  Finalizar e ver resultados
-                </button>
-                <button
-                  onClick={() => {
-                    setShowExitConfirm(false);
-                    if (onCancelExit) onCancelExit();
-                  }}
-                  className="w-full bg-text-main/5 hover:bg-text-main/10 text-text-secondary py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all"
-                >
-                  Continuar respondendo
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {renderExitConfirmModal()}
     </>
   );
 }

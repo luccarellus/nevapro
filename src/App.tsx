@@ -143,6 +143,21 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const handleConfirmExit = async () => {
+    setIsSimulationActive(false);
+    if (pendingTab) {
+      if (pendingTab === 'logout') {
+        await supabase.auth.signOut();
+        localStorage.removeItem('neva_student_session');
+        setIsLoggedIn(false);
+        setActiveTab('dashboard');
+      } else {
+        setActiveTab(pendingTab);
+      }
+      setPendingTab(null);
+    }
+  };
+
   const handleEarnXp = async (amount: number, correctIncrement?: number, answeredIncrement?: number, isFlashQuiz?: boolean) => {
     const currentXp = user.xp || 0;
     const newXp = currentXp + amount;
@@ -197,6 +212,7 @@ export default function App() {
             onSimulationActiveChange={setIsSimulationActive}
             pendingTab={pendingTab}
             onCancelExit={() => setPendingTab(null)}
+            onConfirmExit={handleConfirmExit}
           />
         );
       case 'ranking':
