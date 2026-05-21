@@ -906,60 +906,70 @@ export const app = express();
   });
 
   // EVENTOS
-  const EVENTOS_FILE = process.env.VERCEL ? '/tmp/eventos.json' : path.join(process.cwd(), 'eventos.json');
-
-  const getEventosList = (): any[] => {
-    try {
-      if (!fs.existsSync(EVENTOS_FILE)) {
-        const initial: any[] = [];
-        fs.writeFileSync(EVENTOS_FILE, JSON.stringify(initial, null, 2), 'utf-8');
-        return initial;
-      }
-      const content = fs.readFileSync(EVENTOS_FILE, 'utf-8');
-      return JSON.parse(content);
-    } catch (err) {
-      console.error('Error reading eventos.json, returning empty list:', err);
-      return [];
-    }
-  };
-
-  const saveEventosList = (list: any[]) => {
-    try {
-      fs.writeFileSync(EVENTOS_FILE, JSON.stringify(list, null, 2), 'utf-8');
-    } catch (err) {
-      console.error('Error writing to eventos.json:', err);
-    }
-  };
-
   app.get('/api/eventos', async (req, res) => {
     try {
-      res.json(getEventosList());
+      const { data, error } = await supabaseAdmin
+        .from('eventos')
+        .select('*')
+        .order('date', { ascending: true });
+      if (error) throw error;
+      
+      const mapped = (data || []).map(evt => ({
+        id: evt.id,
+        title: evt.title,
+        description: evt.description,
+        date: evt.date,
+        time: evt.time,
+        type: evt.type,
+        category: evt.category,
+        questionsCount: evt.questions_count,
+        xpReward: evt.xp_reward,
+        observation: evt.observation
+      }));
+      res.json(mapped);
     } catch (err) {
+      console.error('[GET /api/eventos] Error:', err);
       res.json([]);
     }
   });
 
   app.post('/api/eventos', async (req, res) => {
     try {
-      const list = getEventosList();
-      const newEvent = {
-        id: crypto.randomUUID(),
+      const dbRecord = {
         title: req.body.title,
         description: req.body.description || '',
         date: req.body.date,
         time: req.body.time || '',
-        type: req.body.type || 'outros',
-        category: req.body.category || 'Outros',
-        questionsCount: req.body.questionsCount,
-        xpReward: req.body.xpReward,
+        type: req.body.type || 'evento',
+        category: req.body.category || 'Evento',
+        questions_count: req.body.questionsCount,
+        xp_reward: req.body.xpReward || 0,
         observation: req.body.observation || ''
       };
       
-      list.push(newEvent);
-      saveEventosList(list);
+      const { data, error } = await supabaseAdmin
+        .from('eventos')
+        .insert([dbRecord])
+        .select()
+        .single();
+        
+      if (error) throw error;
       
-      await addNotification('Novo Evento', `${req.body.title}`, 'evento', { id: newEvent.id });
-      res.status(201).json(newEvent);
+      const mapped = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        date: data.date,
+        time: data.time,
+        type: data.type,
+        category: data.category,
+        questionsCount: data.questions_count,
+        xpReward: data.xp_reward,
+        observation: data.observation
+      };
+      
+      await addNotification('Novo Evento', `${req.body.title}`, 'evento', { id: data.id });
+      res.status(201).json(mapped);
     } catch (err: any) {
       console.error('[POST /api/eventos] Failed to insert event:', err);
       res.status(500).json({ error: 'Failed to insert evento', details: err?.message || err });
@@ -968,36 +978,55 @@ export const app = express();
 
   app.delete('/api/eventos/:id', async (req, res) => {
     try {
-      const list = getEventosList();
-      const filtered = list.filter(evt => evt.id !== req.params.id);
-      saveEventosList(filtered);
+      const { error } = await supabaseAdmin
+        .from('eventos')
+        .delete()
+        .eq('id', req.params.id);
+      if (error) throw error;
       res.status(204).end();
     } catch (err) {
+      console.error('[DELETE /api/eventos/:id] Error:', err);
       res.status(500).json({ error: 'Failed to delete event' });
     }
   });
 
   app.put('/api/eventos/:id', async (req, res) => {
     try {
-      const list = getEventosList();
-      const index = list.findIndex(evt => evt.id === req.params.id);
-      if (index === -1) return res.status(404).json({ error: 'Event not found' });
-      
-      list[index] = {
-        ...list[index],
+      const dbRecord = {
         title: req.body.title,
         description: req.body.description || '',
         date: req.body.date,
         time: req.body.time || '',
-        type: req.body.type || list[index].type,
-        category: req.body.category || list[index].category,
-        questionsCount: req.body.questionsCount,
-        xpReward: req.body.xpReward,
+        type: req.body.type || 'evento',
+        category: req.body.category || 'Evento',
+        questions_count: req.body.questionsCount,
+        xp_reward: req.body.xpReward || 0,
         observation: req.body.observation || ''
       };
       
-      saveEventosList(list);
-      res.json(list[index]);
+      const { data, error } = await supabaseAdmin
+        .from('eventos')
+        .update(dbRecord)
+        .eq('id', req.params.id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      const mapped = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        date: data.date,
+        time: data.time,
+        type: data.type,
+        category: data.category,
+        questionsCount: data.questions_count,
+        xpReward: data.xp_reward,
+        observation: data.observation
+      };
+      
+      res.json(mapped);
     } catch (err: any) {
       console.error('[PUT /api/eventos/:id] Failed to update event:', err);
       res.status(500).json({ error: 'Failed to update event', details: err?.message });
@@ -1041,6 +1070,13 @@ export const app = express();
       const buffer = Buffer.from(await response.arrayBuffer());
       res.send(buffer);
     } catch (error) { res.status(500).send('Proxy error'); }
+  });
+
+  // LGPD Consent log endpoint
+  app.post('/api/lgpd/consent-log', (req, res) => {
+    // Retorna 200 OK para evitar erro de 404 no console do navegador
+    console.log('[LGPD] Consent preferences received:', req.body);
+    res.json({ success: true });
   });
 
   async function initVite() {
