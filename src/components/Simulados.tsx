@@ -64,7 +64,7 @@ export default function Simulados({
         setTimer(prev => prev - 1);
       }, 1000); // Decréscimo a cada segundo para o cronômetro realista do ENEM!
     } else if (view === 'simulation' && timer === 0) {
-      handleFinishSimulation();
+      handleFinishSimulation(true);
     }
     return () => clearInterval(interval);
   }, [view, timer]);
@@ -153,7 +153,7 @@ export default function Simulados({
     }));
   };
 
-  const handleFinishSimulation = () => {
+  const handleFinishSimulation = (isCompleted: boolean = false) => {
     let correctOnes = 0;
     questions.forEach((q, idx) => {
       if (userAnswers[idx] === q.correctOptionIndex) {
@@ -163,7 +163,14 @@ export default function Simulados({
 
     setScore(correctOnes);
     if (selectedSim) {
-      onEarnXp(selectedSim.xpReward, correctOnes, questions.length || selectedSim.totalQuestions || 90);
+      const totalQ = questions.length || selectedSim.totalQuestions || 90;
+      // Se finalizou por completo, ganha o xpReward total do simulado.
+      // Se saiu antes, ganha XP proporcional aos acertos em relação ao total de questões.
+      const xpEarned = isCompleted
+        ? selectedSim.xpReward
+        : Math.round((correctOnes / totalQ) * selectedSim.xpReward);
+
+      onEarnXp(xpEarned, correctOnes, totalQ);
       const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;
       localStorage.setItem(`neva_sim_result_${selectedSim.id}_${selectedYear}`, JSON.stringify({
         questions,
@@ -686,7 +693,7 @@ export default function Simulados({
             </button>
           ) : (
             <button
-              onClick={handleFinishSimulation}
+              onClick={() => handleFinishSimulation(true)}
               className="px-10 py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
             >
               Finalizar Simulado
