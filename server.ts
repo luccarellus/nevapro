@@ -511,7 +511,7 @@ app.post('/api/user/profile', async (req, res) => {
       await supabaseAdmin.from('xp_logs').insert([{
         user_id: userId,
         amount: xpDiff,
-        reason: isFlashQuizUpdate ? 'Flash Quiz: Maranhão' : 'Conclusão de Simulado / Atividade',
+        reason: updateData.xpReason || (isFlashQuizUpdate ? 'Flash Quiz: Maranhão' : 'Conclusão de Simulado / Atividade'),
         created_at: new Date().toISOString()
       }]);
     }
@@ -1178,16 +1178,14 @@ app.get('/api/questoes', async (req, res) => {
 });
 
 app.post('/api/answers', async (req, res) => {
-  const { userId, questionId, isCorrect, xpReward } = req.body;
+  const { userId, questionId, isCorrect } = req.body;
   try {
     await supabaseAdmin.from('answers').insert([{ user_id: userId, question_id: questionId, is_correct: isCorrect, created_at: new Date().toISOString() }]);
-    if (isCorrect) {
-      await supabaseAdmin.from('xp_logs').insert([{ user_id: userId, amount: xpReward, reason: `Questão: ${questionId}`, created_at: new Date().toISOString() }]);
-      const { data: user } = await supabaseAdmin.from('users').select('xp').eq('id', userId).single();
-      if (user) await supabaseAdmin.from('users').update({ xp: (user.xp || 0) + xpReward }).eq('id', userId);
-    }
     res.json({ success: true });
-  } catch (err) { res.json({ success: true }); }
+  } catch (err) {
+    console.error('[POST /api/answers] Error logging answer:', err);
+    res.json({ success: true });
+  }
 });
 
 app.get('/api/imagem', async (req, res) => {

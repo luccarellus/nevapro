@@ -34,6 +34,7 @@ export interface UserProfile {
   browserNotifications?: boolean;
   isFlashQuizUpdate?: boolean;
   flashQuizCompleted?: boolean;
+  xpReason?: string;
 }
 
 export interface Notice {

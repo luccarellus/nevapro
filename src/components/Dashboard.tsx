@@ -12,7 +12,7 @@ import confetti from 'canvas-confetti';
 interface DashboardProps {
   user: UserProfile;
   onTabChange?: (tab: string) => void;
-  onEarnXp?: (amount: number, correct?: number, answered?: number, isFlashQuiz?: boolean) => void;
+  onEarnXp?: (amount: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
 }
 
 const WEEKLY_DATA = [
@@ -149,7 +149,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     setDailyChallengeDone(true);
     setShowQuiz(false);
     if (onEarnXp) {
-      onEarnXp(50, 1, 1, true);
+      onEarnXp(50, 1, 1, true, 'Flash Quiz: Maranhão');
     }
   };
 
@@ -200,7 +200,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
             <motion.div 
               variants={itemVariants}
-              className="bg-bg-card/40 backdrop-blur-xl rounded-[40px] p-8 md:p-12 md:col-span-8 lg:col-span-8 relative overflow-hidden group border border-border-color shadow-2xl shadow-black/5"
+              className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-12 md:col-span-8 lg:col-span-8 relative overflow-hidden group border border-border-color shadow-2xl shadow-black/5"
             >
             <div className="relative z-10">
               <div className="flex flex-col lg:flex-row justify-between items-start mb-12 gap-8">
@@ -232,11 +232,11 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-1 md:grid-cols-4 md:col-span-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-1 md:grid-cols-2 md:col-span-4 gap-6">
             <motion.div 
               variants={itemVariants} 
               whileHover={{ y: -5 }}
-              className="bg-bg-card/40 backdrop-blur-xl rounded-[40px] p-8 relative overflow-hidden group transition-all border border-border-color shadow-2xl shadow-black/5 flex flex-col justify-between h-full"
+              className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 relative overflow-hidden group transition-all border border-border-color shadow-2xl shadow-black/5 flex flex-col justify-between h-full"
             >
               <div className="bg-orange-500/10 w-12 h-12 flex items-center justify-center rounded-2xl text-orange-500 mb-6 group-hover:scale-110 transition-transform">
                 <Flame size={24} />
@@ -250,7 +250,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
             <motion.div 
               variants={itemVariants}
               whileHover={{ y: -5 }}
-              className="bg-bg-card/40 backdrop-blur-xl rounded-[40px] p-8 relative overflow-hidden group transition-all border border-border-color shadow-2xl shadow-black/5 flex flex-col justify-between h-full"
+              className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 relative overflow-hidden group transition-all border border-border-color shadow-2xl shadow-black/5 flex flex-col justify-between h-full"
             >
               <div className="bg-blue-500/10 w-12 h-12 flex items-center justify-center rounded-2xl text-blue-500 mb-6 group-hover:scale-110 transition-transform">
                 <Award size={24} />
@@ -268,7 +268,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
           {/* Daily Challenge Interactive Card */}
           <motion.div 
             variants={itemVariants}
-            className="lg:col-span-7 bg-brand-primary/5 border border-brand-primary/20 rounded-[40px] p-8 md:p-10 relative overflow-hidden group"
+            className="lg:col-span-7 bg-brand-primary/5 border border-brand-primary/20 rounded-3xl md:rounded-[40px] p-6 md:p-10 relative overflow-hidden group"
           >
             <div className="relative z-10">
               {!dailyChallengeDone ? (
@@ -389,7 +389,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
           {/* Ranking Teaser Card */}
           <motion.div 
             variants={itemVariants}
-            className="lg:col-span-5 bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[40px] p-8 md:p-10 relative overflow-hidden group flex flex-col justify-between"
+            className="lg:col-span-5 bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-3xl md:rounded-[40px] p-6 md:p-10 relative overflow-hidden group flex flex-col justify-between"
           >
             <div className="flex flex-col h-full justify-between">
               <div>
@@ -538,7 +538,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                   variants={itemVariants}
                   whileHover={{ y: -5, scale: 1.02 }}
                   onClick={() => onTabChange?.('materiais')}
-                  className="bg-bg-card/50 backdrop-blur-xl rounded-[32px] p-8 group transition-all cursor-pointer shadow-xl shadow-black/5 border border-border-color/50"
+                  className="bg-bg-card/50 backdrop-blur-xl rounded-3xl p-6 md:p-8 group transition-all cursor-pointer shadow-xl shadow-black/5 border border-border-color/50"
                 >
                   <div className="flex justify-between items-start mb-10">
                     <div className="bg-text-main/5 p-4 rounded-2xl text-brand-primary group-hover:bg-brand-primary/10 transition-colors">
@@ -575,27 +575,27 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
 
       <AnimatePresence>
         {showDetails && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-bg-card w-full max-w-3xl p-10 rounded-[40px] relative shadow-2xl overflow-hidden"
+              className="bg-bg-card w-full max-w-3xl p-6 sm:p-10 rounded-3xl sm:rounded-[40px] relative shadow-2xl overflow-y-auto max-h-[90vh]"
             >
               <button 
                 onClick={() => setShowDetails(false)}
-                className="absolute top-8 right-8 p-3 text-text-secondary hover:text-text-main transition-colors bg-text-main/5 rounded-full hover:bg-text-main/10"
+                className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2.5 sm:p-3 text-text-secondary hover:text-text-main transition-colors bg-text-main/5 rounded-full hover:bg-text-main/10"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
 
-              <div className="mb-10">
+              <div className="mb-6 sm:mb-10 pr-8">
                 <span className="text-brand-primary text-[10px] font-bold mb-2 block">Análise de desempenho</span>
-                <h2 className="text-4xl font-black text-text-main tracking-tight">Evolução semanal</h2>
-                <p className="text-text-secondary font-medium">Acompanhe seu ganho de XP e frequência de estudos.</p>
+                <h2 className="text-3xl sm:text-4xl font-black text-text-main tracking-tight">Evolução semanal</h2>
+                <p className="text-text-secondary font-medium text-xs sm:text-sm">Acompanhe seu ganho de XP e frequência de estudos.</p>
               </div>
 
-              <div className="h-72 w-full mb-10 min-h-[288px]">
+              <div className="h-48 sm:h-72 w-full mb-6 sm:mb-10 min-h-[192px] sm:min-h-[288px]">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <AreaChart data={stats.weekly}>
                     <defs>
@@ -638,18 +638,18 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                 </ResponsiveContainer>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-6 bg-bg-main/50 rounded-3xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 sm:p-6 bg-bg-main/50 rounded-2xl sm:rounded-3xl">
                   <p className="text-[10px] font-bold text-text-secondary mb-1">Média diária</p>
-                  <p className="text-2xl font-black text-text-main">{stats.summary.average} <span className="text-text-secondary text-sm">XP</span></p>
+                  <p className="text-xl sm:text-2xl font-black text-text-main">{stats.summary.average} <span className="text-text-secondary text-xs sm:text-sm">XP</span></p>
                 </div>
-                <div className="p-6 bg-bg-main/50 rounded-3xl">
+                <div className="p-4 sm:p-6 bg-bg-main/50 rounded-2xl sm:rounded-3xl">
                   <p className="text-[10px] font-bold text-text-secondary mb-1">Melhor dia</p>
-                  <p className="text-2xl font-black text-text-main">{stats.summary.best} <span className="text-text-secondary text-sm">XP</span></p>
+                  <p className="text-xl sm:text-2xl font-black text-text-main">{stats.summary.best} <span className="text-text-secondary text-xs sm:text-sm">XP</span></p>
                 </div>
-                <div className="p-6 bg-brand-primary rounded-3xl shadow-lg shadow-brand-primary/20">
+                <div className="p-4 sm:p-6 bg-brand-primary rounded-2xl sm:rounded-3xl shadow-lg shadow-brand-primary/20">
                   <p className="text-[10px] font-bold text-white/70 mb-1">Total semana</p>
-                  <p className="text-2xl font-black text-white">{stats.summary.total >= 1000 ? (stats.summary.total / 1000).toFixed(1) + 'k' : stats.summary.total} <span className="text-white/70 text-sm">XP</span></p>
+                  <p className="text-xl sm:text-2xl font-black text-white">{stats.summary.total >= 1000 ? (stats.summary.total / 1000).toFixed(1) + 'k' : stats.summary.total} <span className="text-white/70 text-xs sm:text-sm">XP</span></p>
                 </div>
               </div>
             </motion.div>

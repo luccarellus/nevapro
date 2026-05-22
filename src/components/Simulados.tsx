@@ -9,7 +9,7 @@ import { enemService } from '../services/enemService';
 import { ClipboardList, Clock, ArrowRight, Loader2, Award, Check, X, Info, ChevronDown, AlertTriangle } from 'lucide-react';
 
 interface SimuladosProps {
-  onEarnXp: (xp: number, correct?: number, answered?: number) => void;
+  onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
   user: UserProfile;
   onSimulationActiveChange?: (isActive: boolean) => void;
   pendingTab?: string | null;
@@ -170,7 +170,7 @@ export default function Simulados({
         ? selectedSim.xpReward
         : Math.round((correctOnes / totalQ) * selectedSim.xpReward);
 
-      onEarnXp(xpEarned, correctOnes, totalQ);
+      onEarnXp(xpEarned, correctOnes, totalQ, false, `Simulado: ${selectedSim.title}`);
       const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;
       localStorage.setItem(`neva_sim_result_${selectedSim.id}_${selectedYear}`, JSON.stringify({
         questions,
@@ -267,30 +267,30 @@ export default function Simulados({
           <h2 className="text-3xl font-black text-text-main tracking-tight mb-2">Simulado finalizado</h2>
           <p className="text-text-secondary font-bold text-[10px] mb-10 opacity-60 uppercase tracking-wider">Confira seu desempenho global</p>
           
-          <div className="flex flex-wrap justify-center gap-6 md:gap-10 mb-10">
+          <div className="grid grid-cols-2 min-[480px]:grid-cols-3 sm:flex sm:flex-wrap justify-center items-center gap-6 md:gap-10 mb-10">
             <div className="text-center min-w-[80px]">
               <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50 uppercase tracking-wider">Acertos</p>
-              <p className="text-4xl font-black text-brand-primary">{score}</p>
+              <p className="text-3xl sm:text-4xl font-black text-brand-primary">{score}</p>
             </div>
             <div className="bg-border-color w-[1px] h-12 my-auto hidden sm:block" />
             <div className="text-center min-w-[80px]">
               <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50 uppercase tracking-wider">Erros</p>
-              <p className="text-4xl font-black text-red-500">{wrongAnswersCount}</p>
+              <p className="text-3xl sm:text-4xl font-black text-red-500">{wrongAnswersCount}</p>
             </div>
             <div className="bg-border-color w-[1px] h-12 my-auto hidden sm:block" />
             <div className="text-center min-w-[80px]">
               <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50 uppercase tracking-wider">Em Branco</p>
-              <p className="text-4xl font-black text-zinc-400">{blankAnswersCount}</p>
+              <p className="text-3xl sm:text-4xl font-black text-zinc-400">{blankAnswersCount}</p>
             </div>
             <div className="bg-border-color w-[1px] h-12 my-auto hidden sm:block" />
             <div className="text-center min-w-[80px]">
               <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50 uppercase tracking-wider">Total</p>
-              <p className="text-4xl font-black text-text-main">{totalQuestions}</p>
+              <p className="text-3xl sm:text-4xl font-black text-text-main">{totalQuestions}</p>
             </div>
             <div className="bg-border-color w-[1px] h-12 my-auto hidden sm:block" />
             <div className="text-center min-w-[80px]">
               <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50 uppercase tracking-wider">Desempenho</p>
-              <p className="text-4xl font-black text-blue-500">{totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0}%</p>
+              <p className="text-3xl sm:text-4xl font-black text-blue-500">{totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0}%</p>
             </div>
           </div>
 
@@ -316,7 +316,7 @@ export default function Simulados({
             </p>
 
             {/* Grid of question numbers */}
-            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2.5 mb-10">
+            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-1.5 sm:gap-2.5 mb-10">
               {questions.map((q, idx) => {
                 const answer = userAnswers[idx];
                 const isCorrect = answer === q.correctOptionIndex;
@@ -336,7 +336,7 @@ export default function Simulados({
                   <button
                     key={idx}
                     onClick={() => setSelectedReviewIndex(idx)}
-                    className={`h-11 rounded-xl font-black text-xs border transition-all duration-200 select-none ${statusClass} ${
+                    className={`h-9 sm:h-11 rounded-lg sm:rounded-xl font-black text-xs border transition-all duration-200 select-none ${statusClass} ${
                       isSelected ? 'ring-2 ring-brand-primary scale-105 shadow-md shadow-brand-primary/10' : ''
                     }`}
                   >
@@ -447,14 +447,14 @@ export default function Simulados({
                       if (isCorrectOption) {
                         optStyle = "bg-brand-primary/10 border-brand-primary ring-1 ring-brand-primary";
                         badge = (
-                          <span className="ml-auto text-[9px] font-black text-brand-primary uppercase tracking-wider flex items-center gap-1">
+                          <span className="ml-auto text-[9px] font-black text-brand-primary uppercase tracking-wider flex items-center gap-1 shrink-0">
                             <Check size={12} /> Gabarito
                           </span>
                         );
                       } else if (isSelected && !isCorrectOption) {
                         optStyle = "bg-red-500/10 border-red-500 ring-1 ring-red-500";
                         badge = (
-                          <span className="ml-auto text-[9px] font-black text-red-500 uppercase tracking-wider flex items-center gap-1">
+                          <span className="ml-auto text-[9px] font-black text-red-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
                             <X size={12} /> Sua Resposta
                           </span>
                         );
@@ -463,9 +463,9 @@ export default function Simulados({
                       return (
                         <div
                           key={optIdx}
-                          className={`w-full p-5 rounded-2xl border text-left flex flex-col gap-3.5 transition-all ${optStyle}`}
+                          className={`w-full p-4 sm:p-5 rounded-2xl border text-left flex flex-col gap-3.5 transition-all ${optStyle}`}
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3 sm:gap-4">
                             <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
                               isCorrectOption 
                               ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20' 
@@ -476,7 +476,7 @@ export default function Simulados({
                               {String.fromCharCode(65 + optIdx)}
                             </span>
                             {option && (
-                              <span className="font-bold text-xs md:text-sm text-text-main leading-snug">
+                              <span className="font-bold text-xs md:text-sm text-text-main leading-snug flex-1">
                                 {option}
                               </span>
                             )}
@@ -484,7 +484,7 @@ export default function Simulados({
                           </div>
 
                           {optionImage && (
-                            <div className="ml-12 rounded-xl overflow-hidden max-w-full md:max-w-xs bg-bg-sidebar p-2 ring-1 ring-border-color">
+                            <div className="ml-0 sm:ml-12 rounded-xl overflow-hidden max-w-full md:max-w-xs bg-bg-sidebar p-2 ring-1 ring-border-color">
                               <img 
                                 src={optionImage} 
                                 alt={`Opção ${String.fromCharCode(65 + optIdx)}`}
@@ -509,9 +509,9 @@ export default function Simulados({
   if (view === 'simulation' && currentQuestion) {
     return (
       <>
-        <div className="max-w-4xl mx-auto pt-10 md:pt-24 pb-32 px-4 md:px-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="max-w-4xl mx-auto pt-6 sm:pt-24 pb-20 sm:pb-32 px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 w-full">
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
              <div className="flex items-center gap-2 bg-brand-primary/10 px-4 py-2 rounded-full ring-1 ring-brand-primary/20">
                <div className="w-2 h-2 rounded-full bg-brand-primary animate-pulse" />
                <span className="text-[10px] font-bold text-brand-primary leading-none">Simulado ativo</span>
@@ -524,14 +524,14 @@ export default function Simulados({
                <span className="text-[9px] uppercase tracking-wider opacity-80 font-extrabold">restantes</span>
              </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
             <button
               onClick={() => setShowExitConfirm(true)}
               className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-xl text-red-500 font-black text-[10px] uppercase tracking-widest transition-all duration-200"
             >
               Sair do Simulado
             </button>
-            <span className="text-[11px] font-black text-text-secondary uppercase tracking-tighter">
+            <span className="text-[11px] font-black text-text-secondary uppercase tracking-tighter shrink-0">
               Questão <span className="text-text-main text-sm">{currentIndex + 1}</span> de <span className="opacity-40">{questions.length}</span>
             </span>
           </div>
@@ -623,14 +623,14 @@ export default function Simulados({
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(index)}
-                    className={`w-full text-left p-5 md:p-6 rounded-[24px] border-transparent transition-all duration-300 flex flex-col gap-4 group/opt ${
+                    className={`w-full text-left p-4 sm:p-5 md:p-6 rounded-[24px] border-transparent transition-all duration-300 flex flex-col gap-3 sm:gap-4 group/opt ${
                       isSelected 
                       ? 'bg-brand-primary/10 ring-2 ring-brand-primary shadow-lg shadow-brand-primary/5' 
                       : 'bg-text-main/5 hover:bg-text-main/10'
                     }`}
                   >
-                    <div className="flex items-start md:items-center gap-4 md:gap-5">
-                      <span className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center font-black text-xs md:text-sm shrink-0 transition-all ${
+                    <div className="flex items-start md:items-center gap-3 sm:gap-4 md:gap-5">
+                      <span className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center font-black text-xs md:text-sm shrink-0 transition-all ${
                         isSelected 
                         ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20 scale-105 md:scale-110' 
                         : 'bg-text-main/10 text-text-secondary group-hover/opt:text-text-main'
@@ -645,7 +645,7 @@ export default function Simulados({
                     </div>
                     
                     {optionImage && (
-                      <div className="ml-12 md:ml-14 rounded-xl overflow-hidden max-w-full md:max-w-md bg-bg-sidebar p-2 md:p-3 ring-1 ring-border-color">
+                      <div className="ml-0 sm:ml-12 md:ml-14 rounded-xl overflow-hidden max-w-full md:max-w-md bg-bg-sidebar p-2 md:p-3 ring-1 ring-border-color">
                         <img 
                           src={optionImage} 
                           alt={`Opção ${String.fromCharCode(65 + index)}`}
@@ -673,28 +673,26 @@ export default function Simulados({
           </div>
         </motion.div>
 
-        <div className="flex gap-4">
+        <div className="flex justify-between items-center gap-4">
           <button
             onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
             disabled={currentIndex === 0}
-            className="px-8 py-5 bg-text-main/5 border border-border-color rounded-2xl text-text-secondary font-black text-xs uppercase tracking-widest disabled:opacity-30 transition-all hover:bg-text-main/10"
+            className="px-6 sm:px-8 py-4 sm:py-5 bg-text-main/5 border border-border-color rounded-2xl text-text-secondary font-black text-xs uppercase tracking-widest disabled:opacity-30 transition-all hover:bg-text-main/10"
           >
             Anterior
           </button>
-          
-          <div className="flex-1" />
 
           {currentIndex < questions.length - 1 ? (
             <button
               onClick={() => setCurrentIndex(prev => prev + 1)}
-              className="px-10 py-5 bg-text-main/5 border border-border-color rounded-2xl text-brand-primary font-black text-xs uppercase tracking-widest transition-all hover:bg-brand-primary/10"
+              className="px-6 sm:px-10 py-4 sm:py-5 bg-text-main/5 border border-border-color rounded-2xl text-brand-primary font-black text-xs uppercase tracking-widest transition-all hover:bg-brand-primary/10"
             >
               Próxima
             </button>
           ) : (
             <button
               onClick={() => handleFinishSimulation(true)}
-              className="px-10 py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
+              className="px-6 sm:px-10 py-4 sm:py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
             >
               Finalizar Simulado
             </button>
@@ -717,125 +715,125 @@ export default function Simulados({
 
   return (
     <>
-      <div className="max-w-6xl mx-auto pt-24 pb-32 px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <header className="mb-12 text-center">
-            <span className="text-brand-primary text-[10px] font-black tracking-[0.3em] uppercase mb-2 block">AVALIAÇÃO</span>
-            <h1 className="text-4xl font-black text-text-main tracking-tight mb-3">Simulados Oficiais</h1>
-            <p className="text-text-secondary font-medium">Prepare-se com testes nos moldes reais do ENEM e cronometragem oficial.</p>
-            {error && <div className="mt-4 p-4 bg-red-500/10 text-red-500 rounded-2xl font-bold text-sm uppercase tracking-widest ring-1 ring-red-500/20">{error}</div>}
-          </header>
+    <div className="max-w-6xl mx-auto pt-16 sm:pt-24 pb-20 sm:pb-32 px-4 sm:px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <header className="mb-8 sm:mb-12 text-center">
+          <span className="text-brand-primary text-[10px] font-black tracking-[0.3em] uppercase mb-2 block">AVALIAÇÃO</span>
+          <h1 className="text-2xl sm:text-4xl font-black text-text-main tracking-tight mb-3">Simulados Oficiais</h1>
+          <p className="text-text-secondary text-xs sm:text-base font-medium">Prepare-se com testes nos moldes reais do ENEM e cronometragem oficial.</p>
+          {error && <div className="mt-4 p-4 bg-red-500/10 text-red-500 rounded-2xl font-bold text-sm uppercase tracking-widest ring-1 ring-red-500/20">{error}</div>}
+        </header>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {MOCK_SIMULADOS.map((sim, i) => {
-              const selectedYear = selectedYears[sim.id] || 2023;
-              const savedResult = resultsCache[`${sim.id}_${selectedYear}`];
-              return (
-                <motion.div
-                  key={sim.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="group bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[40px] p-8 transition-all hover:shadow-[0_20px_50px_rgba(0,176,148,0.05)] relative overflow-hidden"
-                >
-                  <div className="flex justify-between items-start mb-8">
-                    <div className="w-14 h-14 bg-brand-primary/10 text-brand-primary rounded-2xl flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-all">
-                      <ClipboardList size={28} />
-                    </div>
-                    <div className="relative flex items-center select-none">
-                      <select
-                        value={selectedYears[sim.id] || 2023}
-                        onChange={(e) => setSelectedYears(prev => ({ ...prev, [sim.id]: parseInt(e.target.value, 10) }))}
-                        className="pl-5 pr-10 py-2 bg-text-main/5 hover:bg-text-main/10 border-none rounded-full text-[10px] font-black text-text-secondary uppercase tracking-widest cursor-pointer focus:outline-none ring-1 ring-border-color hover:ring-brand-primary/40 focus:ring-brand-primary text-center appearance-none [color-scheme:dark] transition-all duration-200"
-                      >
-                        {ENEM_YEARS.map(year => (
-                          <option 
-                            key={year} 
-                            value={year} 
-                            className="bg-[#111827] text-white dark:bg-[#111827] dark:text-white [data-theme=light]:bg-white [data-theme=light]:text-black font-bold text-xs"
-                          >
-                            ENEM {year}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute right-4 pointer-events-none text-brand-primary/75">
-                        <ChevronDown size={12} className="transition-transform duration-200 group-hover:scale-110" />
-                      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+          {MOCK_SIMULADOS.map((sim, i) => {
+            const selectedYear = selectedYears[sim.id] || 2023;
+            const savedResult = resultsCache[`${sim.id}_${selectedYear}`];
+            return (
+              <motion.div
+                key={sim.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.1 }}
+                className="group bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] sm:rounded-[40px] p-5 sm:p-8 transition-all hover:shadow-[0_20px_50px_rgba(0,176,148,0.05)] relative overflow-hidden"
+              >
+                <div className="flex justify-between items-start mb-6 sm:mb-8">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-brand-primary/10 text-brand-primary rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:bg-brand-primary group-hover:text-white transition-all shrink-0">
+                    <ClipboardList className="w-6 h-6 sm:w-7 sm:h-7" />
+                  </div>
+                  <div className="relative flex items-center select-none ml-2">
+                    <select
+                      value={selectedYears[sim.id] || 2023}
+                      onChange={(e) => setSelectedYears(prev => ({ ...prev, [sim.id]: parseInt(e.target.value, 10) }))}
+                      className="pl-4 sm:pl-5 pr-8 sm:pr-10 py-1.5 sm:py-2 bg-text-main/5 hover:bg-text-main/10 border-none rounded-full text-[9px] sm:text-[10px] font-black text-text-secondary uppercase tracking-wider sm:tracking-widest cursor-pointer focus:outline-none ring-1 ring-border-color hover:ring-brand-primary/40 focus:ring-brand-primary text-center appearance-none [color-scheme:dark] transition-all duration-200"
+                    >
+                      {ENEM_YEARS.map(year => (
+                        <option 
+                          key={year} 
+                          value={year} 
+                          className="bg-[#111827] text-white dark:bg-[#111827] dark:text-white [data-theme=light]:bg-white [data-theme=light]:text-black font-bold text-xs"
+                        >
+                          ENEM {year}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 pointer-events-none text-brand-primary/75">
+                      <ChevronDown size={12} className="transition-transform duration-200 group-hover:scale-110" />
                     </div>
                   </div>
-                  
-                  <h3 className="text-2xl font-black text-text-main mb-3 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">{sim.title}</h3>
-                  <p className="text-text-secondary text-sm mb-8 leading-relaxed font-medium">{sim.description}</p>
-                  
-                  <div className="flex items-center gap-8 mb-10">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-bold text-text-secondary mb-1">Questões</span>
-                      <span className="text-text-main font-black text-xl">{sim.totalQuestions}</span>
+                </div>
+                
+                <h3 className="text-xl sm:text-2xl font-black text-text-main mb-3 uppercase tracking-tight leading-none group-hover:text-brand-primary transition-colors">{sim.title}</h3>
+                <p className="text-text-secondary text-xs sm:text-sm mb-6 sm:mb-8 leading-relaxed font-medium">{sim.description}</p>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-10">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-text-secondary mb-1">Questões</span>
+                    <span className="text-text-main font-black text-lg sm:text-xl">{sim.totalQuestions}</span>
+                  </div>
+                  <div className="flex flex-col text-left sm:text-center order-3 sm:order-2 col-span-2 sm:col-span-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-text-secondary mb-1 sm:justify-center">
+                      <Clock size={12} className="text-brand-primary" />
+                      <span>Duração Oficial</span>
                     </div>
+                    <span className="text-text-main font-black text-lg sm:text-xl block">
+                      {sim.id === 's1' ? '5h 30min' : '5h 00min'}
+                      <span className="text-xs text-text-secondary opacity-50 ml-1.5 font-bold">({sim.durationMinutes} min)</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-right sm:text-right order-2 sm:order-3">
+                    <span className="text-[10px] font-bold text-brand-primary mb-1">Recompensa</span>
+                    <span className="text-brand-primary font-black text-lg sm:text-xl">+{sim.xpReward} <span className="text-xs opacity-70">XP</span></span>
+                  </div>
+                </div>
+
+                {savedResult ? (
+                  <div className="flex items-center gap-2.5 p-3.5 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl mb-6 text-left">
+                    <Award size={18} className="text-brand-primary shrink-0" />
                     <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-text-secondary mb-1">
-                        <Clock size={12} className="text-brand-primary" />
-                        <span>Duração Oficial de Prova</span>
-                      </div>
-                      <span className="text-text-main font-black text-xl">
-                        {sim.id === 's1' ? '5h 30min' : '5h 00min'}
-                        <span className="text-xs text-text-secondary opacity-50 ml-1.5 font-bold">({sim.durationMinutes} min)</span>
+                      <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest opacity-60">Última Tentativa</span>
+                      <span className="text-xs font-black text-brand-primary">
+                        {savedResult.score} / {savedResult.questions?.length || 90} Acertos ({savedResult.questions?.length > 0 ? Math.round((savedResult.score / savedResult.questions.length) * 100) : 0}%)
                       </span>
                     </div>
-                    <div className="flex flex-col ml-auto text-right">
-                      <span className="text-[10px] font-bold text-brand-primary mb-1">Recompensa</span>
-                      <span className="text-brand-primary font-black text-xl">+{sim.xpReward} <span className="text-xs opacity-70">XP</span></span>
-                    </div>
                   </div>
-
-                  {savedResult ? (
-                    <div className="flex items-center gap-2.5 p-3.5 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl mb-6 text-left">
-                      <Award size={18} className="text-brand-primary shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest opacity-60">Última Tentativa</span>
-                        <span className="text-xs font-black text-brand-primary">
-                          {savedResult.score} / {savedResult.questions?.length || 90} Acertos ({savedResult.questions?.length > 0 ? Math.round((savedResult.score / savedResult.questions.length) * 100) : 0}%)
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
-                  
-                  {savedResult ? (
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => handleLoadSavedResult(sim, savedResult)}
-                        className="flex-1 bg-text-main/5 hover:bg-brand-primary/10 border border-border-color hover:border-brand-primary/30 text-text-main hover:text-brand-primary py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-                      >
-                        Revisar Respostas
-                      </button>
-                      <button 
-                        onClick={() => handleStartSimulation(sim)}
-                        className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-                      >
-                        Refazer
-                        <ArrowRight size={14} />
-                      </button>
-                    </div>
-                  ) : (
+                ) : null}
+                
+                {savedResult ? (
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                    <button 
+                      onClick={() => handleLoadSavedResult(sim, savedResult)}
+                      className="flex-1 bg-text-main/5 hover:bg-brand-primary/10 border border-border-color hover:border-brand-primary/30 text-text-main hover:text-brand-primary py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                    >
+                      Revisar Respostas
+                    </button>
                     <button 
                       onClick={() => handleStartSimulation(sim)}
-                      className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                      className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                     >
-                      Começar agora
-                      <ArrowRight size={18} />
+                      Refazer
+                      <ArrowRight size={14} />
                     </button>
-                  )}
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => handleStartSimulation(sim)}
+                    className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                  >
+                    Começar agora
+                    <ArrowRight size={18} />
+                  </button>
+                )}
 
-                  <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-[#00b094]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
-      </div>
+                <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-[#00b094]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </div>
 
       {renderExitConfirmModal()}
     </>

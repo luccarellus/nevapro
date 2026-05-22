@@ -166,24 +166,24 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
   if (!user) return null;
 
   return (
-    <div className="max-w-5xl mx-auto pt-24 pb-32 px-6">
+    <div className="max-w-5xl mx-auto pt-24 pb-32 px-4 md:px-6">
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-bg-card/50 backdrop-blur-xl rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[600px]"
+        className="bg-bg-card/50 backdrop-blur-xl rounded-3xl md:rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[600px]"
       >
         {/* Internal Sidebar */}
-        <div className="w-full md:w-72 bg-bg-sidebar/80 p-8">
-          <h2 className="text-3xl font-black text-text-main mb-12 tracking-tight">Configurações</h2>
+        <div className="w-full md:w-72 bg-bg-sidebar/80 p-6 md:p-8 border-b md:border-b-0 md:border-r border-border-color/30">
+          <h2 className="text-2xl md:text-3xl font-black text-text-main mb-6 md:mb-12 tracking-tight">Configurações</h2>
           
-          <nav className="space-y-1">
+          <nav className="flex flex-row md:flex-col gap-2 overflow-x-auto no-scrollbar pb-3 md:pb-0">
             {sidebarItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id as SettingsTab)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-bold text-sm ${
+                className={`flex-shrink-0 flex items-center gap-2 md:gap-4 px-4 py-3 md:px-5 md:py-4 rounded-2xl transition-all font-bold text-sm ${
                   activeTab === item.id 
-                    ? 'text-[#00b094]' 
+                    ? 'text-[#00b094] bg-[#00b094]/10 md:bg-[#00b094]/5' 
                     : 'text-text-secondary hover:bg-white/5 dark:hover:bg-white/5 hover:bg-black/5 hover:text-text-main'
                 }`}
               >
@@ -197,10 +197,10 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 p-12 relative overflow-y-auto max-h-[80vh]">
+        <div className="flex-1 p-6 md:p-12 relative overflow-y-auto max-h-[80vh] md:max-h-[none]">
           <button 
             onClick={onClose}
-            className="absolute top-10 right-10 text-text-secondary hover:text-text-main transition-all"
+            className="absolute top-6 right-6 md:top-10 md:right-10 text-text-secondary hover:text-text-main transition-all z-10"
           >
             <X size={24} />
           </button>
@@ -342,11 +342,11 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-10 pt-6">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-10 pt-6">
                   <button 
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="bg-[#00b094] hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-bold text-[12px] shadow-lg shadow-[#00b094]/20 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-[#00b094] hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-bold text-[12px] shadow-lg shadow-[#00b094]/20 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSaving ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -357,7 +357,7 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                   </button>
                   <button 
                     onClick={handleReset}
-                    className="text-text-main hover:text-[#00b094] font-bold text-[12px] transition-all"
+                    className="text-text-main hover:text-[#00b094] font-bold text-[12px] transition-all text-center py-2"
                   >
                     Restaurar padrões
                   </button>
@@ -408,11 +408,11 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-10 pt-6">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-10 pt-6">
                   <button 
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="bg-brand-primary hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-lg shadow-brand-primary/20 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
+                    className="bg-brand-primary hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-lg shadow-brand-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {isSaving ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -423,7 +423,7 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                   </button>
                   <button 
                     onClick={handleReset}
-                    className="text-text-secondary hover:text-text-main font-black text-[12px] uppercase tracking-widest transition-all"
+                    className="text-text-secondary hover:text-text-main font-black text-[12px] uppercase tracking-widest transition-all text-center py-2"
                   >
                     Restaurar Padrões
                   </button>

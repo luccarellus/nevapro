@@ -100,29 +100,29 @@ export default function Mural() {
           {/* Sidebar Column */}
           <div className="space-y-6">
             {/* Categories List */}
-            <div className="bg-bg-card/50 backdrop-blur-xl border border-border-color shadow-sm rounded-3xl p-6">
-              <span className="text-[10px] font-bold text-text-secondary opacity-50 mb-6 block">
+            <div className="bg-bg-card/50 backdrop-blur-xl border border-border-color shadow-sm rounded-3xl p-4 md:p-6">
+              <span className="hidden md:block text-[10px] font-bold text-text-secondary opacity-50 mb-6">
                 Categorias
               </span>
-              <div className="space-y-2">
+              <div className="flex flex-row md:flex-col gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setActiveCategory(cat.id as NoticeCategory)}
-                    className={`w-full flex items-start gap-4 p-4 rounded-2xl transition-all text-left ${
+                    className={`flex-shrink-0 md:w-full flex items-center md:items-start gap-2 md:gap-4 p-3 md:p-4 rounded-xl md:rounded-2xl transition-all text-left ${
                       activeCategory === cat.id 
-                        ? 'bg-brand-primary/10 shadow-lg shadow-brand-primary/5' 
-                        : 'hover:bg-text-main/5'
+                        ? 'bg-brand-primary/10 shadow-lg shadow-brand-primary/5 text-brand-primary' 
+                        : 'hover:bg-text-main/5 text-text-secondary hover:text-text-main'
                     }`}
                   >
-                    <div className={`mt-1 flex-shrink-0 ${activeCategory === cat.id ? 'text-brand-primary' : 'text-text-secondary'}`}>
+                    <div className={`flex-shrink-0 ${activeCategory === cat.id ? 'text-brand-primary' : 'text-text-secondary'}`}>
                       {cat.icon}
                     </div>
                     <div>
-                      <div className={`text-sm font-bold transition-colors ${activeCategory === cat.id ? 'text-brand-primary' : 'text-text-main/80'}`}>
+                      <div className={`text-xs md:text-sm font-bold transition-colors whitespace-nowrap ${activeCategory === cat.id ? 'text-brand-primary' : 'text-text-main/80'}`}>
                         {cat.label}
                       </div>
-                      <div className="text-[10px] text-text-secondary/60 leading-tight mt-1 font-medium">
+                      <div className="hidden md:block text-[10px] text-text-secondary/60 leading-tight mt-1 font-medium">
                         {cat.description}
                       </div>
                     </div>
@@ -132,7 +132,7 @@ export default function Mural() {
             </div>
 
             {/* Category Summary Card */}
-            <div className="bg-bg-card/50 backdrop-blur-xl border border-border-color shadow-sm rounded-3xl p-6 space-y-4">
+            <div className="hidden lg:block bg-bg-card/50 backdrop-blur-xl border border-border-color shadow-sm rounded-3xl p-6 space-y-4">
               <div className="space-y-2">
                 <h3 className="text-text-main font-black text-lg">{currentCategoryData?.label}</h3>
                 <p className="text-[11px] text-text-secondary leading-relaxed font-semibold">
@@ -169,7 +169,7 @@ export default function Mural() {
           </div>
 
           {/* Main Content Column */}
-          <div className="bg-bg-card/20 backdrop-blur-sm border border-border-color rounded-[40px] relative min-h-[500px] overflow-hidden">
+          <div className="bg-bg-card/20 backdrop-blur-sm border border-border-color rounded-3xl lg:rounded-[40px] relative min-h-[500px] overflow-hidden">
              {isLoading ? (
                <div className="absolute inset-0 flex items-center justify-center">
                  <Loader2 className="text-brand-primary animate-spin" size={48} />
@@ -177,7 +177,7 @@ export default function Mural() {
              ) : (
                <AnimatePresence mode="popLayout">
                 {filteredNotices.length > 0 ? (
-                  <div className="p-8 space-y-6">
+                  <div className="p-4 md:p-8 space-y-6">
                     {filteredNotices.map((notice, i) => (
                       <motion.div
                         key={notice.id}
@@ -186,7 +186,7 @@ export default function Mural() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.98 }}
                         transition={{ delay: i * 0.05 }}
-                        className="bg-bg-card/40 backdrop-blur-xl border border-border-color shadow-sm rounded-[32px] p-8 transition-all flex flex-col md:flex-row gap-8 relative group"
+                        className="bg-bg-card/40 backdrop-blur-xl border border-border-color shadow-sm rounded-2xl md:rounded-[32px] p-5 md:p-8 transition-all flex flex-col md:flex-row gap-8 relative group"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-4 mb-6">

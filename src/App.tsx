@@ -154,7 +154,13 @@ export default function App() {
     }
   };
 
-  const handleEarnXp = async (amount: number, correctIncrement?: number, answeredIncrement?: number, isFlashQuiz?: boolean) => {
+  const handleEarnXp = async (
+    amount: number, 
+    correctIncrement?: number, 
+    answeredIncrement?: number, 
+    isFlashQuiz?: boolean,
+    activityName?: string
+  ) => {
     const currentXp = user.xp || 0;
     const newXp = currentXp + amount;
     
@@ -173,7 +179,8 @@ export default function App() {
       currentLevelMinXp: currentLevelMinXp,
       correctAnswers: (user.correctAnswers || 0) + corrInc,
       answeredQuestions: (user.answeredQuestions || 0) + ansInc,
-      isFlashQuizUpdate: isFlashQuiz
+      isFlashQuizUpdate: isFlashQuiz,
+      xpReason: activityName
     };
 
     // Update locally

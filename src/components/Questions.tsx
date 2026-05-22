@@ -9,7 +9,7 @@ import { enemService } from '../services/enemService';
 import { Check, X, ArrowRight, Info, Award, Loader2, BookOpen } from 'lucide-react';
 
 interface QuestionsProps {
-  onEarnXp: (xp: number, correct?: number, answered?: number) => void;
+  onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
   user: UserProfile;
 }
 
@@ -100,7 +100,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
     });
 
     setScore(correctOnes);
-    onEarnXp(totalXp, correctOnes, questions.length);
+    onEarnXp(totalXp, correctOnes, questions.length, false, 'Treinamento de Questões');
     setShowResult(true);
   };
 
@@ -131,18 +131,18 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          <div className="bg-bg-card/40 backdrop-blur-xl rounded-[32px] md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-sm">
-            <h3 className="text-[10px] font-bold text-text-secondary opacity-50 mb-10">Escolha a edição</h3>
+          <div className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-5 md:p-8 border border-border-color shadow-sm">
+            <h3 className="text-[10px] font-bold text-text-secondary opacity-50 mb-6 md:mb-10">Escolha a edição</h3>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
               {ENEM_YEARS.map(year => (
                 <button
                   key={year}
                   onClick={() => setSelectedYear(year)}
-                  className={`py-3.5 rounded-2xl font-bold text-[11px] transition-all ${
-                    selectedYear === year 
-                    ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' 
-                    : 'bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary'
-                  }`}
+                  className="py-3 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary cursor-pointer active:scale-95"
+                  style={{
+                    backgroundColor: selectedYear === year ? 'var(--brand-primary)' : '',
+                    color: selectedYear === year ? '#ffffff' : ''
+                  }}
                 >
                   {year}
                 </button>
@@ -150,7 +150,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             </div>
           </div>
 
-          <div className="bg-bg-card/40 backdrop-blur-xl rounded-[32px] md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-sm">
+          <div className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-5 md:p-8 border border-border-color shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-[10px] font-bold text-text-secondary opacity-50">Disciplina</h3>
               <span className="text-[8px] font-bold bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full">LIMITADO</span>
@@ -160,11 +160,11 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                 <button
                   key={subject}
                   onClick={() => setSelectedSubject(subject)}
-                  className={`w-full text-left px-5 py-4 rounded-2xl font-bold text-[11px] transition-all ${
-                    selectedSubject === subject 
-                    ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' 
-                    : 'bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary'
-                  }`}
+                  className="w-full text-left px-4 py-3.5 md:px-5 md:py-4 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary cursor-pointer active:scale-95"
+                  style={{
+                    backgroundColor: selectedSubject === subject ? 'var(--brand-primary)' : '',
+                    color: selectedSubject === subject ? '#ffffff' : ''
+                  }}
                 >
                   {subject}
                 </button>
@@ -176,7 +176,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
         <button
           onClick={handleStartStudy}
           disabled={!selectedYear || !selectedSubject || loading}
-          className="w-full mt-8 bg-brand-primary hover:bg-brand-secondary text-white py-5 md:py-6 rounded-[28px] font-bold text-xs md:text-sm shadow-lg shadow-brand-primary/20 transition-all flex items-center justify-center gap-3 disabled:opacity-20 disabled:cursor-not-allowed group active:scale-[0.98]"
+          className="w-full mt-8 bg-brand-primary hover:bg-brand-secondary text-white py-4 md:py-6 rounded-2xl md:rounded-[28px] font-bold text-xs md:text-sm shadow-lg shadow-brand-primary/20 transition-all flex items-center justify-center gap-3 disabled:opacity-20 disabled:cursor-not-allowed group active:scale-[0.98]"
         >
           {loading ? 'Sincronizando...' : 'Iniciar treinamento'}
           <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -269,13 +269,13 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             </div>
           </div>
 
-          <div className="bg-bg-card/40 backdrop-blur-xl rounded-[40px] p-8 md:p-14 shadow-2xl mb-10 relative overflow-hidden border border-border-color group">
+          <div className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-5 md:p-14 shadow-2xl mb-8 relative overflow-hidden border border-border-color group">
             <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
               <BookOpen size={120} />
             </div>
 
-            <div className="prose prose-invert max-w-none mb-12 relative z-10 font-sans">
-              <div className="text-lg md:text-xl lg:text-2xl leading-relaxed text-text-main font-medium tracking-tight">
+            <div className="prose prose-invert max-w-none mb-10 relative z-10 font-sans">
+              <div className="text-base md:text-xl lg:text-2xl leading-relaxed text-text-main font-medium tracking-tight">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw]}
@@ -288,18 +288,18 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                       const fullUrl = isProxy ? src : `/api/imagem?url=${encodeURIComponent(src)}`;
 
                       return (
-                        <div className="my-10 md:my-14 flex justify-center">
+                        <div className="my-6 md:my-14 flex justify-center">
                           <img 
                             src={fullUrl} 
                             alt={alt || 'Imagem da questão'} 
-                            className="max-w-full h-auto rounded-3xl bg-bg-sidebar p-4 md:p-6 shadow-2xl ring-1 ring-border-color" 
+                            className="max-w-full h-auto rounded-2xl md:rounded-3xl bg-bg-sidebar p-3 md:p-6 shadow-2xl ring-1 ring-border-color" 
                             referrerPolicy="no-referrer"
                             loading="lazy"
                           />
                         </div>
                       );
                     },
-                    p: ({ children }) => <p className="mb-8 last:mb-0 leading-relaxed opacity-95">{children}</p>
+                    p: ({ children }) => <p className="mb-6 last:mb-0 leading-relaxed opacity-95">{children}</p>
                   }}
                 >
                   {currentQuestion.text}
@@ -307,7 +307,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
               </div>
             </div>
 
-            <div className="space-y-4 md:space-y-5 relative z-10">
+            <div className="space-y-3.5 md:space-y-5 relative z-10">
               {currentQuestion.options.map((option, index) => {
                 const isSelected = userAnswers[currentIndex] === index;
                 const optionImage = currentQuestion.optionImages?.[index];
@@ -316,31 +316,31 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                   <button
                     key={index}
                     onClick={() => handleOptionSelect(index)}
-                    className={`w-full text-left p-6 md:p-8 rounded-[32px] border transition-all duration-500 group/opt relative overflow-hidden ${
+                    className={`w-full text-left p-4 md:p-6 rounded-2xl md:rounded-[32px] border transition-all duration-500 group/opt relative overflow-hidden ${
                       isSelected 
                       ? 'bg-brand-primary/10 border-brand-primary/30 shadow-xl shadow-brand-primary/10' 
                       : 'bg-bg-main/30 border-transparent hover:border-border-color hover:bg-bg-main/50'
                     }`}
                   >
-                    <div className="flex items-start gap-6 relative z-10">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 transition-all duration-500 ${
+                    <div className="flex items-start gap-4 md:gap-6 relative z-10">
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-xs md:text-sm shrink-0 transition-all duration-500 ${
                         isSelected 
                         ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/40 rotate-[360deg] scale-110' 
                         : 'bg-bg-sidebar text-text-secondary group-hover/opt:text-brand-primary border border-border-color'
                       }`}>
                         {String.fromCharCode(64 + index + 1)}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         {option && (
-                          <p className={`font-bold text-base md:text-lg leading-snug transition-colors ${isSelected ? 'text-text-main' : 'text-text-secondary group-hover/opt:text-text-main'}`}>
+                          <p className={`font-bold text-sm sm:text-base md:text-lg leading-snug transition-colors ${isSelected ? 'text-text-main' : 'text-text-secondary group-hover/opt:text-text-main'}`}>
                             {option}
                           </p>
                         )}
                         
                         {optionImage && (
-                          <div className="mt-6 rounded-2xl bg-bg-sidebar p-3 ring-1 ring-border-color inline-block overflow-hidden max-w-full">
+                          <div className="mt-4 sm:mt-6 rounded-2xl bg-bg-sidebar p-3 ring-1 ring-border-color inline-block overflow-hidden max-w-full">
                             <img 
-                              src={optionImage} 
+                               src={optionImage} 
                               alt={`Opção ${String.fromCharCode(65 + index)}`} 
                               className="max-h-64 object-contain"
                               referrerPolicy="no-referrer"
@@ -361,11 +361,11 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-6">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
             <button
               onClick={handlePrevious}
               disabled={currentIndex === 0}
-              className="apple-button-secondary py-5 px-10 text-xs font-bold group w-full sm:w-auto"
+              className="apple-button-secondary py-4 md:py-5 px-10 text-xs font-bold group w-full sm:w-auto"
             >
               Anterior
             </button>
@@ -373,7 +373,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             {currentIndex < questions.length - 1 ? (
               <button
                 onClick={handleNext}
-                className="flex-1 py-5 bg-bg-card/40 hover:bg-bg-card text-brand-primary rounded-[28px] font-bold text-xs transition-all flex items-center justify-center gap-4 border border-border-color shadow-xl active:scale-[0.98] group"
+                className="flex-1 py-4 md:py-5 bg-bg-card/40 hover:bg-bg-card text-brand-primary rounded-2xl md:rounded-[28px] font-bold text-xs transition-all flex items-center justify-center gap-4 border border-border-color shadow-xl active:scale-[0.98] group cursor-pointer"
               >
                 Próxima questão
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -381,7 +381,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             ) : (
               <button
                 onClick={handleFinish}
-                className="flex-1 py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-[28px] font-bold text-xs transition-all flex items-center justify-center gap-4 shadow-2xl shadow-brand-primary/20 active:scale-[0.98]"
+                className="flex-1 py-4 md:py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl md:rounded-[28px] font-bold text-xs transition-all flex items-center justify-center gap-4 shadow-2xl shadow-brand-primary/20 active:scale-[0.98] cursor-pointer"
               >
                 Finalizar desafio
                 <Award size={20} />

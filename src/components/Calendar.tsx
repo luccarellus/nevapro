@@ -93,20 +93,20 @@ export default function Calendar() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="flex gap-6 group"
+                  className="flex flex-col sm:flex-row gap-4 sm:gap-6 group"
                 >
                   {/* Date column */}
-                  <div className="flex flex-col items-center w-20 shrink-0">
-                    <div className="w-20 h-20 bg-bg-card/50 backdrop-blur-xl border border-border-color rounded-[24px] flex flex-col items-center justify-center p-0 transition-all shadow-xl group-hover:shadow-brand-primary/5">
-                      <span className="text-text-main font-black text-2xl leading-none">{day}</span>
-                      <span className="text-[10px] font-black text-text-secondary mt-1 uppercase tracking-widest">{monthName}</span>
+                  <div className="flex flex-row sm:flex-col items-center sm:w-20 shrink-0 gap-3 sm:gap-0">
+                    <div className="w-full sm:w-20 h-14 sm:h-20 bg-bg-card/50 backdrop-blur-xl border border-border-color rounded-2xl sm:rounded-[24px] flex flex-row sm:flex-col items-center justify-center gap-2 sm:gap-0 p-3 sm:p-0 transition-all shadow-xl group-hover:shadow-brand-primary/5">
+                      <span className="text-text-main font-black text-xl sm:text-2xl leading-none">{day}</span>
+                      <span className="text-[10px] font-black text-text-secondary sm:mt-1 uppercase tracking-widest">{monthName}</span>
                     </div>
-                    <div className="w-px flex-1 bg-gradient-to-b from-border-color to-transparent my-4" />
+                    <div className="hidden sm:block w-px flex-1 bg-gradient-to-b from-border-color to-transparent my-4" />
                   </div>
 
                   {/* Content column */}
-                  <div className="flex-grow pb-12">
-                    <div className="bg-bg-card/20 backdrop-blur-sm border border-border-color rounded-[32px] p-8 hover:bg-bg-card/40 transition-all group-hover:translate-x-1 duration-300">
+                  <div className="flex-grow pb-8 sm:pb-12">
+                    <div className="bg-bg-card/20 backdrop-blur-sm border border-border-color rounded-3xl p-5 sm:p-8 hover:bg-bg-card/40 transition-all group-hover:translate-x-1 duration-300">
                       <div className="flex items-center justify-between mb-4">
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${typeColors[event.type] || typeColors.evento}`}>
                           {typeIcons[event.type] || typeIcons.evento}
@@ -120,7 +120,7 @@ export default function Calendar() {
                         </div>
                       </div>
                       
-                      <h3 className="text-2xl font-black text-text-main mb-2 leading-none uppercase tracking-tight group-hover:text-brand-primary transition-colors">{event.title}</h3>
+                      <h3 className="text-xl sm:text-2xl font-black text-text-main mb-2 leading-none uppercase tracking-tight group-hover:text-brand-primary transition-colors">{event.title}</h3>
                       <p className="text-text-secondary text-sm mb-6 leading-relaxed font-medium opacity-70">{event.observation || event.description}</p>
                       
                       <div className="flex items-center justify-between">
