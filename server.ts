@@ -203,17 +203,16 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
     if (!authError && authData.user) {
-      await ensureAdminInDb(cleanEmail, authData.user.user_metadata?.full_name, authData.user.id);
-      const adminProfile = {
-        id: authData.user.id,
-        email: cleanEmail,
-        name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-        role: 'admin',
-        created_at: authData.user.created_at || new Date().toISOString()
-      };
+      const dbAdmin = await ensureAdminInDb(cleanEmail, authData.user.user_metadata?.full_name, authData.user.id);
       return res.json({
         success: true,
-        user: getUserWithRole(adminProfile)
+        user: getUserWithRole(dbAdmin || {
+          id: authData.user.id,
+          email: cleanEmail,
+          name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+          role: 'admin',
+          created_at: authData.user.created_at || new Date().toISOString()
+        })
       });
     }
 

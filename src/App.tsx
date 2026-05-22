@@ -126,6 +126,11 @@ export default function App() {
     
     // Persiste a sessão local para ambos os perfis (aluno e admin)
     localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
+
+    // Carrega e calcula imediatamente os dados corretos de interação e progresso do banco
+    if (loggedUser.email) {
+      await fetchUser(loggedUser.email);
+    }
   };
 
   const handleLogout = async () => {

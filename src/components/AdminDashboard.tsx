@@ -35,6 +35,44 @@ import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 
+const normalizeString = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return str
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+};
+
+const getUniqueNormalized = (items: (string | undefined | null)[]): string[] => {
+  const seen = new Set<string>();
+  const uniqueItems: string[] = [];
+  
+  for (const item of items) {
+    if (!item) continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    
+    const normalized = normalizeString(trimmed);
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueItems.push(trimmed);
+    } else {
+      const index = uniqueItems.findIndex(x => normalizeString(x) === normalized);
+      if (index !== -1) {
+        const existing = uniqueItems[index];
+        const existingUpperCount = (existing.match(/[A-Z]/g) || []).length;
+        const newUpperCount = (trimmed.match(/[A-Z]/g) || []).length;
+        if (newUpperCount > existingUpperCount) {
+          uniqueItems[index] = trimmed;
+        }
+      }
+    }
+  }
+  
+  return uniqueItems.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+};
+
 interface AdminDashboardProps {
   user: UserProfile;
   onBackToApp: () => void;
@@ -88,15 +126,25 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
   const filteredStudents = students.filter(student => {
     const matchesSearch = (student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                          (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCity = filterCity ? student.city === filterCity : true;
-    const matchesSchool = filterSchool ? student.school === filterSchool : true;
-    const matchesGremio = filterGremio ? student.gremio === filterGremio : true;
+    
+    const matchesCity = filterCity 
+      ? (student.city && normalizeString(student.city) === normalizeString(filterCity)) 
+      : true;
+      
+    const matchesSchool = filterSchool 
+      ? (student.school && normalizeString(student.school) === normalizeString(filterSchool)) 
+      : true;
+      
+    const matchesGremio = filterGremio 
+      ? (student.gremio && normalizeString(student.gremio) === normalizeString(filterGremio)) 
+      : true;
+      
     return matchesSearch && matchesCity && matchesSchool && matchesGremio;
   });
 
-  const citiesMA = Array.from(new Set(students.map(s => s.city).filter(Boolean))) as string[];
-  const schoolsMA = Array.from(new Set(students.map(s => s.school).filter(Boolean))) as string[];
-  const gremiosMA = Array.from(new Set(students.map(s => s.gremio).filter(Boolean))) as string[];
+  const citiesMA = useMemo(() => getUniqueNormalized(students.map(s => s.city)), [students]);
+  const schoolsMA = useMemo(() => getUniqueNormalized(students.map(s => s.school)), [students]);
+  const gremiosMA = useMemo(() => getUniqueNormalized(students.map(s => s.gremio)), [students]);
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
