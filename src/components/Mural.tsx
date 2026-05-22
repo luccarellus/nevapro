@@ -217,6 +217,8 @@ export default function Mural() {
                            <button 
                              onClick={() => setSelectedNotice(notice)}
                              className="w-full md:w-16 md:h-16 bg-bg-sidebar hover:bg-brand-primary text-brand-primary hover:text-white p-4 rounded-[20px] border border-border-color transition-all flex items-center justify-center group/btn active:scale-95 shadow-xl cursor-pointer"
+                             title="Ler aviso completo"
+                             aria-label="Ler aviso completo"
                            >
                              <ArrowRight size={24} className="group-hover/btn:translate-x-1 transition-transform" />
                            </button>

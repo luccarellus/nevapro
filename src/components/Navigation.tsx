@@ -180,7 +180,12 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
             <div className="relative bg-bg-sidebar border-t border-border-color rounded-t-[32px] p-8 pb-12 max-h-[80vh] overflow-y-auto safe-p-bottom">
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-bold text-text-main">Navegação</h3>
-                <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-bg-card rounded-full text-text-secondary">
+                <button 
+                  onClick={() => setIsMenuOpen(false)} 
+                  className="p-2 bg-bg-card rounded-full text-text-secondary"
+                  title="Fechar menu"
+                  aria-label="Fechar menu"
+                >
                   <X size={20} />
                 </button>
               </div>

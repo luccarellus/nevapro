@@ -585,6 +585,8 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
               <button 
                 onClick={() => setShowDetails(false)}
                 className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2.5 sm:p-3 text-text-secondary hover:text-text-main transition-colors bg-text-main/5 rounded-full hover:bg-text-main/10"
+                title="Fechar detalhes"
+                aria-label="Fechar detalhes"
               >
                 <X size={18} />
               </button>

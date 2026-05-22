@@ -138,11 +138,11 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                 <button
                   key={year}
                   onClick={() => setSelectedYear(year)}
-                  className="py-3 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary cursor-pointer active:scale-95"
-                  style={{
-                    backgroundColor: selectedYear === year ? 'var(--brand-primary)' : '',
-                    color: selectedYear === year ? '#ffffff' : ''
-                  }}
+                  className={`py-3 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all cursor-pointer active:scale-95 ${
+                    selectedYear === year
+                      ? 'bg-brand-primary text-white'
+                      : 'bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary'
+                  }`}
                 >
                   {year}
                 </button>
@@ -160,11 +160,11 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                 <button
                   key={subject}
                   onClick={() => setSelectedSubject(subject)}
-                  className="w-full text-left px-4 py-3.5 md:px-5 md:py-4 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary cursor-pointer active:scale-95"
-                  style={{
-                    backgroundColor: selectedSubject === subject ? 'var(--brand-primary)' : '',
-                    color: selectedSubject === subject ? '#ffffff' : ''
-                  }}
+                  className={`w-full text-left px-4 py-3.5 md:px-5 md:py-4 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all cursor-pointer active:scale-95 ${
+                    selectedSubject === subject
+                      ? 'bg-brand-primary text-white'
+                      : 'bg-text-main/5 text-text-secondary hover:bg-brand-primary/10 hover:text-brand-primary'
+                  }`}
                 >
                   {subject}
                 </button>

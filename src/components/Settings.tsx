@@ -201,6 +201,8 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
           <button 
             onClick={onClose}
             className="absolute top-6 right-6 md:top-10 md:right-10 text-text-secondary hover:text-text-main transition-all z-10"
+            title="Fechar configurações"
+            aria-label="Fechar configurações"
           >
             <X size={24} />
           </button>
@@ -216,15 +218,17 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
               <div className="space-y-8">
                 {/* Display Name */}
                 <div className="space-y-3">
-                  <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                  <label htmlFor="settings-display-name" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                     Nome de exibição
                   </label>
                   <input 
+                    id="settings-display-name"
                     type="text" 
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
                     placeholder="Seu nome"
+                    title="Nome de exibição"
                   />
                   <p className="text-[11px] text-text-secondary font-bold ml-1 opacity-70">
                     Esse nome aparece no topo e no ranking.
@@ -233,13 +237,16 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
 
                 {/* Email */}
                 <div className="space-y-3">
-                  <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                  <label htmlFor="settings-email" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                     E-mail
                   </label>
                   <input 
+                    id="settings-email"
                     type="email" 
                     value={email}
                     className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-secondary font-bold opacity-70 cursor-not-allowed shadow-inner"
+                    placeholder="E-mail"
+                    title="E-mail"
                     readOnly
                   />
                 </div>
@@ -247,42 +254,48 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                 {/* City and School Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                    <label htmlFor="settings-city" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                       Cidade
                     </label>
                     <input 
+                      id="settings-city"
                       type="text" 
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
                       placeholder="Sua cidade"
+                      title="Cidade"
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                    <label htmlFor="settings-school" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                       Escola
                     </label>
                     <input 
+                      id="settings-school"
                       type="text" 
                       value={school}
                       onChange={(e) => setSchool(e.target.value)}
                       className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
                       placeholder="Sua escola"
+                      title="Escola"
                     />
                   </div>
                 </div>
 
                 {/* Grêmio Estudantil (Opcional) */}
                 <div className="space-y-3">
-                  <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                  <label htmlFor="settings-gremio" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                     Grêmio estudantil <span className="text-text-secondary text-[10px] font-medium ml-2">(Opcional)</span>
                   </label>
                   <input 
+                    id="settings-gremio"
                     type="text" 
                     value={gremio}
                     onChange={(e) => setGremio(e.target.value)}
                     className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
                     placeholder="Nome do Grêmio"
+                    title="Grêmio estudantil"
                   />
                   <p className="text-[11px] text-text-secondary font-bold ml-1 opacity-70">
                     Se você faz parte de um grêmio estudantil, identifique-o aqui.
@@ -323,13 +336,15 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
 
                 {/* Daily Goal */}
                 <div className="space-y-3">
-                  <label className="text-[12px] font-bold text-text-main ml-1 opacity-70">
+                  <label htmlFor="settings-daily-goal" className="text-[12px] font-bold text-text-main ml-1 opacity-70">
                     Meta de horas diárias
                   </label>
                   <div className="relative">
                     <select 
+                      id="settings-daily-goal"
                       defaultValue="2 Horas"
                       className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold appearance-none cursor-pointer focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
+                      title="Meta de horas diárias"
                     >
                       <option>2 Horas</option>
                       <option>4 Horas</option>
@@ -472,6 +487,8 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
                     <button 
                       onClick={() => setShowInLeaderboard(!showInLeaderboard)}
                       className={`w-14 h-8 rounded-full relative transition-all duration-300 ${showInLeaderboard ? 'bg-brand-primary' : 'bg-text-secondary/20'}`}
+                      title="Alternar visibilidade no ranking"
+                      aria-label="Alternar visibilidade no ranking"
                     >
                       <motion.div 
                         animate={{ x: showInLeaderboard ? 24 : 4 }}

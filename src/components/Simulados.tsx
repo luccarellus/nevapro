@@ -748,6 +748,8 @@ export default function Simulados({
                       value={selectedYears[sim.id] || 2023}
                       onChange={(e) => setSelectedYears(prev => ({ ...prev, [sim.id]: parseInt(e.target.value, 10) }))}
                       className="pl-4 sm:pl-5 pr-8 sm:pr-10 py-1.5 sm:py-2 bg-text-main/5 hover:bg-text-main/10 border-none rounded-full text-[9px] sm:text-[10px] font-black text-text-secondary uppercase tracking-wider sm:tracking-widest cursor-pointer focus:outline-none ring-1 ring-border-color hover:ring-brand-primary/40 focus:ring-brand-primary text-center appearance-none [color-scheme:dark] transition-all duration-200"
+                      title="Selecionar ano do ENEM"
+                      aria-label="Selecionar ano do ENEM"
                     >
                       {ENEM_YEARS.map(year => (
                         <option 
