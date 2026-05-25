@@ -227,10 +227,12 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                           <div>
-                            <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Cidade</label>
+                            <label htmlFor="select-city" className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Cidade</label>
                             <div className="relative group">
                               <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors z-10" size={18} />
                               <select
+                                id="select-city"
+                                title="Selecione sua cidade"
                                 value={city}
                                 onChange={(e) => {
                                   setCity(e.target.value);
@@ -250,10 +252,12 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Escola</label>
+                            <label htmlFor="select-school" className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Escola</label>
                             <div className="relative group">
                               <School className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors z-10" size={18} />
                               <select
+                                id="select-school"
+                                title="Selecione sua escola"
                                 value={school}
                                 onChange={(e) => setSchool(e.target.value)}
                                 required
