@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Mail, Lock, UserPlus, MapPin, School, Flag, Loader2, Check, AlertCircle } from 'lucide-react';
 import Logo from './Logo';
 import { supabase } from '../lib/supabase';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
+import cidadesEscolasData from '../data/cidades_escolas.json';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -25,6 +26,19 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
   const [authError, setAuthError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const uniqueCities = useMemo(() => {
+    const cities = cidadesEscolasData.map(item => item.city);
+    return Array.from(new Set(cities)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, []);
+
+  const availableSchools = useMemo(() => {
+    if (!city) return [];
+    return cidadesEscolasData
+      .filter(item => item.city === city)
+      .map(item => item.school)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [city]);
 
   // Load remembered email on mount
   useEffect(() => {
@@ -215,29 +229,45 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                           <div>
                             <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Cidade</label>
                             <div className="relative group">
-                              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                              <input
-                                type="text"
+                              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors z-10" size={18} />
+                              <select
                                 value={city}
-                                onChange={(e) => setCity(e.target.value)}
+                                onChange={(e) => {
+                                  setCity(e.target.value);
+                                  setSchool('');
+                                }}
                                 required
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
-                                placeholder="Imperatriz"
-                              />
+                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-10 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner appearance-none [color-scheme:dark] relative z-0"
+                              >
+                                <option value="">Selecione sua cidade</option>
+                                {uniqueCities.map(c => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 z-10">
+                                <ArrowRight className="rotate-90 text-text-secondary" size={14} />
+                              </div>
                             </div>
                           </div>
                           <div>
                             <label className="block text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 ml-2">Escola</label>
                             <div className="relative group">
-                              <School className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors" size={18} />
-                              <input
-                                type="text"
+                              <School className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-brand-primary transition-colors z-10" size={18} />
+                              <select
                                 value={school}
                                 onChange={(e) => setSchool(e.target.value)}
                                 required
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
-                                placeholder="Colégio Neva Pro"
-                              />
+                                disabled={!city}
+                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-10 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner appearance-none disabled:opacity-50 [color-scheme:dark] relative z-0"
+                              >
+                                <option value="">{city ? "Selecione sua escola" : "Selecione uma cidade primeiro"}</option>
+                                {availableSchools.map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 z-10">
+                                <ArrowRight className="rotate-90 text-text-secondary" size={14} />
+                              </div>
                             </div>
                           </div>
                         </div>

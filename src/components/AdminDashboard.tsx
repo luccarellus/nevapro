@@ -34,6 +34,7 @@ import { adminService, AdminActivity, ProductionStat } from '../services/adminSe
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
+import cidadesEscolasData from '../data/cidades_escolas.json';
 
 const normalizeString = (str: string | null | undefined): string => {
   if (!str) return '';
@@ -71,6 +72,60 @@ const getUniqueNormalized = (items: (string | undefined | null)[]): string[] => 
   }
   
   return uniqueItems.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+};
+
+const getSignificantTokens = (name: string): string[] => {
+  const normalized = normalizeString(name);
+  const genericWords = new Set([
+    'centro', 'de', 'do', 'da', 'em', 'e', 'ensino', 'escola', 'colegio', 
+    'municipal', 'estadual', 'unidade', 'escolar', 'ce', 'c.e', 'c.e.', 'u.e', 'u.e.', 'ue'
+  ]);
+  return normalized
+    .split(/[\s,.\-\/]+/)
+    .filter(word => word.length > 2 && !genericWords.has(word));
+};
+
+const getCanonicalSchoolMap = (rawSchools: (string | null | undefined)[]): Record<string, string> => {
+  const canonicalMap: Record<string, string> = {};
+  const uniqueRaws = Array.from(new Set(rawSchools.map(s => s?.trim() || '').filter(Boolean)));
+  uniqueRaws.sort((a, b) => b.length - a.length);
+  
+  const clusters: { representative: string; tokens: string[] }[] = [];
+  
+  for (const raw of uniqueRaws) {
+    const tokens = getSignificantTokens(raw);
+    if (tokens.length === 0) {
+      canonicalMap[raw] = raw;
+      continue;
+    }
+    
+    let matchedCluster = null;
+    for (const cluster of clusters) {
+      const hasOverlap = tokens.some(t => cluster.tokens.includes(t)) || cluster.tokens.some(t => tokens.includes(t));
+      if (hasOverlap) {
+        matchedCluster = cluster;
+        break;
+      }
+    }
+    
+    if (matchedCluster) {
+      canonicalMap[raw] = matchedCluster.representative;
+    } else {
+      clusters.push({ representative: raw, tokens });
+      canonicalMap[raw] = raw;
+    }
+  }
+  
+  return canonicalMap;
+};
+
+const ensureCentroPrefix = (schoolName: string): string => {
+  if (!schoolName) return '';
+  const trimmed = schoolName.trim();
+  if (/^centro\b/i.test(trimmed)) {
+    return trimmed;
+  }
+  return `Centro ${trimmed}`;
 };
 
 interface AdminDashboardProps {
@@ -123,28 +178,94 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
   const [filterSchool, setFilterSchool] = useState('');
   const [filterGremio, setFilterGremio] = useState('');
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = (student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCity = filterCity 
-      ? (student.city && normalizeString(student.city) === normalizeString(filterCity)) 
-      : true;
-      
-    const matchesSchool = filterSchool 
-      ? (student.school && normalizeString(student.school) === normalizeString(filterSchool)) 
-      : true;
-      
-    const matchesGremio = filterGremio 
-      ? (student.gremio && normalizeString(student.gremio) === normalizeString(filterGremio)) 
-      : true;
-      
-    return matchesSearch && matchesCity && matchesSchool && matchesGremio;
-  });
+  const schoolMap = useMemo(() => {
+    const rawSchools = students.map(s => s.school);
+    return getCanonicalSchoolMap(rawSchools);
+  }, [students]);
 
-  const citiesMA = useMemo(() => getUniqueNormalized(students.map(s => s.city)), [students]);
-  const schoolsMA = useMemo(() => getUniqueNormalized(students.map(s => s.school)), [students]);
+  const filteredStudents = useMemo(() => {
+    return students
+      .filter(student => {
+        const matchesSearch = (student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesCity = filterCity 
+          ? (student.city && normalizeString(student.city) === normalizeString(filterCity)) 
+          : true;
+          
+        let matchesSchool = true;
+        if (filterSchool) {
+          const studentRawSchool = student.school || '';
+          const studentCanonical = schoolMap[studentRawSchool] || studentRawSchool;
+          const studentFormatted = ensureCentroPrefix(studentCanonical);
+          matchesSchool = normalizeString(studentFormatted) === normalizeString(filterSchool);
+        }
+          
+        const matchesGremio = filterGremio 
+          ? (student.gremio && normalizeString(student.gremio) === normalizeString(filterGremio)) 
+          : true;
+          
+        return matchesSearch && matchesCity && matchesSchool && matchesGremio;
+      })
+      .sort((a, b) => (b.xp || 0) - (a.xp || 0));
+  }, [students, searchTerm, filterCity, filterSchool, filterGremio, schoolMap]);
+
+  const citiesMA = useMemo(() => {
+    const cities = cidadesEscolasData.map(item => item.city);
+    return Array.from(new Set(cities)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, []);
+  
+  const schoolsMA = useMemo(() => {
+    let filtered = cidadesEscolasData;
+    if (filterCity) {
+      filtered = cidadesEscolasData.filter(item => item.city === filterCity);
+    }
+    const canonicalNames = filtered.map(item => ensureCentroPrefix(item.school));
+    return Array.from(new Set(canonicalNames)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [filterCity]);
+
   const gremiosMA = useMemo(() => getUniqueNormalized(students.map(s => s.gremio)), [students]);
+
+  const mostEngagedCity = useMemo(() => {
+    if (!students.length) return { name: '-', xp: 0 };
+    const cityXp: Record<string, number> = {};
+    students.forEach(s => {
+      if (s.city) {
+        const cityNormalized = s.city.trim();
+        cityXp[cityNormalized] = (cityXp[cityNormalized] || 0) + (s.xp || 0);
+      }
+    });
+    let bestCity = '-';
+    let maxXp = -1;
+    Object.entries(cityXp).forEach(([city, xp]) => {
+      if (xp > maxXp) {
+        maxXp = xp;
+        bestCity = city;
+      }
+    });
+    return { name: bestCity, xp: maxXp };
+  }, [students]);
+
+  const mostEngagedSchool = useMemo(() => {
+    if (!students.length) return { name: '-', xp: 0 };
+    const schoolXp: Record<string, number> = {};
+    students.forEach(s => {
+      if (s.school) {
+        const canonical = schoolMap[s.school] || s.school;
+        const formatted = ensureCentroPrefix(canonical);
+        schoolXp[formatted] = (schoolXp[formatted] || 0) + (s.xp || 0);
+      }
+    });
+    let bestSchool = '-';
+    let maxXp = -1;
+    Object.entries(schoolXp).forEach(([school, xp]) => {
+      if (xp > maxXp) {
+        maxXp = xp;
+        bestSchool = school;
+      }
+    });
+    return { name: bestSchool, xp: maxXp };
+  }, [students, schoolMap]);
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -406,8 +527,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
       return (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título do evento</label>
+            <label htmlFor="eventTitle" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título do evento</label>
             <input 
+              id="eventTitle"
               value={eventForm.title}
               onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" 
@@ -416,9 +538,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Data de liberação</label>
+            <label htmlFor="eventReleaseDate" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Data de liberação</label>
             <input 
+              id="eventReleaseDate"
               type="datetime-local"
+              title="Data de liberação"
               value={eventForm.releaseDate}
               onChange={(e) => setEventForm({...eventForm, releaseDate: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all [color-scheme:dark]" 
@@ -426,8 +550,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">XP de Participação (opcional)</label>
+            <label htmlFor="eventXpReward" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">XP de Participação (opcional)</label>
             <input 
+              id="eventXpReward"
               type="number"
               value={eventForm.xpReward}
               onChange={(e) => setEventForm({...eventForm, xpReward: e.target.value})}
@@ -437,9 +562,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
+            <label htmlFor="eventCategory" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
             <div className="relative">
               <select 
+                id="eventCategory"
+                title="Categoria do evento"
                 value={eventForm.category}
                 onChange={(e) => setEventForm({...eventForm, category: e.target.value})}
                 className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none"
@@ -456,8 +583,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Observação</label>
+            <label htmlFor="eventObservation" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Observação</label>
             <textarea 
+              id="eventObservation"
               value={eventForm.observation}
               onChange={(e) => setEventForm({...eventForm, observation: e.target.value})}
               rows={4}
@@ -490,8 +618,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
       return (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
+            <label htmlFor="muralTitle" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
             <input 
+              id="muralTitle"
               value={muralForm.title}
               onChange={(e) => setMuralForm({...muralForm, title: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" 
@@ -500,9 +629,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
+            <label htmlFor="muralCategory" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
             <div className="relative">
               <select 
+                id="muralCategory"
+                title="Categoria do recado"
                 value={muralForm.category}
                 onChange={(e) => setMuralForm({...muralForm, category: e.target.value})}
                 className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none"
@@ -518,8 +649,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Etiqueta</label>
+            <label htmlFor="muralTag" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Etiqueta</label>
             <input 
+              id="muralTag"
               value={muralForm.tag}
               onChange={(e) => setMuralForm({...muralForm, tag: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" 
@@ -528,8 +660,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Texto</label>
+            <label htmlFor="muralContent" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Texto</label>
             <textarea 
+              id="muralContent"
               value={muralForm.content}
               onChange={(e) => setMuralForm({...muralForm, content: e.target.value})}
               rows={4}
@@ -562,8 +695,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
       return (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
+            <label htmlFor="materialTitle" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
             <input 
+              id="materialTitle"
               value={materialForm.title}
               onChange={(e) => setMaterialForm({...materialForm, title: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all" 
@@ -572,9 +706,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Tipo</label>
+            <label htmlFor="materialType" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Tipo</label>
             <div className="relative">
               <select 
+                id="materialType"
+                title="Tipo de material"
                 value={materialForm.type}
                 onChange={(e) => setMaterialForm({...materialForm, type: e.target.value})}
                 className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none"
@@ -590,9 +726,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Foco</label>
+            <label htmlFor="materialFoco" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Foco</label>
             <div className="relative">
               <select 
+                id="materialFoco"
+                title="Foco do material"
                 value={materialForm.foco}
                 onChange={(e) => setMaterialForm({...materialForm, foco: e.target.value})}
                 className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none"
@@ -609,8 +747,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Link / arquivo</label>
+            <label htmlFor="materialUrl" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Link / arquivo</label>
             <input 
+              id="materialUrl"
               value={materialForm.url}
               onChange={(e) => setMaterialForm({...materialForm, url: e.target.value})}
               className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all mb-3" 
@@ -639,8 +778,9 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           </div>
 
           <div className="space-y-2 text-sans">
-            <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Descrição</label>
+            <label htmlFor="materialDescription" className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Descrição</label>
             <textarea 
+              id="materialDescription"
               value={materialForm.description}
               onChange={(e) => setMaterialForm({...materialForm, description: e.target.value})}
               rows={4}
@@ -731,6 +871,8 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
         <button 
           onClick={() => setIsSidebarOpen(true)}
           className="p-3 bg-bg-card border border-border-color rounded-xl text-brand-primary"
+          title="Abrir menu"
+          aria-label="Abrir menu"
         >
           <PanelLeftClose size={24} />
         </button>
@@ -755,7 +897,12 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
         <div className="p-8 pt-10">
           <div className="flex justify-between items-center mb-10">
              <div className="text-text-main"><Logo className="h-10 md:h-12" /></div>
-            <button className="lg:hidden text-text-secondary w-10 h-10 flex items-center justify-center bg-bg-main border border-border-color rounded-xl" onClick={() => setIsSidebarOpen(false)}>
+            <button 
+              className="lg:hidden text-text-secondary w-10 h-10 flex items-center justify-center bg-bg-main border border-border-color rounded-xl" 
+              onClick={() => setIsSidebarOpen(false)}
+              title="Fechar menu"
+              aria-label="Fechar menu"
+            >
               <PanelLeftClose size={20} className="rotate-180" />
             </button>
           </div>
@@ -1293,6 +1440,8 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                               <Users size={18} />
                             </div>
                             <input 
+                              id="searchTerm"
+                              title="Buscar aluno"
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
                               className="w-full bg-bg-main/40 border border-border-color rounded-2xl pl-14 pr-6 py-4 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all font-sans backdrop-blur-md" 
@@ -1300,15 +1449,44 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                             />
                          </div>
                        </div>
-                    </div>
+                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                     {/* Destaques de engajamento */}
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 mt-6">
+                       <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                         <div className="w-12 h-12 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                           <Trophy size={24} />
+                         </div>
+                         <div>
+                           <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Cidade mais engajada</p>
+                           <h4 className="text-lg font-black text-text-main leading-tight">{mostEngagedCity.name}</h4>
+                           <p className="text-[10px] font-bold text-brand-primary mt-1">{mostEngagedCity.xp.toLocaleString()} XP Total</p>
+                         </div>
+                       </div>
+                       <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                         <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
+                           <Library size={24} />
+                         </div>
+                         <div>
+                           <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Escola mais engajada</p>
+                           <h4 className="text-lg font-black text-text-main leading-tight truncate max-w-[200px]" title={mostEngagedSchool.name}>{mostEngagedSchool.name}</h4>
+                           <p className="text-[10px] font-bold text-purple-500 mt-1">{mostEngagedSchool.xp.toLocaleString()} XP Total</p>
+                         </div>
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Cidades</label>
+                        <label htmlFor="filterCity" className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Cidades</label>
                         <div className="relative">
                            <select 
+                             id="filterCity"
+                             title="Filtrar por cidade"
                              value={filterCity}
-                             onChange={(e) => setFilterCity(e.target.value)}
+                             onChange={(e) => {
+                               setFilterCity(e.target.value);
+                               setFilterSchool('');
+                             }}
                              className="w-full bg-bg-main/30 border border-border-color rounded-2xl px-6 py-4 text-sm font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none backdrop-blur-md"
                            >
                              <option value="">Todas as cidades</option>
@@ -1323,9 +1501,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Escolas</label>
+                        <label htmlFor="filterSchool" className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Escolas</label>
                         <div className="relative">
                            <select 
+                             id="filterSchool"
+                             title="Filtrar por escola"
                              value={filterSchool}
                              onChange={(e) => setFilterSchool(e.target.value)}
                              className="w-full bg-bg-main/30 border border-border-color rounded-2xl px-6 py-4 text-sm font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none backdrop-blur-md"
@@ -1342,9 +1522,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                       </div>
 
                       <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-                        <label className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Grêmios</label>
+                        <label htmlFor="filterGremio" className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Grêmios</label>
                         <div className="relative">
                            <select 
+                             id="filterGremio"
+                             title="Filtrar por grêmio"
                              value={filterGremio}
                              onChange={(e) => setFilterGremio(e.target.value)}
                              className="w-full bg-bg-main/30 border border-border-color rounded-2xl px-6 py-4 text-sm font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none backdrop-blur-md"
@@ -1406,8 +1588,8 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                                          : 0;
                                        return (
                                          <div 
+                                          ref={(el) => { if (el) el.style.width = `${xpPercentage}%`; }}
                                           className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
-                                          style={{ width: `${xpPercentage}%` }}
                                          />
                                        );
                                      })()}
@@ -1465,7 +1647,7 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
                                      return (
                                        <div 
                                          className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
-                                         style={{ width: `${xpPercentage}%` }}
+                                         ref={(el) => { if (el) el.style.width = `${xpPercentage}%`; }}
                                        />
                                      );
                                    })()}
@@ -1637,6 +1819,8 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
               <button 
                 onClick={handleCloseModal}
                 className="absolute top-6 right-6 md:top-10 md:right-10 text-text-secondary hover:text-text-main p-2"
+                title="Fechar"
+                aria-label="Fechar"
               >
                 <ArrowRight size={24} />
               </button>
@@ -1798,8 +1982,8 @@ function Bar({ day, value, label, active }: { day: string; value: number; label:
       <div className="mb-4 text-xs font-black text-text-main opacity-80">{label}</div>
       <div className="w-full relative group">
         <div 
+          ref={(el) => { if (el) el.style.height = `${value * 160}px`; }}
           className={`w-full rounded-t-xl transition-all duration-700 ${active ? 'bg-brand-primary' : 'bg-text-main/5 border border-border-color'}`}
-          style={{ height: `${value * 160}px` }}
         />
         {active && (
           <div className="absolute inset-0 bg-brand-primary/10 blur-xl opacity-50" />
@@ -1820,8 +2004,8 @@ function DistributionRow({ label, info, percent, color }: { label: string; info:
       <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
         <div className="flex-1 md:w-48 h-1.5 md:h-2 bg-text-main/5 rounded-full overflow-hidden">
           <div 
+            ref={(el) => { if (el) el.style.width = `${percent}%`; }}
             className={`h-full ${color} transition-all duration-1000`} 
-            style={{ width: `${percent}%` }} 
           />
         </div>
         <span className="text-text-main font-black text-lg md:text-xl leading-none shrink-0">{percent}%</span>

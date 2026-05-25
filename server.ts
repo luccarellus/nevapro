@@ -93,33 +93,23 @@ const isFlashQuizCompleted = async (email: string, userId: string): Promise<bool
   if (userId) {
     try {
       const { data } = await supabaseAdmin
-        .from('users')
-        .select('flash_quiz_completed')
-        .eq('id', userId)
-        .maybeSingle();
-      if (data?.flash_quiz_completed) return true;
-    } catch (e) {
-      console.error('Error checking flash_quiz_completed in users:', e);
-    }
-  }
-
-  if (userId) {
-    try {
-      const { data } = await supabaseAdmin
         .from('xp_logs')
-        .select('id')
+        .select('created_at')
         .eq('user_id', userId)
         .eq('reason', 'Flash Quiz: Maranhão')
-        .limit(1);
-      if (data && data.length > 0) {
-        await supabaseAdmin
-          .from('users')
-          .update({ flash_quiz_completed: true })
-          .eq('id', userId);
-        return true;
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        const lastQuizTime = new Date(data.created_at).getTime();
+        const now = Date.now();
+        const sixHours = 6 * 60 * 60 * 1000;
+        if (now - lastQuizTime < sixHours) {
+          return true;
+        }
       }
     } catch (e) {
-      console.error('Error checking xp_logs for quiz:', e);
+      console.error('Error checking last quiz log:', e);
     }
   }
   return false;
@@ -646,12 +636,33 @@ app.get('/api/user/stats', async (req, res) => {
     const best = Math.max(...xps, 0);
     const average = Math.round(total / 7);
 
-    const quizDone = await isFlashQuizCompleted(email, user.id);
+    const { data: lastQuizLog } = await supabaseAdmin
+      .from('xp_logs')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .eq('reason', 'Flash Quiz: Maranhão')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let quizDone = false;
+    let secondsRemaining = 0;
+
+    if (lastQuizLog) {
+      const lastQuizTime = new Date(lastQuizLog.created_at).getTime();
+      const now = Date.now();
+      const sixHours = 6 * 60 * 60 * 1000;
+      if (now - lastQuizTime < sixHours) {
+        quizDone = true;
+        secondsRemaining = Math.max(0, Math.ceil((lastQuizTime + sixHours - now) / 1000));
+      }
+    }
 
     res.json({
       weekly,
       summary: { average, best, total },
-      flashQuizCompleted: quizDone
+      flashQuizCompleted: quizDone,
+      quizSecondsRemaining: secondsRemaining
     });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao processar estatísticas' });
@@ -699,7 +710,7 @@ app.get('/api/admin/users', async (req, res) => {
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('*')
-      .order('name', { ascending: true });
+      .order('xp', { ascending: false });
     if (error) throw error;
 
     const regularStudents = (data || []).filter(u => {

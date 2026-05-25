@@ -63,6 +63,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     summary: { average: 0, best: 0, total: 0 }
   });
   const [loading, setLoading] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,6 +89,9 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
             }
             if (statsData.flashQuizCompleted) {
               setDailyChallengeDone(true);
+            }
+            if (statsData.quizSecondsRemaining > 0) {
+              setSecondsLeft(statsData.quizSecondsRemaining);
             }
           }
         } catch (e) {
@@ -125,6 +129,28 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
       fetchData();
     }
   }, [user.email, user.name, user.city, user.xp, user.level]);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) {
+          setDailyChallengeDone(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [secondsLeft]);
+
+  const formatCountdown = (secs: number) => {
+    if (secs <= 0) return "Próximo desafio disponível!";
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `Próximo em ${h}h : ${m}m : ${s}s`;
+  };
   
   // Safe defaults if user metadata is missing
   const currentXp = user?.xp || 0;
@@ -147,6 +173,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
       colors: ['#00b094', '#00ffd5', '#ffffff']
     });
     setDailyChallengeDone(true);
+    setSecondsLeft(6 * 60 * 60);
     setShowQuiz(false);
     if (onEarnXp) {
       onEarnXp(50, 1, 1, true, 'Flash Quiz: Maranhão');
@@ -273,8 +300,8 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
             <div className="relative z-10">
               {!dailyChallengeDone ? (
                 (() => {
-                  const dayOfMonth = new Date().getDate();
-                  const quizQuest = DAILY_QUESTIONS[dayOfMonth % DAILY_QUESTIONS.length];
+                  const hourEpoch = Math.floor(Date.now() / (6 * 60 * 60 * 1000));
+                  const quizQuest = DAILY_QUESTIONS[hourEpoch % DAILY_QUESTIONS.length];
                   return (
                     <>
                       <div className="flex justify-between items-start mb-6">
@@ -374,7 +401,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                     disabled
                     className="mt-8 bg-text-main/5 text-text-secondary font-bold text-[10px] px-8 py-4 rounded-2xl cursor-not-allowed"
                   >
-                    Próximo em 14h : 22m
+                    {secondsLeft > 0 ? formatCountdown(secondsLeft) : "Próximo em 6h : 00m : 00s"}
                   </button>
                 </div>
               )}
@@ -483,7 +510,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                               </div>
                             </div>
                             <span className={`text-[10px] font-black ${isCurrentUser ? 'text-brand-primary' : 'text-text-secondary opacity-85'}`}>
-                              {rank.xp >= 1000 ? (rank.xp / 1000).toFixed(1) + 'k' : rank.xp} XP
+                              {rank.xp.toLocaleString()} XP
                             </span>
                           </motion.div>
                         );
@@ -651,7 +678,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                 </div>
                 <div className="p-4 sm:p-6 bg-brand-primary rounded-2xl sm:rounded-3xl shadow-lg shadow-brand-primary/20">
                   <p className="text-[10px] font-bold text-white/70 mb-1">Total semana</p>
-                  <p className="text-xl sm:text-2xl font-black text-white">{stats.summary.total >= 1000 ? (stats.summary.total / 1000).toFixed(1) + 'k' : stats.summary.total} <span className="text-white/70 text-xs sm:text-sm">XP</span></p>
+                  <p className="text-xl sm:text-2xl font-black text-white">{stats.summary.total.toLocaleString()} <span className="text-white/70 text-xs sm:text-sm">XP</span></p>
                 </div>
               </div>
             </motion.div>
