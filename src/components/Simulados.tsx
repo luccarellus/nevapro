@@ -94,7 +94,7 @@ export default function Simulados({
       const cache: Record<string, any> = {};
       MOCK_SIMULADOS.forEach(sim => {
         const selectedYear = selectedYears[sim.id] || 2023;
-        const stored = localStorage.getItem(`neva_sim_result_${sim.id}_${selectedYear}`);
+        const stored = localStorage.getItem(`neva_sim_result_${user.id}_${sim.id}_${selectedYear}`);
         if (stored) {
           try {
             cache[`${sim.id}_${selectedYear}`] = JSON.parse(stored);
@@ -105,7 +105,7 @@ export default function Simulados({
       });
       setResultsCache(cache);
     }
-  }, [view, selectedYears]);
+  }, [view, selectedYears, user.id]);
 
   const handleLoadSavedResult = (sim: typeof MOCK_SIMULADOS[0], savedData: any) => {
     setSelectedSim(sim);
@@ -172,7 +172,7 @@ export default function Simulados({
 
       onEarnXp(xpEarned, correctOnes, totalQ, false, `Simulado: ${selectedSim.title}`);
       const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;
-      localStorage.setItem(`neva_sim_result_${selectedSim.id}_${selectedYear}`, JSON.stringify({
+      localStorage.setItem(`neva_sim_result_${user.id}_${selectedSim.id}_${selectedYear}`, JSON.stringify({
         questions,
         userAnswers,
         score: correctOnes,

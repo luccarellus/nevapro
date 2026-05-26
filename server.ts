@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import helmet from 'helmet';
 import multer from 'multer';
+import cookieParser from 'cookie-parser';
 import { supabaseAdmin, supabaseAuthVerifier } from './src/lib/supabaseServer.js';
 import * as dotenv from 'dotenv';
 
@@ -11,12 +12,154 @@ dotenv.config();
 
 export const app = express();
 
-// Segurança de produção
+// Configuração de cookies
+app.use(cookieParser());
+
+// Segurança de produção com CSP condicional (ativada apenas em prod para não quebrar o dev HMR)
 app.use(helmet({
-  contentSecurityPolicy: false, // Vite precisa disso desabilitado em dev
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://*.supabase.co", "https://api.enem.dev", "https://enem.dev"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://api.enem.dev"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    }
+  } : false,
   crossOriginEmbedderPolicy: false
 }));
 app.use(express.json());
+
+// --- SISTEMA DE AUTENTICAÇÃO E SESSÕES CRIPTOGRAFADAS ---
+const SESSION_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'neva_fallback_secret_key_12345';
+
+// Gera um token de sessão assinado
+const generateToken = (userId: string, email: string, role: string) => {
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 horas de validade
+  const payload = `${userId}:${email}:${role}:${expiresAt}`;
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}:${signature}`;
+};
+
+// Valida a assinatura de um token de sessão
+const verifyToken = (token: string) => {
+  try {
+    if (!token) return null;
+    const parts = token.split(':');
+    if (parts.length !== 5) return null;
+    const [userId, email, role, expiresAtStr, signature] = parts;
+    const expiresAt = parseInt(expiresAtStr, 10);
+    if (Date.now() > expiresAt) return null; // Expirado
+    
+    const payload = `${userId}:${email}:${role}:${expiresAtStr}`;
+    const expectedSignature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+    if (signature !== expectedSignature) return null;
+    
+    return { userId, email, role };
+  } catch (err) {
+    return null;
+  }
+};
+
+// Recupera usuário do Supabase a partir do header Authorization
+const getUserFromSupabase = async (authHeader?: string) => {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  const token = authHeader.substring(7);
+  try {
+    const { data: { user }, error } = await supabaseAuthVerifier.auth.getUser(token);
+    if (error || !user) return null;
+    return user;
+  } catch (err) {
+    return null;
+  }
+};
+
+// Middleware: Exige que a requisição esteja autenticada (via Cookie ou Bearer Token)
+const requireAuth = async (req: any, res: any, next: any) => {
+  // 1. Tentar autenticação via cookie
+  const token = req.cookies?.session_token;
+  const user = verifyToken(token);
+  if (user) {
+    req.user = user;
+    return next();
+  }
+
+  // 2. Tentar autenticação via header Authorization (Bearer JWT do Supabase no client)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const supabaseUser = await getUserFromSupabase(authHeader);
+    if (supabaseUser && supabaseUser.email) {
+      // Busca a role no banco
+      const { data: dbUser } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('email', supabaseUser.email.toLowerCase().trim())
+        .maybeSingle();
+
+      const userRole = dbUser?.role || 'student';
+      req.user = {
+        userId: supabaseUser.id,
+        email: supabaseUser.email,
+        role: userRole
+      };
+
+      // Estabelece o cookie de sessão para chamadas subsequentes
+      const sessionToken = generateToken(supabaseUser.id, supabaseUser.email, userRole);
+      res.cookie('session_token', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+
+      return next();
+    }
+  }
+
+  return res.status(401).json({ error: 'Sessão inválida ou expirada. Por favor, faça login novamente.' });
+};
+
+// Middleware: Exige que o usuário autenticado tenha permissões de administrador
+const requireAdmin = (req: any, res: any, next: any) => {
+  requireAuth(req, res, () => {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado: recursos exclusivos de administrador.' });
+    }
+    next();
+  });
+};
+
+// Middleware: Rate Limiter simples em memória
+const rateLimiterAttempts = new Map<string, { count: number, lastAttempt: number }>();
+const rateLimiter = (limit: number, windowMs: number) => {
+  return (req: any, res: any, next: any) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const now = Date.now();
+    const attempt = rateLimiterAttempts.get(ip);
+    
+    if (!attempt) {
+      rateLimiterAttempts.set(ip, { count: 1, lastAttempt: now });
+      return next();
+    }
+    
+    if (now - attempt.lastAttempt > windowMs) {
+      attempt.count = 1;
+      attempt.lastAttempt = now;
+      return next();
+    }
+    
+    if (attempt.count >= limit) {
+      const waitTime = Math.ceil((windowMs - (now - attempt.lastAttempt)) / 1000);
+      return res.status(429).json({ error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.` });
+    }
+    
+    attempt.count++;
+    next();
+  };
+};
 
 // Configuração de Administradores
 const ADMIN_EMAILS = [
@@ -179,7 +322,7 @@ app.use((req, res, next) => {
 });
 
 // Auth Endpoints (LOGIN)
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
 
@@ -194,15 +337,27 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!authError && authData.user) {
       const dbAdmin = await ensureAdminInDb(cleanEmail, authData.user.user_metadata?.full_name, authData.user.id);
+      const userObj = getUserWithRole(dbAdmin || {
+        id: authData.user.id,
+        email: cleanEmail,
+        name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+        role: 'admin',
+        created_at: authData.user.created_at || new Date().toISOString()
+      });
+
+      if (userObj) {
+        const token = generateToken(userObj.id, userObj.email, userObj.role);
+        res.cookie('session_token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 24 * 60 * 60 * 1000
+        });
+      }
+
       return res.json({
         success: true,
-        user: getUserWithRole(dbAdmin || {
-          id: authData.user.id,
-          email: cleanEmail,
-          name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-          role: 'admin',
-          created_at: authData.user.created_at || new Date().toISOString()
-        })
+        user: userObj
       });
     }
 
@@ -227,7 +382,17 @@ app.post('/api/auth/login', async (req, res) => {
       }
 
       if (isValid) {
-        return res.json({ success: true, user: getUserWithRole(student) });
+        const userObj = getUserWithRole(student);
+        if (userObj) {
+          const token = generateToken(userObj.id, userObj.email, userObj.role);
+          res.cookie('session_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000
+          });
+        }
+        return res.json({ success: true, user: userObj });
       }
     }
 
@@ -240,7 +405,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // REGISTER
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
 
@@ -274,7 +439,18 @@ app.post('/api/auth/register', async (req, res) => {
     const { data, error } = await supabaseAdmin.from('users').insert([newStudent]).select().single();
     if (error) throw error;
 
-    res.status(201).json({ success: true, user: getUserWithRole(data) });
+    const userObj = getUserWithRole(data);
+    if (userObj) {
+      const token = generateToken(userObj.id, userObj.email, userObj.role);
+      res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+    }
+
+    res.status(201).json({ success: true, user: userObj });
   } catch (err: any) {
     console.error('[Auth] Register error:', err.message);
     res.status(500).json({ error: 'Erro ao criar conta.' });
@@ -282,10 +458,14 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // DELETE USER
-app.post('/api/auth/delete-user', async (req, res) => {
+app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'E-mail é obrigatório.' });
   const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
 
   try {
     const { data: userData } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
@@ -309,13 +489,17 @@ app.post('/api/auth/delete-user', async (req, res) => {
   }
 });
 
-app.post('/api/auth/change-password', async (req, res) => {
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   const { email, currentPassword, newPassword } = req.body;
   if (!email || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
   }
 
   const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
 
   try {
     // 1. Administrador (Supabase Auth)
@@ -385,13 +569,29 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
+// LOGOUT
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('session_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.json({ success: true });
+});
+
 // PROFILE
-app.get('/api/user/profile', async (req, res) => {
-  const email = req.query.email as string;
-  if (!email) return res.status(400).json({ error: 'Identificação ausente' });
+app.get('/api/user/profile', requireAuth, async (req, res) => {
+  let email = req.query.email as string;
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
 
   try {
-    const cleanEmail = email.toLowerCase().trim();
     const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail);
 
     if (isAdmin) {
@@ -410,10 +610,19 @@ app.get('/api/user/profile', async (req, res) => {
   }
 });
 
-app.post('/api/user/profile', async (req, res) => {
+app.post('/api/user/profile', requireAuth, async (req, res) => {
   const updateData = req.body;
   const email = (updateData.email || '').toLowerCase().trim();
   if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
+
+  if (req.user.role !== 'admin' && req.user.email !== email) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
+
+  // Proteção contra Mass Assignment do campo role
+  if (updateData.role !== undefined && req.user.role !== 'admin') {
+    delete updateData.role;
+  }
 
   const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email);
   if (isAdmin) {
@@ -511,10 +720,14 @@ app.post('/api/user/profile', async (req, res) => {
   }
 });
 
-app.delete('/api/user/profile', async (req, res) => {
+app.delete('/api/user/profile', requireAuth, async (req, res) => {
   const email = (req.query.email || req.body.email) as string;
   if (!email) return res.status(400).json({ error: 'E-mail é obrigatório.' });
   const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
 
   try {
     const { data: userData } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
@@ -542,13 +755,21 @@ app.delete('/api/user/profile', async (req, res) => {
 });
 
 // NOTIFICATIONS
-app.get('/api/notifications', async (req, res) => {
-  const email = req.query.email as string;
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  let email = req.query.email as string;
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
+
   try {
     let query = supabaseAdmin.from('notifications').select('*');
 
-    if (email) {
-      const cleanEmail = email.toLowerCase().trim();
+    if (cleanEmail) {
       const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
       if (user) {
         query = query.eq('user_id', user.id);
@@ -589,13 +810,20 @@ app.get('/api/notifications', async (req, res) => {
 });
 
 // USER STATS (Real Weekly Data)
-app.get('/api/user/stats', async (req, res) => {
-  const email = (req.query.email as string || '').toLowerCase().trim();
-  if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
+app.get('/api/user/stats', requireAuth, async (req, res) => {
+  let email = (req.query.email as string || '').toLowerCase().trim();
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
 
   try {
     // Busca o user id
-    const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', email).maybeSingle();
+    const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
     if (!user) return res.json({ weekly: [], summary: { average: 0, best: 0, total: 0 } });
 
     // Busca logs de XP dos últimos 7 dias
@@ -705,7 +933,7 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // ADMIN ENDPOINTS
-app.get('/api/admin/users', async (req, res) => {
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('users')
@@ -724,7 +952,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-app.get('/api/admin/activities', async (req, res) => {
+app.get('/api/admin/activities', requireAdmin, async (req, res) => {
   try {
     const { data: logs, error } = await supabaseAdmin
       .from('xp_logs')
@@ -791,13 +1019,21 @@ app.get('/api/admin/activities', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/read-all', async (req, res) => {
-  const email = req.query.email as string;
+app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
+  let email = req.query.email as string;
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
+
   try {
     let query = supabaseAdmin.from('notifications').update({ is_read: true }).eq('is_read', false);
 
-    if (email) {
-      const cleanEmail = email.toLowerCase().trim();
+    if (cleanEmail) {
       const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
       if (user) {
         query = query.eq('user_id', user.id);
@@ -815,8 +1051,19 @@ app.post('/api/notifications/read-all', async (req, res) => {
   }
 });
 
-app.post('/api/notifications/:id/read', async (req, res) => {
+app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
   try {
+    // Valida que a notificação pertence ao usuário logado
+    const { data: notif } = await supabaseAdmin
+      .from('notifications')
+      .select('user_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (notif && notif.user_id !== req.user.userId && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    }
+
     const { error } = await supabaseAdmin.from('notifications').update({ is_read: true }).eq('id', req.params.id);
     if (error) throw error;
     res.json({ success: true });
@@ -827,9 +1074,35 @@ app.post('/api/notifications/:id/read', async (req, res) => {
 });
 
 // UPLOAD DE ARQUIVOS (PDF, ETC) COM SUPABASE STORAGE
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Limite de 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif'
+    ];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo não permitido. Apenas PDFs e imagens (PNG, JPEG, GIF) são aceitos.'));
+    }
+  }
+});
 
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', requireAdmin, (req: any, res: any, next: any) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+}, async (req: any, res: any) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
@@ -867,7 +1140,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 
 // MATERIALS
-app.get('/api/materials', async (req, res) => {
+app.get('/api/materials', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin.from('materials').select('*').order('id', { ascending: false });
     if (error) throw error;
@@ -889,7 +1162,7 @@ app.get('/api/materials', async (req, res) => {
   }
 });
 
-app.post('/api/materials', async (req, res) => {
+app.post('/api/materials', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -920,14 +1193,14 @@ app.post('/api/materials', async (req, res) => {
   }
 });
 
-app.delete('/api/materials/:id', async (req, res) => {
+app.delete('/api/materials/:id', requireAdmin, async (req, res) => {
   try {
     await supabaseAdmin.from('materials').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) { res.status(204).end(); }
 });
 
-app.put('/api/materials/:id', async (req, res) => {
+app.put('/api/materials/:id', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -957,7 +1230,7 @@ app.put('/api/materials/:id', async (req, res) => {
 });
 
 // MURAL
-app.get('/api/recados', async (req, res) => {
+app.get('/api/recados', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin.from('mural').select('*').order('created_at', { ascending: false });
     if (error) throw error;
@@ -978,7 +1251,7 @@ app.get('/api/recados', async (req, res) => {
   }
 });
 
-app.post('/api/recados', async (req, res) => {
+app.post('/api/recados', requireAdmin, async (req, res) => {
   try {
     const dbBody = {
       title: req.body.title,
@@ -1010,7 +1283,7 @@ app.post('/api/recados', async (req, res) => {
   }
 });
 
-app.delete('/api/recados/:id', async (req, res) => {
+app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
     await supabaseAdmin.from('mural').delete().eq('id', req.params.id);
     res.status(204).end();
@@ -1019,7 +1292,7 @@ app.delete('/api/recados/:id', async (req, res) => {
   }
 });
 
-app.put('/api/recados/:id', async (req, res) => {
+app.put('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
     const dbBody = {
       title: req.body.title,
@@ -1047,7 +1320,7 @@ app.put('/api/recados/:id', async (req, res) => {
 });
 
 // EVENTOS
-app.get('/api/eventos', async (req, res) => {
+app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
       .from('eventos')
@@ -1074,7 +1347,7 @@ app.get('/api/eventos', async (req, res) => {
   }
 });
 
-app.post('/api/eventos', async (req, res) => {
+app.post('/api/eventos', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1117,7 +1390,7 @@ app.post('/api/eventos', async (req, res) => {
   }
 });
 
-app.delete('/api/eventos/:id', async (req, res) => {
+app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabaseAdmin
       .from('eventos')
@@ -1131,7 +1404,7 @@ app.delete('/api/eventos/:id', async (req, res) => {
   }
 });
 
-app.put('/api/eventos/:id', async (req, res) => {
+app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1175,7 +1448,7 @@ app.put('/api/eventos/:id', async (req, res) => {
 });
 
 // QUESTOES
-app.get('/api/questoes', async (req, res) => {
+app.get('/api/questoes', requireAuth, async (req, res) => {
   const { year, limit = 50, offset = 0 } = req.query;
   if (!year) return res.status(400).json({ error: 'Ano necessário' });
   try {
@@ -1187,7 +1460,7 @@ app.get('/api/questoes', async (req, res) => {
   } catch (error) { res.status(500).json({ error: 'Erro ao buscar questões' }); }
 });
 
-app.post('/api/answers', async (req, res) => {
+app.post('/api/answers', requireAuth, async (req, res) => {
   const { userId, questionId, isCorrect } = req.body;
   try {
     await supabaseAdmin.from('answers').insert([{ user_id: userId, question_id: questionId, is_correct: isCorrect, created_at: new Date().toISOString() }]);
@@ -1199,10 +1472,22 @@ app.post('/api/answers', async (req, res) => {
 });
 
 app.get('/api/imagem', async (req, res) => {
-  const url = req.query.url as string;
-  if (!url) return res.status(400).send('URL missing');
+  const urlStr = req.query.url as string;
+  if (!urlStr) return res.status(400).send('URL missing');
   try {
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' } });
+    const parsedUrl = new URL(urlStr);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    
+    // Allowlist de domínios seguros contra SSRF
+    const isAllowedHost = hostname === 'enem.dev' || 
+                          hostname === 'api.enem.dev' || 
+                          hostname.endsWith('.supabase.co');
+
+    if (!isAllowedHost) {
+      return res.status(403).send('Acesso negado: domínio não permitido.');
+    }
+
+    const response = await fetch(urlStr, { headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' } });
     if (!response.ok) return res.status(response.status).send('Fetch error');
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=86400');

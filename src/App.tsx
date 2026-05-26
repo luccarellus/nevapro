@@ -155,6 +155,11 @@ export default function App() {
       setPendingTab('logout');
       return;
     }
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Erro ao fazer logout no servidor:', err);
+    }
     await supabase.auth.signOut();
     localStorage.removeItem('neva_student_session');
     setIsLoggedIn(false);
@@ -165,6 +170,11 @@ export default function App() {
     setIsSimulationActive(false);
     if (pendingTab) {
       if (pendingTab === 'logout') {
+        try {
+          await fetch('/api/auth/logout', { method: 'POST' });
+        } catch (err) {
+          console.error('Erro ao fazer logout no servidor:', err);
+        }
         await supabase.auth.signOut();
         localStorage.removeItem('neva_student_session');
         setIsLoggedIn(false);
