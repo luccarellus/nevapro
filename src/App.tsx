@@ -46,6 +46,12 @@ export default function App() {
   const [pendingTab, setPendingTab] = useState<string | null>(null);
 
   const handleTabChange = (newTab: string) => {
+    if (user.role === 'admin') {
+      if (['admin', 'privacidade', 'cookies'].includes(newTab)) {
+        setActiveTab(newTab);
+      }
+      return;
+    }
     if (isSimulationActive) {
       setPendingTab(newTab);
     } else {
@@ -63,6 +69,9 @@ export default function App() {
         const parsedUser = JSON.parse(savedUser);
         setIsLoggedIn(true);
         setUser(parsedUser);
+        if (parsedUser.role === 'admin') {
+          setActiveTab('admin');
+        }
         fetchUser(parsedUser.email);
       } catch (e) {
         localStorage.removeItem('neva_student_session');
@@ -102,6 +111,10 @@ export default function App() {
         setUser(prev => ({ ...prev, ...profileWithNextLevel }));
         // Atualiza a sessão no localStorage para ambos os perfis (aluno e admin) para persistir no F5
         localStorage.setItem('neva_student_session', JSON.stringify(profileWithNextLevel));
+        
+        if (profile.role === 'admin') {
+          setActiveTab('admin');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch user:', error);
@@ -126,6 +139,10 @@ export default function App() {
     
     // Persiste a sessão local para ambos os perfis (aluno e admin)
     localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
+
+    if (loggedUser.role === 'admin') {
+      setActiveTab('admin');
+    }
 
     // Carrega e calcula imediatamente os dados corretos de interação e progresso do banco
     if (loggedUser.email) {
@@ -200,8 +217,8 @@ export default function App() {
   };
 
   const renderContent = () => {
-    if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => handleTabChange('dashboard')} />;
-    if (activeTab === 'cookies') return <CookiePolicy onBack={() => handleTabChange('dashboard')} />;
+    if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => handleTabChange(user.role === 'admin' ? 'admin' : 'dashboard')} />;
+    if (activeTab === 'cookies') return <CookiePolicy onBack={() => handleTabChange(user.role === 'admin' ? 'admin' : 'dashboard')} />;
 
     if (!isLoggedIn) {
       return <Login onLogin={handleLogin} onTabChange={handleTabChange} />;
@@ -232,7 +249,7 @@ export default function App() {
       case 'calendar':
         return <Calendar />;
       case 'admin':
-        return user.role === 'admin' ? <AdminDashboard user={user} onBackToApp={() => handleTabChange('dashboard')} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
+        return user.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
       case 'profile':
         return <Settings user={user} onUpdateUser={setUser} onClose={() => handleTabChange('dashboard')} />;
       default:
@@ -240,7 +257,7 @@ export default function App() {
     }
   };
 
-  const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab);
+  const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
 
   return (
     <div className="min-h-screen bg-bg-main transition-colors duration-300">

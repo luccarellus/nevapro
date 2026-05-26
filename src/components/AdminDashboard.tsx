@@ -25,7 +25,8 @@ import {
   Upload,
   Link as LinkIcon,
   BookOpen,
-  Trophy
+  Trophy,
+  LogOut
 } from 'lucide-react';
 import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
@@ -130,10 +131,10 @@ const ensureCentroPrefix = (schoolName: string): string => {
 
 interface AdminDashboardProps {
   user: UserProfile;
-  onBackToApp: () => void;
+  onLogout: () => void;
 }
 
-export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProps) {
+export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [recados, setRecados] = useState<Notice[]>([]);
   const [eventos, setEventos] = useState<StudyEvent[]>([]);
@@ -858,7 +859,7 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
           <ShieldCheck size={64} className="mx-auto mb-6 text-red-500" />
           <h1 className="text-3xl font-black mb-2">Acesso Restrito</h1>
           <p className="text-text-secondary mb-8">Esta área é exclusiva para administradores.</p>
-          <button onClick={onBackToApp} className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white">Voltar ao App</button>
+          <button onClick={onLogout} className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white">Sair do sistema</button>
         </div>
       </div>
     );
@@ -969,11 +970,11 @@ export default function AdminDashboard({ user, onBackToApp }: AdminDashboardProp
 
         <div className="mt-auto p-8">
           <button 
-            onClick={onBackToApp}
-            className="w-full flex items-center gap-3 px-6 py-4 bg-text-main/5 hover:bg-text-main/10 border border-border-color rounded-2xl text-text-main font-bold text-sm transition-all shadow-sm"
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-6 py-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-2xl text-red-500 font-bold text-sm transition-all shadow-sm"
           >
-            <ArrowRight className="rotate-180" size={18} />
-            Voltar ao painel
+            <LogOut size={18} />
+            Sair do sistema
           </button>
         </div>
       </aside>
