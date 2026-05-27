@@ -10,6 +10,14 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: any;
+    }
+  }
+}
+
 export const app = express();
 
 // Configuração de cookies
@@ -92,14 +100,24 @@ const requireAuth = async (req: any, res: any, next: any) => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const supabaseUser = await getUserFromSupabase(authHeader);
     if (supabaseUser && supabaseUser.email) {
-      // Busca a role no banco
-      const { data: dbUser } = await supabaseAdmin
-        .from('users')
+      // Busca a role no banco de administradores
+      const { data: dbAdmin } = await supabaseAdmin
+        .from('admin_users')
         .select('role')
         .eq('email', supabaseUser.email.toLowerCase().trim())
         .maybeSingle();
 
-      const userRole = dbUser?.role || 'student';
+      let userRole = dbAdmin?.role;
+      if (!userRole) {
+        // Fallback para a tabela de usuários comuns se necessário
+        const { data: dbUser } = await supabaseAdmin
+          .from('users')
+          .select('role')
+          .eq('email', supabaseUser.email.toLowerCase().trim())
+          .maybeSingle();
+        userRole = dbUser?.role || 'student';
+      }
+
       req.user = {
         userId: supabaseUser.id,
         email: supabaseUser.email,
@@ -172,14 +190,14 @@ const ensureAdminInDb = async (email: string, name?: string, preferredId?: strin
   try {
     const cleanEmail = email.toLowerCase().trim();
     const { data: existingUser } = await supabaseAdmin
-      .from('users')
+      .from('admin_users')
       .select('*')
       .eq('email', cleanEmail)
       .maybeSingle();
 
     if (existingUser) {
       if (existingUser.role !== 'admin') {
-        await supabaseAdmin.from('users').update({ role: 'admin' }).eq('id', existingUser.id);
+        await supabaseAdmin.from('admin_users').update({ role: 'admin' }).eq('id', existingUser.id);
         existingUser.role = 'admin';
       }
       return existingUser;
@@ -207,17 +225,12 @@ const ensureAdminInDb = async (email: string, name?: string, preferredId?: strin
       email: cleanEmail,
       name: name || cleanEmail.split('@')[0],
       role: 'admin',
-      password_hash: 'managed_by_auth',
-      level: 1,
-      total_xp: 0,
-      current_streak: 0,
-      questions_attempted: 0,
-      questions_resolved: 0,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
     const { data: inserted, error: insertErr } = await supabaseAdmin
-      .from('users')
+      .from('admin_users')
       .insert([newAdmin])
       .select()
       .single();
@@ -477,6 +490,7 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
     }
 
     await supabaseAdmin.from('users').delete().eq('email', cleanEmail);
+    await supabaseAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
     const { data: authResult } = await supabaseAdmin.auth.admin.listUsers();
     const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
@@ -502,8 +516,17 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   }
 
   try {
+    // Verifica se é administrador
+    const { data: adminExists } = await supabaseAdmin
+      .from('admin_users')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail) || !!adminExists;
+
     // 1. Administrador (Supabase Auth)
-    if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail)) {
+    if (isAdmin) {
       const { data: authData, error: authError } = await supabaseAuthVerifier.auth.signInWithPassword({
         email: cleanEmail,
         password: currentPassword,
@@ -592,15 +615,27 @@ app.get('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   try {
-    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail);
+    // 1. Busca se é administrador em admin_users
+    const { data: dbAdmin } = await supabaseAdmin
+      .from('admin_users')
+      .select('*')
+      .eq('email', cleanEmail)
+      .maybeSingle();
 
+    if (dbAdmin) {
+      return res.json(getUserWithRole(dbAdmin));
+    }
+
+    // Fallback de administrador na lista estática
+    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail);
     if (isAdmin) {
-      const dbAdmin = await ensureAdminInDb(cleanEmail);
-      if (dbAdmin) {
-        return res.json(getUserWithRole(dbAdmin));
+      const ensuredAdmin = await ensureAdminInDb(cleanEmail);
+      if (ensuredAdmin) {
+        return res.json(getUserWithRole(ensuredAdmin));
       }
     }
 
+    // 2. Busca na tabela de usuários comuns (estudantes)
     const { data, error } = await supabaseAdmin.from('users').select('*').eq('email', cleanEmail).maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Usuário não encontrado' });
@@ -624,7 +659,14 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     delete updateData.role;
   }
 
-  const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email);
+  // Verifica se é administrador
+  const { data: adminExists } = await supabaseAdmin
+    .from('admin_users')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || !!adminExists;
   if (isAdmin) {
     await ensureAdminInDb(email, updateData.name);
   }
@@ -688,24 +730,42 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   try {
-    const { data, error } = await supabaseAdmin.from('users').update(supabaseUpdate).eq('email', email).select().single();
+    const targetTable = isAdmin ? 'admin_users' : 'users';
+    const updatePayload = isAdmin 
+      ? { name: supabaseUpdate.name, email: supabaseUpdate.email }
+      : supabaseUpdate;
+
+    const { data, error } = await supabaseAdmin.from(targetTable).update(updatePayload).eq('email', email).select().single();
     if (error && error.code === 'PGRST116') {
-      supabaseUpdate.password_hash = 'managed_by_auth';
-      const ins = await supabaseAdmin.from('users').insert([supabaseUpdate]).select().single();
-      if (ins.data && ins.data.xp > 0) {
-        await supabaseAdmin.from('xp_logs').insert([{
-          user_id: ins.data.id,
-          amount: ins.data.xp,
-          reason: 'XP Inicial',
-          created_at: new Date().toISOString()
-        }]);
+      if (!isAdmin) {
+        supabaseUpdate.password_hash = 'managed_by_auth';
+        const ins = await supabaseAdmin.from('users').insert([supabaseUpdate]).select().single();
+        if (ins.data && ins.data.xp > 0) {
+          await supabaseAdmin.from('xp_logs').insert([{
+            user_id: ins.data.id,
+            amount: ins.data.xp,
+            reason: 'XP Inicial',
+            created_at: new Date().toISOString()
+          }]);
+        }
+        return res.json({ success: true, user: getUserWithRole(ins.data) });
+      } else {
+        const newAdminPayload = {
+          id: req.user.userId || crypto.randomUUID(),
+          email,
+          name: updateData.name || email.split('@')[0],
+          role: 'admin',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        const ins = await supabaseAdmin.from('admin_users').insert([newAdminPayload]).select().single();
+        return res.json({ success: true, user: getUserWithRole(ins.data) });
       }
-      return res.json({ success: true, user: getUserWithRole(ins.data) });
     }
     if (error) throw error;
 
     // If there is an XP increase, insert an entry in xp_logs to feed weekly charts
-    if (userId && xpDiff > 0) {
+    if (!isAdmin && userId && xpDiff > 0) {
       await supabaseAdmin.from('xp_logs').insert([{
         user_id: userId,
         amount: xpDiff,
@@ -737,9 +797,10 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
       await supabaseAdmin.from('xp_logs').delete().eq('user_id', userId);
       await supabaseAdmin.from('answers').delete().eq('user_id', userId);
       await supabaseAdmin.from('notifications').delete().eq('user_id', userId);
+      await supabaseAdmin.from('users').delete().eq('email', cleanEmail);
     }
 
-    await supabaseAdmin.from('users').delete().eq('email', cleanEmail);
+    await supabaseAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
     const { data: authResult } = await supabaseAdmin.auth.admin.listUsers();
     const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
