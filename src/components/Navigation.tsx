@@ -42,8 +42,8 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
     <>
       {/* Desktop Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-bg-sidebar border-r border-border-color z-50 flex flex-col pt-8 px-4 hidden lg:flex">
-        <div className="px-4 mb-10">
-          <Logo className="h-12" />
+        <div className="mb-10 flex justify-center w-full">
+          <Logo className="h-14 justify-center w-full" />
         </div>
 
         <div className="space-y-1">

@@ -896,8 +896,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="p-8 pt-10">
-          <div className="flex justify-between items-center mb-10">
-             <div className="text-text-main"><Logo className="h-10 md:h-12" /></div>
+          <div className="flex justify-between lg:justify-center items-center mb-10">
+             <div className="text-text-main flex lg:justify-center lg:w-full"><Logo className="h-10 md:h-12 lg:h-14 justify-center w-full" /></div>
             <button 
               className="lg:hidden text-text-secondary w-10 h-10 flex items-center justify-center bg-bg-main border border-border-color rounded-xl" 
               onClick={() => setIsSidebarOpen(false)}

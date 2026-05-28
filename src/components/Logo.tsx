@@ -18,7 +18,7 @@ export default function Logo({ className = "h-8" }: LogoProps) {
           onError={() => setHasError(true)}
         />
       ) : (
-        <div className="flex items-center h-full">
+        <div className="flex items-center justify-center h-full">
           <div className="h-full aspect-square bg-[#00b094] rounded-lg flex items-center justify-center text-white font-black text-xs min-h-[32px] min-w-[32px]">
             OJ
           </div>
