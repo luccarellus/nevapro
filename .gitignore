@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 uploads/
+crop.ps1
+public/icon-512.png.bak
+
