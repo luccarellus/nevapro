@@ -19,6 +19,7 @@ declare global {
 }
 
 export const app = express();
+app.set('trust proxy', 1);
 
 // Configuração de cookies
 app.use(cookieParser());
@@ -42,7 +43,11 @@ app.use(helmet({
 app.use(express.json());
 
 // --- SISTEMA DE AUTENTICAÇÃO E SESSÕES CRIPTOGRAFADAS ---
-const SESSION_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'neva_fallback_secret_key_12345';
+const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.JWT_SECRET && !process.env.SESSION_SECRET) {
+  console.warn('\n[SECURITY WARNING] JWT_SECRET não definido no .env. Uma chave randômica foi gerada, o que invalidará todas as sessões se o servidor reiniciar.\n');
+}
+
 
 // Gera um token de sessão assinado
 const generateToken = (userId: string, email: string, role: string) => {
@@ -152,6 +157,15 @@ const requireAdmin = (req: any, res: any, next: any) => {
 
 // Middleware: Rate Limiter simples em memória
 const rateLimiterAttempts = new Map<string, { count: number, lastAttempt: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, attempt] of rateLimiterAttempts.entries()) {
+    if (now - attempt.lastAttempt > 60000) {
+      rateLimiterAttempts.delete(ip);
+    }
+  }
+}, 60000);
+
 const rateLimiter = (limit: number, windowMs: number) => {
   return (req: any, res: any, next: any) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
@@ -388,13 +402,25 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
       if (!dbPassword) return res.status(401).json({ error: 'Conta sem senha definida. Entre em contato com o suporte.' });
 
       let isValid = false;
+      let needsHashUpgrade = false;
       if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
         isValid = await bcrypt.compare(password, dbPassword);
       } else {
         isValid = dbPassword === password;
+        if (isValid) needsHashUpgrade = true;
       }
 
       if (isValid) {
+        if (needsHashUpgrade) {
+          try {
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            await supabaseAdmin.from('users').update({ password_hash: hashedPassword }).eq('id', student.id);
+            console.log(`[Security] Senha legada do usuário ${student.email} convertida para BCrypt com sucesso.`);
+          } catch (e) {
+            console.error('[Security] Erro ao converter senha legada:', e);
+          }
+        }
         const userObj = getUserWithRole(student);
         if (userObj) {
           const token = generateToken(userObj.id, userObj.email, userObj.role);
@@ -672,11 +698,12 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   const supabaseUpdate: any = { email };
-  const allowedFields = [
-    'name', 'xp', 'level', 'city', 'school', 'gremio',
-    'role',
-    'answeredQuestions', 'correctAnswers', 'streak'
-  ];
+  const allowedFields = ['name', 'city', 'school', 'gremio', 'languagePreference', 'showInLeaderboard'];
+  
+  if (req.user.role === 'admin') {
+    allowedFields.push('xp', 'level', 'role', 'answeredQuestions', 'correctAnswers', 'streak');
+  }
+
   allowedFields.forEach(field => {
     if (updateData[field] !== undefined) supabaseUpdate[field] = updateData[field];
   });
@@ -1540,9 +1567,13 @@ app.get('/api/imagem', async (req, res) => {
     const hostname = parsedUrl.hostname.toLowerCase();
     
     // Allowlist de domínios seguros contra SSRF
+    const SUPABASE_URL = process.env.SUPABASE_URL || '';
+    let supabaseHostname = '';
+    try { supabaseHostname = new URL(SUPABASE_URL).hostname.toLowerCase(); } catch (e) {}
+
     const isAllowedHost = hostname === 'enem.dev' || 
                           hostname === 'api.enem.dev' || 
-                          hostname.endsWith('.supabase.co');
+                          (supabaseHostname && hostname === supabaseHostname);
 
     if (!isAllowedHost) {
       return res.status(403).send('Acesso negado: domínio não permitido.');
