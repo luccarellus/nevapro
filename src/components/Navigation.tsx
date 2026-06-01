@@ -11,7 +11,7 @@ interface NavigationProps {
 }
 
 export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout }: NavigationProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-[#00e5ff]', bgColor: 'bg-[#00e5ff]/10', hex: '#00e5ff' },
@@ -29,13 +29,18 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
 
   const mainMobileTabs = tabs.slice(0, 4);
   const otherTabs = [
-    ...tabs.slice(4), 
-    { id: 'profile', label: 'Preferências', icon: User, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' }
+    ...tabs.slice(4),
+    { id: 'profile', label: 'Preferências', icon: User, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' },
+    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-500', bgColor: 'bg-red-500/10', hex: '#ef4444' }
   ];
 
   const handleTabClick = (id: string) => {
-    setActiveTab(id);
-    setIsMenuOpen(false);
+    if (id === 'logout' && onLogout) {
+      onLogout();
+    } else {
+      setActiveTab(id);
+      setShowMore(false);
+    }
   };
 
   return (
@@ -105,137 +110,99 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 lg:hidden bg-bg-sidebar/95 backdrop-blur-xl z-[100] border-t border-border-color shadow-2xl safe-p-bottom">
-        <div className="flex justify-around items-center px-2">
-          {mainMobileTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabClick(tab.id)}
-                className={`flex flex-col items-center gap-1 py-3 px-2 flex-1 transition-all ${
-                  isActive ? tab.color : 'text-text-secondary'
-                }`}
-              >
-                <div className={`relative p-2 rounded-xl transition-all ${isActive ? tab.bgColor : ''}`}>
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeBottomTab"
-                      className="absolute inset-x-0 -bottom-1 h-0.5 rounded-full"
-                      style={{
-                        backgroundColor: tab.hex || 'currentColor'
-                      }}
-                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
-                </div>
-                <span className="text-[10px] font-bold tracking-tight opacity-70 text-center whitespace-nowrap">
-                  {tab.id === 'dashboard' ? 'Início' : tab.label.split(' ')[0]}
-                </span>
-              </button>
-            );
-          })}
+      {/* Mobile Bottom Navigation - Expandable */}
+      <nav className="fixed bottom-0 left-0 right-0 lg:hidden bg-bg-sidebar/95 backdrop-blur-xl z-[100] border-t border-border-color shadow-2xl safe-p-bottom transition-all duration-300">
+        <div className="flex flex-col px-2">
           
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className={`flex flex-col items-center gap-1 py-3 px-2 flex-1 transition-all ${
-              isMenuOpen ? 'text-brand-primary' : (otherTabs.some(t => t.id === activeTab) ? 'text-brand-primary' : 'text-text-secondary text-opacity-50')
-            }`}
-          >
-            <div className={`relative p-2 rounded-xl transition-all`}>
-              {isMenuOpen ? <X size={20} /> : <MoreHorizontal size={20} />}
-              {!isMenuOpen && otherTabs.some(t => t.id === activeTab) && (
-                 <motion.div
-                   layoutId="activeBottomTab"
-                   className="absolute inset-x-0 -bottom-1 h-0.5 bg-brand-primary rounded-full"
-                   transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                 />
-              )}
-            </div>
-            <span className="text-[10px] font-bold tracking-tight opacity-70 text-center">Menu</span>
-          </button>
+          <AnimatePresence>
+            {showMore && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-4 gap-2 pt-4 pb-2 border-b border-border-color/30">
+                  {otherTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabClick(tab.id)}
+                        className={`flex flex-col items-center gap-1 py-2 px-1 transition-all ${
+                          isActive ? tab.color : tab.id === 'logout' ? 'text-red-500/70 hover:text-red-500' : 'text-text-secondary hover:text-text-main'
+                        }`}
+                      >
+                        <div className={`relative p-2 rounded-xl transition-all ${isActive ? tab.bgColor : tab.id === 'logout' ? 'bg-red-500/10' : 'bg-bg-card'}`}>
+                          <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                        </div>
+                        <span className="text-[10px] font-bold tracking-tight opacity-70 text-center whitespace-nowrap overflow-hidden text-ellipsis w-full">
+                          {tab.label.split(' ')[0]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex justify-around items-center w-full">
+            {mainMobileTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabClick(tab.id)}
+                  className={`flex flex-col items-center gap-1 py-3 px-2 flex-1 transition-all ${
+                    isActive ? tab.color : 'text-text-secondary hover:text-text-main'
+                  }`}
+                >
+                  <div className={`relative p-2 rounded-xl transition-all ${isActive ? tab.bgColor : ''}`}>
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeBottomTab"
+                        className="absolute inset-x-0 -bottom-1 h-0.5 rounded-full"
+                        style={{ backgroundColor: tab.hex || 'currentColor' }}
+                        transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                  </div>
+                  <span className="text-[10px] font-bold tracking-tight opacity-70 text-center whitespace-nowrap">
+                    {tab.id === 'dashboard' ? 'Início' : tab.label.split(' ')[0]}
+                  </span>
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => setShowMore(!showMore)}
+              className={`flex flex-col items-center gap-1 py-3 px-2 flex-1 transition-all ${
+                showMore ? 'text-brand-primary' : (otherTabs.some(t => t.id === activeTab) ? 'text-brand-primary' : 'text-text-secondary')
+              }`}
+            >
+              <div className="relative p-2 rounded-xl transition-all">
+                {showMore ? <X size={20} /> : <MoreHorizontal size={20} />}
+                {!showMore && otherTabs.some(t => t.id === activeTab) && (
+                  <motion.div
+                    layoutId="activeBottomTab"
+                    className="absolute inset-x-0 -bottom-1 h-0.5 bg-brand-primary rounded-full"
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+              </div>
+              <span className="text-[10px] font-bold tracking-tight opacity-70 text-center whitespace-nowrap">
+                {showMore ? 'Menos' : 'Mais opções'}
+              </span>
+            </button>
+          </div>
         </div>
       </nav>
-
-      {/* Mobile More Menu Overlay */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 100 }}
-            className="fixed inset-0 z-[90] lg:hidden flex flex-col justify-end"
-          >
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMenuOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
-            />
-            <div className="relative bg-bg-sidebar border-t border-border-color rounded-t-[32px] p-8 pb-12 max-h-[80vh] overflow-y-auto safe-p-bottom">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-text-main">Navegação</h3>
-                <button 
-                  onClick={() => setIsMenuOpen(false)} 
-                  className="p-2 bg-bg-card rounded-full text-text-secondary"
-                  title="Fechar menu"
-                  aria-label="Fechar menu"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                {otherTabs.map((tab: any) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabClick(tab.id)}
-                      className={`flex flex-col items-start gap-4 p-5 rounded-2xl border transition-all ${
-                        isActive 
-                        ? `${tab.bgColor} border-[#ffffff10] ${tab.color}` 
-                        : 'bg-bg-card border-border-color text-text-secondary hover:text-text-main'
-                      }`}
-                    >
-                      <div className={`p-3 rounded-xl ${isActive ? tab.bgColor : 'bg-bg-sidebar shadow-sm'}`}>
-                        <Icon size={20} className={isActive ? tab.color : 'text-text-secondary'} />
-                      </div>
-                      <span className="text-sm font-black text-left">{tab.label}</span>
-                    </button>
-                  );
-                })}
-
-                <button
-                  onClick={() => {
-                    onLogout?.();
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex flex-col items-start gap-4 p-5 rounded-2xl border bg-red-500/5 border-red-500/10 text-red-500 hover:bg-red-500/10 transition-all"
-                >
-                  <div className="p-3 rounded-xl bg-red-500 text-white shadow-sm">
-                    <LogOut size={20} />
-                  </div>
-                  <span className="text-sm font-black text-left">Log-off</span>
-                </button>
-              </div>
-
-              <div className="mt-8 pt-8 border-t border-border-color">
-                <p className="text-[10px] text-center text-text-secondary opacity-50 font-bold">
-                  Neva v1.0 • Foco no ENEM
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }
