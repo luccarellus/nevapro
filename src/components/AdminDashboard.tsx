@@ -120,14 +120,7 @@ const getCanonicalSchoolMap = (rawSchools: (string | null | undefined)[]): Recor
   return canonicalMap;
 };
 
-const ensureCentroPrefix = (schoolName: string): string => {
-  if (!schoolName) return '';
-  const trimmed = schoolName.trim();
-  if (/^centro\b/i.test(trimmed)) {
-    return trimmed;
-  }
-  return `Centro ${trimmed}`;
-};
+
 
 interface AdminDashboardProps {
   user: UserProfile;
@@ -198,8 +191,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         if (filterSchool) {
           const studentRawSchool = student.school || '';
           const studentCanonical = schoolMap[studentRawSchool] || studentRawSchool;
-          const studentFormatted = ensureCentroPrefix(studentCanonical);
-          matchesSchool = normalizeString(studentFormatted) === normalizeString(filterSchool);
+          matchesSchool = normalizeString(studentCanonical) === normalizeString(filterSchool);
         }
           
         const matchesGremio = filterGremio 
@@ -221,7 +213,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     if (filterCity) {
       filtered = cidadesEscolasData.filter(item => item.city === filterCity);
     }
-    const canonicalNames = filtered.map(item => ensureCentroPrefix(item.school));
+    const canonicalNames = filtered.map(item => item.school);
     return Array.from(new Set(canonicalNames)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [filterCity]);
 
@@ -253,8 +245,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     students.forEach(s => {
       if (s.school) {
         const canonical = schoolMap[s.school] || s.school;
-        const formatted = ensureCentroPrefix(canonical);
-        schoolXp[formatted] = (schoolXp[formatted] || 0) + (s.xp || 0);
+        schoolXp[canonical] = (schoolXp[canonical] || 0) + (s.xp || 0);
       }
     });
     let bestSchool = '-';

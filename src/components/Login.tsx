@@ -316,6 +316,8 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
+                          minLength={6}
+                          title="A senha deve ter no mínimo 6 caracteres"
                           className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-4 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner"
                           placeholder="••••••••"
                         />

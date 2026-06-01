@@ -57,10 +57,18 @@ const generateToken = (userId: string, email: string, role: string) => {
   return `${payload}:${signature}`;
 };
 
+// Armazena tokens revogados em memória (Logout/Invalidação)
+const revokedTokens = new Set<string>();
+
+// Limpeza periódica de tokens revogados antigos (evita vazamento de memória)
+setInterval(() => {
+  revokedTokens.clear();
+}, 24 * 60 * 60 * 1000);
+
 // Valida a assinatura de um token de sessão
 const verifyToken = (token: string) => {
   try {
-    if (!token) return null;
+    if (!token || revokedTokens.has(token)) return null;
     const parts = token.split(':');
     if (parts.length !== 5) return null;
     const [userId, email, role, expiresAtStr, signature] = parts;
@@ -192,6 +200,21 @@ const rateLimiter = (limit: number, windowMs: number) => {
     next();
   };
 };
+
+// Controle de tentativas de login por e-mail (Proteção contra Força Bruta)
+const loginAttempts = new Map<string, { count: number, lockUntil: number | null }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+
+// Limpeza de bloqueios expirados
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, attempt] of loginAttempts.entries()) {
+    if (attempt.lockUntil && now > attempt.lockUntil) {
+      loginAttempts.delete(email);
+    }
+  }
+}, 60000);
 
 // Configuração de Administradores
 const ADMIN_EMAILS = [
@@ -355,6 +378,13 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
+  // Verifica bloqueio de conta
+  const attempt = loginAttempts.get(cleanEmail);
+  if (attempt && attempt.lockUntil && Date.now() < attempt.lockUntil) {
+    const waitTime = Math.ceil((attempt.lockUntil - Date.now()) / 60000);
+    return res.status(429).json({ error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${waitTime} minutos.` });
+  }
+
   try {
     // 1. Supabase Auth (Para Admins registrados via Dash)
     const { data: authData, error: authError } = await supabaseAuthVerifier.auth.signInWithPassword({
@@ -431,9 +461,18 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000
           });
         }
+        loginAttempts.delete(cleanEmail); // Reset attempts on success
         return res.json({ success: true, user: userObj });
       }
     }
+
+    // Incrementar tentativas falhas
+    const currentAttempt = loginAttempts.get(cleanEmail) || { count: 0, lockUntil: null };
+    currentAttempt.count++;
+    if (currentAttempt.count >= MAX_LOGIN_ATTEMPTS) {
+      currentAttempt.lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+    }
+    loginAttempts.set(cleanEmail, currentAttempt);
 
     return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
 
@@ -443,12 +482,26 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   }
 });
 
+// Função utilitária para sanitizar strings (remover tags HTML)
+const sanitizeInput = (input: string) => {
+  if (!input) return '';
+  return input.replace(/<[^>]*>?/gm, '').trim().substring(0, 100);
+};
+
 // REGISTER
 app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
 
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
+  }
+
   const cleanEmail = email.toLowerCase().trim();
+  const safeName = sanitizeInput(name);
+  const safeCity = sanitizeInput(city);
+  const safeSchool = sanitizeInput(school);
+  const safeGremio = sanitizeInput(gremio);
 
   try {
     if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail)) {
@@ -464,11 +517,11 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
     const newStudent = {
       id: crypto.randomUUID(),
       email: cleanEmail,
-      name: name || cleanEmail.split('@')[0],
+      name: safeName || cleanEmail.split('@')[0],
       role: 'student',
-      city,
-      school,
-      gremio,
+      city: safeCity,
+      school: safeSchool,
+      gremio: safeGremio,
       xp: 0,
       level: 1,
       created_at: new Date().toISOString(),
@@ -620,6 +673,11 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // LOGOUT
 app.post('/api/auth/logout', (req, res) => {
+  const token = req.cookies?.session_token;
+  if (token) {
+    revokedTokens.add(token);
+  }
+  
   res.clearCookie('session_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
