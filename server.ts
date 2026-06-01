@@ -43,9 +43,9 @@ app.use(helmet({
 app.use(express.json());
 
 // --- SISTEMA DE AUTENTICAÇÃO E SESSÕES CRIPTOGRAFADAS ---
-const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fallback_secret_nevapro_security_2024';
 if (!process.env.JWT_SECRET && !process.env.SESSION_SECRET) {
-  console.warn('\n[SECURITY WARNING] JWT_SECRET não definido no .env. Uma chave randômica foi gerada, o que invalidará todas as sessões se o servidor reiniciar.\n');
+  console.warn('[Aviso] Variáveis JWT_SECRET e SESSION_SECRET ausentes. Usando chave de fallback estática.');
 }
 
 
