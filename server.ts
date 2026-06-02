@@ -5,7 +5,8 @@ import bcrypt from 'bcryptjs';
 import helmet from 'helmet';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
-import { supabaseAdmin, supabaseAuthVerifier } from './src/lib/supabaseServer.js';
+import { supabaseAdmin } from './src/lib/supabaseServer.js';
+import { query } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -386,36 +387,54 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   }
 
   try {
-    // 1. Supabase Auth (Para Admins registrados via Dash)
-    const { data: authData, error: authError } = await supabaseAuthVerifier.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    });
+    // 1. PostgreSQL (Para Administradores)
+    try {
+      const { rows: adminRows } = await query('SELECT * FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+      const adminUser = adminRows[0];
 
-    if (!authError && authData.user) {
-      const dbAdmin = await ensureAdminInDb(cleanEmail, authData.user.user_metadata?.full_name, authData.user.id);
-      const userObj = getUserWithRole(dbAdmin || {
-        id: authData.user.id,
-        email: cleanEmail,
-        name: authData.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-        role: 'admin',
-        created_at: authData.user.created_at || new Date().toISOString()
-      });
+      if (adminUser) {
+        const dbPassword = adminUser.password_hash;
+        let isAdminValid = false;
+        let needsHashUpgrade = false;
 
-      if (userObj) {
-        const token = generateToken(userObj.id, userObj.email, userObj.role);
-        res.cookie('session_token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 24 * 60 * 60 * 1000
-        });
+        if (dbPassword) {
+          if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
+            isAdminValid = await bcrypt.compare(password, dbPassword);
+          } else {
+            isAdminValid = dbPassword === password;
+            if (isAdminValid) needsHashUpgrade = true;
+          }
+        }
+
+        if (isAdminValid) {
+          if (needsHashUpgrade) {
+            try {
+              const salt = await bcrypt.genSalt(10);
+              const hashedPassword = await bcrypt.hash(password, salt);
+              await query('UPDATE admin_users SET password_hash = $1 WHERE email = $2', [hashedPassword, cleanEmail]);
+              console.log(`[Security] Senha em texto puro do admin ${cleanEmail} convertida para BCrypt.`);
+            } catch (e) {
+              console.error('[Security] Erro ao converter senha de admin:', e);
+            }
+          }
+          const userObj = getUserWithRole(adminUser);
+          
+          if (userObj) {
+            const token = generateToken(userObj.id, userObj.email, userObj.role);
+            res.cookie('session_token', token, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict',
+              maxAge: 24 * 60 * 60 * 1000
+            });
+          }
+          
+          loginAttempts.delete(cleanEmail);
+          return res.json({ success: true, user: userObj });
+        }
       }
-
-      return res.json({
-        success: true,
-        user: userObj
-      });
+    } catch (dbErr) {
+      console.error('[Auth Admin] Erro DB:', dbErr);
     }
 
     // 2. Tabela de Alunos
@@ -604,24 +623,31 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
     const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail) || !!adminExists;
 
-    // 1. Administrador (Supabase Auth)
+    // 1. Administrador (PostgreSQL)
     if (isAdmin) {
-      const { data: authData, error: authError } = await supabaseAuthVerifier.auth.signInWithPassword({
-        email: cleanEmail,
-        password: currentPassword,
-      });
+      const { rows } = await query('SELECT password_hash FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Administrador não encontrado.' });
+      }
+      
+      const dbPassword = rows[0].password_hash;
+      let isValid = false;
+      if (dbPassword) {
+        if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
+          isValid = await bcrypt.compare(currentPassword, dbPassword);
+        } else {
+          isValid = dbPassword === currentPassword;
+        }
+      }
 
-      if (authError || !authData.user) {
+      if (!isValid) {
         return res.status(401).json({ error: 'Senha atual incorreta.' });
       }
 
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authData.user.id, {
-        password: newPassword
-      });
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-      if (updateError) {
-        throw updateError;
-      }
+      await query('UPDATE admin_users SET password_hash = $1 WHERE email = $2', [hashedPassword, cleanEmail]);
 
       return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
     }
