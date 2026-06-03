@@ -1126,13 +1126,13 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/activities', requireAdmin, async (req, res) => {
   try {
-    const { data: logs, error } = await supabaseAdmin
-      .from('xp_logs')
-      .select('*, users(name, city)')
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) throw error;
+    const { rows: logs } = await query(`
+      SELECT x.*, u.name as user_name, u.city as user_city
+      FROM xp_logs x
+      LEFT JOIN users u ON x.user_id = u.id
+      ORDER BY x.created_at DESC
+      LIMIT 20
+    `);
 
     const activities = (logs || []).map((log: any) => {
       const time = new Date(log.created_at);
@@ -1144,10 +1144,10 @@ app.get('/api/admin/activities', requireAdmin, async (req, res) => {
 
       return {
         id: log.id,
-        user: log.users?.name || 'Estudante',
+        user: log.user_name || 'Estudante',
         action: `Ganhou ${log.amount} XP: ${log.reason || 'Atividade'}`,
         time: timeStr,
-        city: log.users?.city || 'Brasil'
+        city: log.user_city || 'Brasil'
       };
     });
 
