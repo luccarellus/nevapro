@@ -1404,7 +1404,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
 // MURAL
 app.get('/api/recados', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin.from('mural').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabaseAdmin.from('notifications').select('*').order('created_at', { ascending: false });
     if (error) throw error;
 
     const mapped = (data || []).map(item => ({
@@ -1431,7 +1431,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('mural').insert([dbBody]).select().single();
+    const { data, error } = await supabaseAdmin.from('notifications').insert([dbBody]).select().single();
     if (error) {
       console.error('[POST /api/recados] Supabase insertion error:', error);
       throw error;
@@ -1457,7 +1457,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
 
 app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
-    await supabaseAdmin.from('mural').delete().eq('id', req.params.id);
+    const { error } = await supabaseAdmin.from('notifications').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) {
     res.status(204).end();
@@ -1472,7 +1472,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('mural').update(dbBody).eq('id', req.params.id).select().single();
+    const { data, error } = await supabaseAdmin.from('notifications').update(dbBody).eq('id', req.params.id).select().single();
     if (error) throw error;
 
     const mappedResult = {
@@ -1495,7 +1495,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
 app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
-      .from('eventos')
+      .from('events')
       .select('*')
       .order('date', { ascending: true });
     if (error) throw error;
@@ -1534,7 +1534,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await supabaseAdmin
-      .from('eventos')
+      .from('events')
       .insert([dbRecord])
       .select()
       .single();
@@ -1565,7 +1565,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
 app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabaseAdmin
-      .from('eventos')
+      .from('events')
       .delete()
       .eq('id', req.params.id);
     if (error) throw error;
@@ -1591,7 +1591,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await supabaseAdmin
-      .from('eventos')
+      .from('events')
       .update(dbRecord)
       .eq('id', req.params.id)
       .select()
