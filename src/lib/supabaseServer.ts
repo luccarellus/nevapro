@@ -56,6 +56,17 @@ class SupabaseQueryBuilder {
     return this;
   }
 
+  range(start: number, end: number) {
+    this.limitVal = end - start + 1;
+    return this;
+  }
+
+  gte(col: string, val: any) {
+    this.whereCols.push(`${col}__gte`);
+    this.whereVals.push(val);
+    return this;
+  }
+
   async execute() {
     let sql = '';
     const params: any[] = [];
@@ -63,7 +74,11 @@ class SupabaseQueryBuilder {
     if (this.action === 'select') {
       sql = `SELECT ${this.selectCols} FROM ${this.tableName}`;
       if (this.whereCols.length > 0) {
-        const whereClause = this.whereCols.map((c, i) => `${c} = $${i+1}`).join(' AND ');
+        const whereClause = this.whereCols.map((c, i) => {
+           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${i+1}`;
+           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${i+1}`;
+           return `${c} = $${i+1}`;
+        }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
       }
@@ -88,7 +103,11 @@ class SupabaseQueryBuilder {
       
       if (this.whereCols.length > 0) {
         const offset = keys.length;
-        const whereClause = this.whereCols.map((c, i) => `${c} = $${offset + i + 1}`).join(' AND ');
+        const whereClause = this.whereCols.map((c, i) => {
+           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${offset + i + 1}`;
+           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${offset + i + 1}`;
+           return `${c} = $${offset + i + 1}`;
+        }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
       }
@@ -96,7 +115,11 @@ class SupabaseQueryBuilder {
     } else if (this.action === 'delete') {
       sql = `DELETE FROM ${this.tableName}`;
       if (this.whereCols.length > 0) {
-        const whereClause = this.whereCols.map((c, i) => `${c} = $${i+1}`).join(' AND ');
+        const whereClause = this.whereCols.map((c, i) => {
+           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${i+1}`;
+           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${i+1}`;
+           return `${c} = $${i+1}`;
+        }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
       }
@@ -111,13 +134,11 @@ class SupabaseQueryBuilder {
     }
   }
 
-  async then(resolve: any, reject: any) {
-    try {
-      const res = await this.execute();
-      resolve(res);
-    } catch(e) {
-      reject(e);
-    }
+  then<TResult1 = any, TResult2 = never>(
+    resolve?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null,
+    reject?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2> {
+    return this.execute().then(resolve, reject);
   }
 
   async maybeSingle() {
@@ -142,8 +163,20 @@ export const supabaseAdmin = {
   auth: {
     admin: {
       async listUsers() { return { data: { users: [] }, error: null }; },
-      async deleteUser() { return { error: null }; },
+      async deleteUser(id: string) { return { error: null }; },
       async updateUserById(id: string, data: any) { return { error: null }; }
+    }
+  },
+  storage: {
+    from(bucket: string) {
+      return {
+        async upload(path: string, file: any, options?: any) {
+          return { data: null, error: new Error('Storage natively disabled. Switch to AWS S3/Vercel Blob.') };
+        },
+        getPublicUrl(path: string) {
+          return { data: { publicUrl: '/placeholder-url.pdf' } };
+        }
+      }
     }
   }
 };

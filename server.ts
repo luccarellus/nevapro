@@ -86,69 +86,18 @@ const verifyToken = (token: string) => {
   }
 };
 
-// Recupera usuário do Supabase a partir do header Authorization
-const getUserFromSupabase = async (authHeader?: string) => {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.substring(7);
-  try {
-    const { data: { user }, error } = await supabaseAuthVerifier.auth.getUser(token);
-    if (error || !user) return null;
-    return user;
-  } catch (err) {
-    return null;
-  }
-};
-
 // Middleware: Exige que a requisição esteja autenticada (via Cookie ou Bearer Token)
 const requireAuth = async (req: any, res: any, next: any) => {
-  // 1. Tentar autenticação via cookie
-  const token = req.cookies?.session_token;
+  let token = req.cookies?.session_token;
+  
+  if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.substring(7);
+  }
+
   const user = verifyToken(token);
   if (user) {
     req.user = user;
     return next();
-  }
-
-  // 2. Tentar autenticação via header Authorization (Bearer JWT do Supabase no client)
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const supabaseUser = await getUserFromSupabase(authHeader);
-    if (supabaseUser && supabaseUser.email) {
-      // Busca a role no banco de administradores
-      const { data: dbAdmin } = await supabaseAdmin
-        .from('admin_users')
-        .select('role')
-        .eq('email', supabaseUser.email.toLowerCase().trim())
-        .maybeSingle();
-
-      let userRole = dbAdmin?.role;
-      if (!userRole) {
-        // Fallback para a tabela de usuários comuns se necessário
-        const { data: dbUser } = await supabaseAdmin
-          .from('users')
-          .select('role')
-          .eq('email', supabaseUser.email.toLowerCase().trim())
-          .maybeSingle();
-        userRole = dbUser?.role || 'student';
-      }
-
-      req.user = {
-        userId: supabaseUser.id,
-        email: supabaseUser.email,
-        role: userRole
-      };
-
-      // Estabelece o cookie de sessão para chamadas subsequentes
-      const sessionToken = generateToken(supabaseUser.id, supabaseUser.email, userRole);
-      res.cookie('session_token', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
-      });
-
-      return next();
-    }
   }
 
   return res.status(401).json({ error: 'Sessão inválida ou expirada. Por favor, faça login novamente.' });
@@ -1404,7 +1353,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
 // MURAL
 app.get('/api/recados', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin.from('notifications').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabaseAdmin.from('mural').select('*').order('created_at', { ascending: false });
     if (error) throw error;
 
     const mapped = (data || []).map(item => ({
@@ -1431,7 +1380,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('notifications').insert([dbBody]).select().single();
+    const { data, error } = await supabaseAdmin.from('mural').insert([dbBody]).select().single();
     if (error) {
       console.error('[POST /api/recados] Supabase insertion error:', error);
       throw error;
@@ -1457,7 +1406,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
 
 app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
-    const { error } = await supabaseAdmin.from('notifications').delete().eq('id', req.params.id);
+    const { error } = await supabaseAdmin.from('mural').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) {
     res.status(204).end();
@@ -1472,7 +1421,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('notifications').update(dbBody).eq('id', req.params.id).select().single();
+    const { data, error } = await supabaseAdmin.from('mural').update(dbBody).eq('id', req.params.id).select().single();
     if (error) throw error;
 
     const mappedResult = {
@@ -1495,7 +1444,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
 app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
-      .from('events')
+      .from('eventos')
       .select('*')
       .order('date', { ascending: true });
     if (error) throw error;
@@ -1534,7 +1483,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await supabaseAdmin
-      .from('events')
+      .from('eventos')
       .insert([dbRecord])
       .select()
       .single();
@@ -1565,7 +1514,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
 app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabaseAdmin
-      .from('events')
+      .from('eventos')
       .delete()
       .eq('id', req.params.id);
     if (error) throw error;
@@ -1591,7 +1540,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await supabaseAdmin
-      .from('events')
+      .from('eventos')
       .update(dbRecord)
       .eq('id', req.params.id)
       .select()
