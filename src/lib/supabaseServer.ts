@@ -2,11 +2,25 @@ import { query } from './db.js';
 
 function sanitizeIdentifier(name: string): string {
   if (!name) return name;
-  // Permite apenas caracteres alfanuméricos, sublinhados, pontos, espaços, vírgulas, parênteses e asterisco
-  if (!/^[a-zA-Z0-9_\.,\s\*\(\)]+$/.test(name)) {
+  // Permite estritamente apenas caracteres alfanuméricos e sublinhados
+  if (!/^[a-zA-Z0-9_]+$/.test(name)) {
     throw new Error(`Identificador de banco de dados inválido ou inseguro: ${name}`);
   }
   return name;
+}
+
+function sanitizeSelectCols(cols: string): string {
+  if (!cols) return '*';
+  // Divide as colunas por vírgula e valida cada uma individualmente
+  const parts = cols.split(',');
+  for (let part of parts) {
+    part = part.trim();
+    // Cada coluna deve conter apenas caracteres alfanuméricos, sublinhados, asterisco e parênteses
+    if (!/^[a-zA-Z0-9_\*\(\)]+$/.test(part)) {
+      throw new Error(`Coluna de select insegura detectada: ${part}`);
+    }
+  }
+  return cols;
 }
 
 class SupabaseQueryBuilder {
@@ -83,7 +97,7 @@ class SupabaseQueryBuilder {
     const params: any[] = [];
     
     const safeTable = sanitizeIdentifier(this.tableName);
-    const safeSelectCols = sanitizeIdentifier(this.selectCols);
+    const safeSelectCols = sanitizeSelectCols(this.selectCols);
 
     if (this.action === 'select') {
       sql = `SELECT ${safeSelectCols} FROM ${safeTable}`;

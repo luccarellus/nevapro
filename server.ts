@@ -22,6 +22,20 @@ declare global {
 export const app = express();
 app.set('trust proxy', 1);
 
+// Configuração nativa de CORS
+app.use((req, res, next) => {
+  const origin = process.env.FRONTEND_URL || 'https://neva.pro';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Configuração de cookies
 app.use(cookieParser());
 
@@ -170,72 +184,7 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
-// Configuração de Administradores
-const ADMIN_EMAILS = [
-  'admin@neva.pro',
-  'lucassantos.-@outlook.com',
-  'presidente@olharjovem.org'
-];
 
-const ensureAdminInDb = async (email: string, name?: string, preferredId?: string) => {
-  try {
-    const cleanEmail = email.toLowerCase().trim();
-    const { data: existingUser } = await supabaseAdmin
-      .from('admin_users')
-      .select('*')
-      .eq('email', cleanEmail)
-      .maybeSingle();
-
-    if (existingUser) {
-      if (existingUser.role !== 'admin') {
-        await supabaseAdmin.from('admin_users').update({ role: 'admin' }).eq('id', existingUser.id);
-        existingUser.role = 'admin';
-      }
-      return existingUser;
-    }
-
-    let userId = preferredId;
-    if (!userId) {
-      try {
-        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-        const target = (authUsers as any)?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-        if (target) {
-          userId = target.id;
-        }
-      } catch (authErr) {
-        console.warn('[ensureAdminInDb] Falha ao listar usuários no auth:', authErr);
-      }
-    }
-
-    if (!userId) {
-      userId = crypto.randomUUID();
-    }
-
-    const newAdmin = {
-      id: userId,
-      email: cleanEmail,
-      name: name || cleanEmail.split('@')[0],
-      role: 'admin',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const { data: inserted, error: insertErr } = await supabaseAdmin
-      .from('admin_users')
-      .insert([newAdmin])
-      .select()
-      .single();
-
-    if (insertErr) {
-      console.error('[ensureAdminInDb] Falha ao inserir administrador:', insertErr);
-      return null;
-    }
-    return inserted;
-  } catch (err) {
-    console.error('[ensureAdminInDb] Erro inesperado:', err);
-    return null;
-  }
-};
 const isFlashQuizCompleted = async (email: string, userId: string): Promise<boolean> => {
   if (userId) {
     try {
@@ -265,8 +214,7 @@ const isFlashQuizCompleted = async (email: string, userId: string): Promise<bool
 // Identifica o cargo do usuário
 const getUserWithRole = (user: any) => {
   if (!user) return null;
-  const email = (user.email || '').toLowerCase().trim();
-  const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || user.role === 'admin';
+  const isAdmin = user.role === 'admin';
 
   return {
     ...user,
@@ -510,8 +458,9 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
   const safeGremio = sanitizeInput(gremio);
 
   try {
-    if (ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail)) {
-      return res.status(403).json({ error: 'E-mails administrativos devem ser criados pelo painel Supabase.' });
+    const { rows: adminExists } = await query('SELECT 1 FROM public.admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+    if (adminExists.length > 0) {
+      return res.status(403).json({ error: 'E-mails administrativos devem ser gerenciados pelo banco de dados.' });
     }
 
     const { data: existing } = await supabaseAdmin.from('users').select('email').eq('email', cleanEmail).maybeSingle();
@@ -608,7 +557,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
       .eq('email', cleanEmail)
       .maybeSingle();
 
-    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail) || !!adminExists;
+    const isAdmin = !!adminExists;
 
     // 1. Administrador (PostgreSQL)
     if (isAdmin) {
@@ -732,14 +681,7 @@ app.get('/api/user/profile', requireAuth, async (req, res) => {
       return res.json(getUserWithRole(dbAdmin));
     }
 
-    // Fallback de administrador na lista estática
-    const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === cleanEmail);
-    if (isAdmin) {
-      const ensuredAdmin = await ensureAdminInDb(cleanEmail);
-      if (ensuredAdmin) {
-        return res.json(getUserWithRole(ensuredAdmin));
-      }
-    }
+
 
     // 2. Busca na tabela de usuários comuns (estudantes)
     const { data, error } = await supabaseAdmin.from('users').select('*').eq('email', cleanEmail).maybeSingle();
@@ -772,10 +714,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     .eq('email', email)
     .maybeSingle();
 
-  const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || !!adminExists;
-  if (isAdmin) {
-    await ensureAdminInDb(email, updateData.name);
-  }
+  const isAdmin = !!adminExists;
 
   const supabaseUpdate: any = { email };
   const allowedFields = ['name', 'city', 'school', 'gremio', 'languagePreference', 'showInLeaderboard'];
@@ -1077,10 +1016,8 @@ app.get('/api/leaderboard', async (req, res) => {
     // Filtra administradores e estudantes que desativaram exibição no ranking
     const filteredLeaderboard = (data || [])
       .filter(u => {
-        const email = (u.email || '').toLowerCase().trim();
-        const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || u.role === 'admin';
+        const isAdmin = u.role === 'admin';
         if (isAdmin) return false;
-
         if (u.show_in_leaderboard === false) return false;
         return true;
       })
@@ -1110,8 +1047,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     if (error) throw error;
 
     const regularStudents = (data || []).filter(u => {
-      const email = (u.email || '').toLowerCase().trim();
-      const isAdmin = ADMIN_EMAILS.some(adm => adm.toLowerCase() === email) || u.role === 'admin';
+      const isAdmin = u.role === 'admin';
       return !isAdmin;
     });
     res.json(regularStudents);
