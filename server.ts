@@ -1101,48 +1101,6 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // ADMIN ENDPOINTS
-// CRIAR NOVO ADMINISTRADOR (Apenas lucassantos.-@outlook.com)
-app.post('/api/admin/create-admin', requireAuth, async (req, res) => {
-  if (req.user.email !== 'lucassantos.-@outlook.com') {
-    return res.status(403).json({ error: 'Acesso negado: recurso exclusivo do Administrador Supremo.' });
-  }
-
-  const { email, password, name } = req.body;
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'E-mail, senha e nome são obrigatórios.' });
-  }
-
-  try {
-    const cleanEmail = email.toLowerCase().trim();
-    
-    // Verifica se o admin já existe
-    const { rows } = await query('SELECT 1 FROM public.admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
-    if (rows.length > 0) {
-      return res.status(400).json({ error: 'Administrador já cadastrado com este e-mail.' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newAdmin = {
-      id: crypto.randomUUID(),
-      email: cleanEmail,
-      name: sanitizeInput(name),
-      role: 'admin',
-      created_at: new Date().toISOString(),
-      password_hash: hashedPassword
-    };
-
-    const { data, error } = await supabaseAdmin.from('admin_users').insert([newAdmin]).select().single();
-    if (error) throw error;
-
-    res.status(201).json({ success: true, user: getUserWithRole(data) });
-  } catch (err: any) {
-    console.error('[Create Admin] Error:', err.message);
-    res.status(500).json({ error: 'Erro interno ao criar administrador.' });
-  }
-});
-
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
     const { data, error } = await supabaseAdmin
