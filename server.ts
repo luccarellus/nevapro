@@ -30,7 +30,7 @@ app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https://*.supabase.co", "https://api.enem.dev", "https://enem.dev"],
       connectSrc: ["'self'", "https://*.supabase.co", "https://api.enem.dev"],
@@ -44,11 +44,11 @@ app.use(helmet({
 app.use(express.json());
 
 // --- SISTEMA DE AUTENTICAÇÃO E SESSÕES CRIPTOGRAFADAS ---
-const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'fallback_secret_nevapro_security_2024';
-if (!process.env.JWT_SECRET && !process.env.SESSION_SECRET) {
-  console.warn('[Aviso] Variáveis JWT_SECRET e SESSION_SECRET ausentes. Usando chave de fallback estática.');
+const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
+if (!SESSION_SECRET) {
+  console.error('[Erro Fatal] Variáveis de ambiente JWT_SECRET ou SESSION_SECRET ausentes.');
+  process.exit(1);
 }
-
 
 // Gera um token de sessão assinado
 const generateToken = (userId: string, email: string, role: string) => {
@@ -58,18 +58,24 @@ const generateToken = (userId: string, email: string, role: string) => {
   return `${payload}:${signature}`;
 };
 
-// Armazena tokens revogados em memória (Logout/Invalidação)
-const revokedTokens = new Set<string>();
-
-// Limpeza periódica de tokens revogados antigos (evita vazamento de memória)
-setInterval(() => {
-  revokedTokens.clear();
-}, 24 * 60 * 60 * 1000);
+// Limpeza periódica de tokens revogados expirados no banco de dados (a cada hora)
+setInterval(async () => {
+  try {
+    await query('DELETE FROM public.revoked_tokens WHERE expires_at < NOW()');
+  } catch (err) {
+    console.error('[Cleanup] Erro ao limpar tokens revogados expirados do banco:', err);
+  }
+}, 60 * 60 * 1000);
 
 // Valida a assinatura de um token de sessão
-const verifyToken = (token: string) => {
+const verifyToken = async (token: string) => {
   try {
-    if (!token || revokedTokens.has(token)) return null;
+    if (!token) return null;
+    
+    // Verifica no banco de dados se o token foi revogado
+    const { rows } = await query('SELECT 1 FROM public.revoked_tokens WHERE token = $1 LIMIT 1', [token]);
+    if (rows.length > 0) return null;
+
     const parts = token.split(':');
     if (parts.length !== 5) return null;
     const [userId, email, role, expiresAtStr, signature] = parts;
@@ -94,7 +100,7 @@ const requireAuth = async (req: any, res: any, next: any) => {
     token = req.headers.authorization.substring(7);
   }
 
-  const user = verifyToken(token);
+  const user = await verifyToken(token);
   if (user) {
     req.user = user;
     return next();
@@ -151,20 +157,18 @@ const rateLimiter = (limit: number, windowMs: number) => {
   };
 };
 
-// Controle de tentativas de login por e-mail (Proteção contra Força Bruta)
-const loginAttempts = new Map<string, { count: number, lockUntil: number | null }>();
+// Controle de tentativas de login por e-mail (Proteção contra Força Bruta no Banco de Dados)
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
 
-// Limpeza de bloqueios expirados
-setInterval(() => {
-  const now = Date.now();
-  for (const [email, attempt] of loginAttempts.entries()) {
-    if (attempt.lockUntil && now > attempt.lockUntil) {
-      loginAttempts.delete(email);
-    }
+// Limpeza periódica de bloqueios expirados do banco de dados (a cada 5 minutos)
+setInterval(async () => {
+  try {
+    await query('DELETE FROM public.login_attempts WHERE lock_until < NOW()');
+  } catch (err) {
+    console.error('[Cleanup] Erro ao limpar tentativas de login expiradas do banco:', err);
   }
-}, 60000);
+}, 5 * 60 * 1000);
 
 // Configuração de Administradores
 const ADMIN_EMAILS = [
@@ -328,10 +332,23 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  // Verifica bloqueio de conta
-  const attempt = loginAttempts.get(cleanEmail);
-  if (attempt && attempt.lockUntil && Date.now() < attempt.lockUntil) {
-    const waitTime = Math.ceil((attempt.lockUntil - Date.now()) / 60000);
+  // Verifica bloqueio de conta no banco de dados (Força Bruta)
+  let isLocked = false;
+  let waitTime = 0;
+  try {
+    const { rows: attemptRows } = await query('SELECT attempts, lock_until FROM public.login_attempts WHERE email = $1', [cleanEmail]);
+    if (attemptRows.length > 0) {
+      const attempt = attemptRows[0];
+      if (attempt.lock_until && Date.now() < new Date(attempt.lock_until).getTime()) {
+        isLocked = true;
+        waitTime = Math.ceil((new Date(attempt.lock_until).getTime() - Date.now()) / 60000);
+      }
+    }
+  } catch (err) {
+    console.error('[Auth Lock Check] Erro ao verificar bloqueio:', err);
+  }
+
+  if (isLocked) {
     return res.status(429).json({ error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${waitTime} minutos.` });
   }
 
@@ -378,7 +395,9 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
             });
           }
           
-          loginAttempts.delete(cleanEmail);
+          try {
+            await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]);
+          } catch (e) {}
           return res.json({ success: true, user: userObj });
         }
       }
@@ -429,18 +448,29 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000
           });
         }
-        loginAttempts.delete(cleanEmail); // Reset attempts on success
+        try {
+          await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]);
+        } catch (e) {}
         return res.json({ success: true, user: userObj });
       }
     }
 
-    // Incrementar tentativas falhas
-    const currentAttempt = loginAttempts.get(cleanEmail) || { count: 0, lockUntil: null };
-    currentAttempt.count++;
-    if (currentAttempt.count >= MAX_LOGIN_ATTEMPTS) {
-      currentAttempt.lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+    // Incrementar tentativas falhas no banco de dados
+    try {
+      const { rows: currentAttemptRows } = await query('SELECT attempts FROM public.login_attempts WHERE email = $1', [cleanEmail]);
+      if (currentAttemptRows.length > 0) {
+        const newAttempts = currentAttemptRows[0].attempts + 1;
+        let lockUntil: string | null = null;
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString();
+        }
+        await query('UPDATE public.login_attempts SET attempts = $1, lock_until = $2, updated_at = NOW() WHERE email = $3', [newAttempts, lockUntil, cleanEmail]);
+      } else {
+        await query('INSERT INTO public.login_attempts (email, attempts, lock_until) VALUES ($1, 1, NULL)', [cleanEmail]);
+      }
+    } catch (dbErr) {
+      console.error('[Auth Increment] Erro ao registrar tentativa falha:', dbErr);
     }
-    loginAttempts.set(cleanEmail, currentAttempt);
 
     return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
 
@@ -450,10 +480,18 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   }
 });
 
-// Função utilitária para sanitizar strings (remover tags HTML)
+// Função utilitária para sanitizar strings (escapando caracteres especiais contra XSS)
 const sanitizeInput = (input: string) => {
   if (!input) return '';
-  return input.replace(/<[^>]*>?/gm, '').trim().substring(0, 100);
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim()
+    .substring(0, 100);
 };
 
 // REGISTER
@@ -647,10 +685,19 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 });
 
 // LOGOUT
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   const token = req.cookies?.session_token;
   if (token) {
-    revokedTokens.add(token);
+    try {
+      const parts = token.split(':');
+      if (parts.length === 5) {
+        const expiresAtMs = parseInt(parts[3], 10);
+        const expiresAtDate = new Date(expiresAtMs).toISOString();
+        await query('INSERT INTO public.revoked_tokens (token, expires_at) VALUES ($1, $2) ON CONFLICT DO NOTHING', [token, expiresAtDate]);
+      }
+    } catch (err) {
+      console.error('[Logout] Erro ao registrar token revogado no banco:', err);
+    }
   }
   
   res.clearCookie('session_token', {
@@ -1612,7 +1659,16 @@ app.get('/api/imagem', async (req, res) => {
       return res.status(403).send('Acesso negado: domínio não permitido.');
     }
 
-    const response = await fetch(urlStr, { headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' } });
+    const response = await fetch(urlStr, { 
+      headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' },
+      redirect: 'manual'
+    });
+    
+    // Bloqueia redirecionamentos para evitar desvio de DNS/Allowlist (SSRF)
+    if (response.status >= 300 && response.status < 400) {
+      return res.status(403).send('Acesso negado: redirecionamentos não são permitidos.');
+    }
+    
     if (!response.ok) return res.status(response.status).send('Fetch error');
     res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=86400');

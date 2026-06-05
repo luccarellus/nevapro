@@ -1,5 +1,14 @@
 import { query } from './db.js';
 
+function sanitizeIdentifier(name: string): string {
+  if (!name) return name;
+  // Permite apenas caracteres alfanuméricos, sublinhados, pontos, espaços, vírgulas, parênteses e asterisco
+  if (!/^[a-zA-Z0-9_\.,\s\*\(\)]+$/.test(name)) {
+    throw new Error(`Identificador de banco de dados inválido ou inseguro: ${name}`);
+  }
+  return name;
+}
+
 class SupabaseQueryBuilder {
   private tableName: string;
   private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
@@ -17,7 +26,9 @@ class SupabaseQueryBuilder {
   }
   
   select(cols = '*') {
-    this.action = 'select';
+    if (this.action === 'select') {
+      this.action = 'select';
+    }
     this.selectCols = cols;
     return this;
   }
@@ -71,19 +82,24 @@ class SupabaseQueryBuilder {
     let sql = '';
     const params: any[] = [];
     
+    const safeTable = sanitizeIdentifier(this.tableName);
+    const safeSelectCols = sanitizeIdentifier(this.selectCols);
+
     if (this.action === 'select') {
-      sql = `SELECT ${this.selectCols} FROM ${this.tableName}`;
+      sql = `SELECT ${safeSelectCols} FROM ${safeTable}`;
       if (this.whereCols.length > 0) {
         const whereClause = this.whereCols.map((c, i) => {
-           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${i+1}`;
-           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${i+1}`;
-           return `${c} = $${i+1}`;
+           const cleanCol = c.replace('__gte', '').replace('__lte', '');
+           const safeCol = sanitizeIdentifier(cleanCol);
+           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+           return `${safeCol} ${op} $${i+1}`;
         }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
       }
       if (this.orderCol) {
-        sql += ` ORDER BY ${this.orderCol} ${this.orderAsc ? 'ASC' : 'DESC'}`;
+        const safeOrderCol = sanitizeIdentifier(this.orderCol);
+        sql += ` ORDER BY ${safeOrderCol} ${this.orderAsc ? 'ASC' : 'DESC'}`;
       }
       if (this.limitVal) {
         sql += ` LIMIT ${this.limitVal}`;
@@ -92,33 +108,37 @@ class SupabaseQueryBuilder {
       const keys = Object.keys(this.insertData);
       const vals = Object.values(this.insertData);
       const placeholders = keys.map((_, i) => `$${i+1}`).join(', ');
-      sql = `INSERT INTO ${this.tableName} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+      keys.forEach(k => sanitizeIdentifier(k));
+      sql = `INSERT INTO ${safeTable} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING ${safeSelectCols}`;
       params.push(...vals);
     } else if (this.action === 'update') {
       const keys = Object.keys(this.updateData);
       const vals = Object.values(this.updateData);
+      keys.forEach(k => sanitizeIdentifier(k));
       const setClause = keys.map((k, i) => `${k} = $${i+1}`).join(', ');
-      sql = `UPDATE ${this.tableName} SET ${setClause}`;
+      sql = `UPDATE ${safeTable} SET ${setClause}`;
       params.push(...vals);
       
       if (this.whereCols.length > 0) {
         const offset = keys.length;
         const whereClause = this.whereCols.map((c, i) => {
-           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${offset + i + 1}`;
-           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${offset + i + 1}`;
-           return `${c} = $${offset + i + 1}`;
+           const cleanCol = c.replace('__gte', '').replace('__lte', '');
+           const safeCol = sanitizeIdentifier(cleanCol);
+           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+           return `${safeCol} ${op} $${offset + i + 1}`;
         }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
       }
-      sql += ' RETURNING *';
+      sql += ` RETURNING ${safeSelectCols}`;
     } else if (this.action === 'delete') {
-      sql = `DELETE FROM ${this.tableName}`;
+      sql = `DELETE FROM ${safeTable}`;
       if (this.whereCols.length > 0) {
         const whereClause = this.whereCols.map((c, i) => {
-           if (c.endsWith('__gte')) return `${c.replace('__gte', '')} >= $${i+1}`;
-           if (c.endsWith('__lte')) return `${c.replace('__lte', '')} <= $${i+1}`;
-           return `${c} = $${i+1}`;
+           const cleanCol = c.replace('__gte', '').replace('__lte', '');
+           const safeCol = sanitizeIdentifier(cleanCol);
+           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+           return `${safeCol} ${op} $${i+1}`;
         }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);

@@ -201,7 +201,25 @@ CREATE TABLE IF NOT EXISTS public.consent_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
+-- 18. REVOKED_TOKENS
+CREATE TABLE IF NOT EXISTS public.revoked_tokens (
+    token VARCHAR(500) PRIMARY KEY,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- 19. LOGIN_ATTEMPTS
+CREATE TABLE IF NOT EXISTS public.login_attempts (
+    email VARCHAR(255) PRIMARY KEY,
+    attempts INTEGER DEFAULT 1,
+    lock_until TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
 -- INSERIR UM ADMINISTRADOR MASTER PADRÃO
-INSERT INTO public.admin_users (email, name, role, password_hash) 
-VALUES ('lucassantos.-@outlook.com', 'Lucas Santos', 'admin', crypt('sua_senha_aqui', gen_salt('bf', 10)))
-ON CONFLICT (email) DO NOTHING;
+-- IMPORTANTE: Para criar o administrador inicial em produção, execute o SQL abaixo
+-- no seu cliente de banco de dados substituindo 'sua_senha_aqui' por uma senha segura.
+--
+-- INSERT INTO public.admin_users (email, name, role, password_hash) 
+-- VALUES ('lucassantos.-@outlook.com', 'Lucas Santos', 'admin', crypt('sua_senha_aqui', gen_salt('bf', 10)))
+-- ON CONFLICT (email) DO NOTHING;
+

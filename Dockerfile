@@ -18,6 +18,10 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
+# Garante permissões e executa com usuário node (sem privilégios root)
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 # Script para iniciar a aplicação
