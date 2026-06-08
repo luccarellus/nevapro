@@ -23,7 +23,7 @@ function sanitizeSelectCols(cols: string): string {
   return cols;
 }
 
-class SupabaseQueryBuilder {
+class PostgresQueryBuilder {
   private tableName: string;
   private action: 'select' | 'insert' | 'update' | 'delete' = 'select';
   private selectCols: string = '*';
@@ -139,7 +139,7 @@ class SupabaseQueryBuilder {
            const cleanCol = c.replace('__gte', '').replace('__lte', '');
            const safeCol = sanitizeIdentifier(cleanCol);
            const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
-           return `${safeCol} ${op} $${offset + i + 1}`;
+           return `${safeCol} ${offset + i + 1}`;
         }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
@@ -190,9 +190,9 @@ class SupabaseQueryBuilder {
   }
 }
 
-export const supabaseAdmin = {
+export const dbAdmin = {
   from(table: string) {
-    return new SupabaseQueryBuilder(table);
+    return new PostgresQueryBuilder(table);
   },
   auth: {
     admin: {

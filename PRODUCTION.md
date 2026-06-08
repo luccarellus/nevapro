@@ -19,16 +19,16 @@ docker-compose up -d --build --scale api=3
 docker image prune -f
 ```
 
-## 🔋 Configuração de Banco (Prisma + Supabase)
-Conecte-se via **PgBouncer** no Supabase para evitar exaustão de conexões em múltiplas réplicas da API:
+## 🔋 Configuração de Banco (PostgreSQL)
+Conecte-se ao seu banco de dados PostgreSQL na VPS:
 ```env
 # DATABASE_URL no .env
-DATABASE_URL="postgres://postgres.xxxx:[SENHA]@aws-0-us-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=10"
+DATABASE_URL="postgres://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]?connection_limit=10"
 ```
 
 ## 🧱 Autenticação (JWT + Refresh Token)
 - **Access Token:** JWT de vida curta (15 min) enviado via HttpOnly Cookie.
-- **Refresh Token:** Armazenado em banco (Supabase) e enviado via Cookie HttpOnly com path `/api/auth/refresh`.
+- **Refresh Token:** Armazenado em banco (PostgreSQL) e enviado via Cookie HttpOnly com path `/api/auth/refresh`.
 - **Estratégia:** Na expiração do Access Token, o frontend tenta bater na rota de refresh. Se o token foi rotacionado ou invalidado, o usuário é deslogado.
 
 ## 📊 Monitoramento Recomendado
@@ -38,5 +38,5 @@ DATABASE_URL="postgres://postgres.xxxx:[SENHA]@aws-0-us-west-1.pooler.supabase.c
 4. **Performance:** [Prometheus](https://prometheus.io/) + [Grafana] para métricas de CPU/RAM dos containers.
 
 ## 💾 Estratégia de Backup
-- **Supabase:** Backups automáticos diários.
+- **PostgreSQL:** Backups automáticos diários (pg_dump ou backup gerenciado).
 - **Arquivos:** Backups semanais da pasta `/nginx` e `.env` em repositório privado ou S3.

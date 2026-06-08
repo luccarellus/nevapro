@@ -24,7 +24,6 @@ import { UserProfile } from './types';
 import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
-import { supabase } from './lib/supabase';
 import { calculateLevelAndProgression } from './utils/xpUtils';
 
 export default function App() {
@@ -62,7 +61,7 @@ export default function App() {
   useEffect(() => {
     initConsentMode();
     
-    // Recovery session for non-Supabase students
+    // Recovery session for students
     const savedUser = localStorage.getItem('neva_student_session');
     if (savedUser) {
       try {
@@ -77,28 +76,6 @@ export default function App() {
         localStorage.removeItem('neva_student_session');
       }
     }
-
-    // Check active session (Admins via Supabase)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && session.user.email) {
-        setIsLoggedIn(true);
-        fetchUser(session.user.email);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && session.user.email) {
-        setIsLoggedIn(true);
-        fetchUser(session.user.email);
-      } else if (!localStorage.getItem('neva_student_session')) {
-        if (event === 'SIGNED_OUT') {
-           setIsLoggedIn(false);
-           setActiveTab('dashboard');
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const fetchUser = async (email?: string) => {
@@ -160,7 +137,6 @@ export default function App() {
     } catch (err) {
       console.error('Erro ao fazer logout no servidor:', err);
     }
-    await supabase.auth.signOut();
     localStorage.removeItem('neva_student_session');
     setIsLoggedIn(false);
     setActiveTab('dashboard');
@@ -175,7 +151,6 @@ export default function App() {
         } catch (err) {
           console.error('Erro ao fazer logout no servidor:', err);
         }
-        await supabase.auth.signOut();
         localStorage.removeItem('neva_student_session');
         setIsLoggedIn(false);
         setActiveTab('dashboard');

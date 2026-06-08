@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import helmet from 'helmet';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
-import { supabaseAdmin } from './src/lib/supabaseServer.js';
+import { dbAdmin } from './src/lib/dbQueryBuilder.js';
 import { query } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
 
@@ -46,8 +46,8 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https://*.supabase.co", "https://api.enem.dev", "https://enem.dev"],
-      connectSrc: ["'self'", "https://*.supabase.co", "https://api.enem.dev"],
+      imgSrc: ["'self'", "data:", "https://api.enem.dev", "https://enem.dev"],
+      connectSrc: ["'self'", "https://api.enem.dev"],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
@@ -188,7 +188,7 @@ setInterval(async () => {
 const isFlashQuizCompleted = async (email: string, userId: string): Promise<boolean> => {
   if (userId) {
     try {
-      const { data } = await supabaseAdmin
+      const { data } = await dbAdmin
         .from('xp_logs')
         .select('created_at')
         .eq('user_id', userId)
@@ -240,7 +240,7 @@ const addNotification = async (title: string, message: string, type: string, met
   };
 
   try {
-    const { data: users, error: usersError } = await supabaseAdmin.from('users').select('id');
+    const { data: users, error: usersError } = await dbAdmin.from('users').select('id');
     if (usersError) throw usersError;
 
     if (users && users.length > 0) {
@@ -253,7 +253,7 @@ const addNotification = async (title: string, message: string, type: string, met
         is_read: false,
         created_at: new Date().toISOString()
       }));
-      const { error } = await supabaseAdmin.from('notifications').insert(notifRecords);
+      const { error } = await dbAdmin.from('notifications').insert(notifRecords);
       if (error) {
         console.error('Failed to save notification: ', error);
         throw error;
@@ -354,7 +354,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
     }
 
     // 2. Tabela de Alunos
-    const { data: student, error: studentError } = await supabaseAdmin
+    const { data: student, error: studentError } = await dbAdmin
       .from('users')
       .select('*')
       .eq('email', cleanEmail)
@@ -380,7 +380,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
           try {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
-            await supabaseAdmin.from('users').update({ password_hash: hashedPassword }).eq('id', student.id);
+            await dbAdmin.from('users').update({ password_hash: hashedPassword }).eq('id', student.id);
             console.log(`[Security] Senha legada do usuário ${student.email} convertida para BCrypt com sucesso.`);
           } catch (e) {
             console.error('[Security] Erro ao converter senha legada:', e);
@@ -463,7 +463,7 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
       return res.status(403).json({ error: 'E-mails administrativos devem ser gerenciados pelo banco de dados.' });
     }
 
-    const { data: existing } = await supabaseAdmin.from('users').select('email').eq('email', cleanEmail).maybeSingle();
+    const { data: existing } = await dbAdmin.from('users').select('email').eq('email', cleanEmail).maybeSingle();
     if (existing) return res.status(400).json({ error: 'E-mail já cadastrado.' });
 
     const salt = await bcrypt.genSalt(10);
@@ -483,7 +483,7 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
       password_hash: hashedPassword
     };
 
-    const { data, error } = await supabaseAdmin.from('users').insert([newStudent]).select().single();
+    const { data, error } = await dbAdmin.from('users').insert([newStudent]).select().single();
     if (error) throw error;
 
     const userObj = getUserWithRole(data);
@@ -515,20 +515,20 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
   }
 
   try {
-    const { data: userData } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+    const { data: userData } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
     if (userData?.id) {
       const userId = userData.id;
-      await supabaseAdmin.from('xp_logs').delete().eq('user_id', userId);
-      await supabaseAdmin.from('answers').delete().eq('user_id', userId);
-      await supabaseAdmin.from('notifications').delete().eq('user_id', userId);
+      await dbAdmin.from('xp_logs').delete().eq('user_id', userId);
+      await dbAdmin.from('answers').delete().eq('user_id', userId);
+      await dbAdmin.from('notifications').delete().eq('user_id', userId);
     }
 
-    await supabaseAdmin.from('users').delete().eq('email', cleanEmail);
-    await supabaseAdmin.from('admin_users').delete().eq('email', cleanEmail);
+    await dbAdmin.from('users').delete().eq('email', cleanEmail);
+    await dbAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
-    const { data: authResult } = await supabaseAdmin.auth.admin.listUsers();
+    const { data: authResult } = await dbAdmin.auth.admin.listUsers();
     const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-    if (target) await supabaseAdmin.auth.admin.deleteUser(target.id);
+    if (target) await dbAdmin.auth.admin.deleteUser(target.id);
 
     res.json({ success: true });
   } catch (err: any) {
@@ -551,7 +551,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
   try {
     // Verifica se é administrador
-    const { data: adminExists } = await supabaseAdmin
+    const { data: adminExists } = await dbAdmin
       .from('admin_users')
       .select('id')
       .eq('email', cleanEmail)
@@ -589,7 +589,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     }
 
     // 2. Estudante (Tabela public.users)
-    const { data: student, error: studentError } = await supabaseAdmin
+    const { data: student, error: studentError } = await dbAdmin
       .from('users')
       .select('*')
       .eq('email', cleanEmail)
@@ -619,7 +619,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await dbAdmin
       .from('users')
       .update({ password_hash: hashedPassword })
       .eq('id', student.id);
@@ -671,20 +671,20 @@ app.get('/api/user/profile', requireAuth, async (req, res) => {
 
   try {
     // 1. Busca se é administrador em admin_users
-    const { data: dbAdmin } = await supabaseAdmin
+    const { data: adminData } = await dbAdmin
       .from('admin_users')
       .select('*')
       .eq('email', cleanEmail)
       .maybeSingle();
 
-    if (dbAdmin) {
-      return res.json(getUserWithRole(dbAdmin));
+    if (adminData) {
+      return res.json(getUserWithRole(adminData));
     }
 
 
 
     // 2. Busca na tabela de usuários comuns (estudantes)
-    const { data, error } = await supabaseAdmin.from('users').select('*').eq('email', cleanEmail).maybeSingle();
+    const { data, error } = await dbAdmin.from('users').select('*').eq('email', cleanEmail).maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Usuário não encontrado' });
     res.json(getUserWithRole(data));
@@ -708,7 +708,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   // Verifica se é administrador
-  const { data: adminExists } = await supabaseAdmin
+  const { data: adminExists } = await dbAdmin
     .from('admin_users')
     .select('id')
     .eq('email', email)
@@ -716,7 +716,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
 
   const isAdmin = !!adminExists;
 
-  const supabaseUpdate: any = { email };
+  const dbUpdate: any = { email };
   const allowedFields = ['name', 'city', 'school', 'gremio', 'languagePreference', 'showInLeaderboard'];
   
   if (req.user.role === 'admin') {
@@ -724,20 +724,20 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   allowedFields.forEach(field => {
-    if (updateData[field] !== undefined) supabaseUpdate[field] = updateData[field];
+    if (updateData[field] !== undefined) dbUpdate[field] = updateData[field];
   });
 
   if (updateData.showInLeaderboard !== undefined) {
-    supabaseUpdate.show_in_leaderboard = updateData.showInLeaderboard;
+    dbUpdate.show_in_leaderboard = updateData.showInLeaderboard;
   }
   if (updateData.languagePreference !== undefined) {
-    supabaseUpdate.language_preference = updateData.languagePreference;
+    dbUpdate.language_preference = updateData.languagePreference;
   }
 
   const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;
 
-  if (supabaseUpdate.xp !== undefined) {
-    supabaseUpdate.total_xp = supabaseUpdate.xp;
+  if (dbUpdate.xp !== undefined) {
+    dbUpdate.total_xp = dbUpdate.xp;
   }
 
   // Fetch the old user profile from database to determine if XP has increased
@@ -745,12 +745,12 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   let userId = null;
   let oldXp = 0;
   try {
-    const { data: oldUser } = await supabaseAdmin.from('users').select('id, xp').eq('email', email).maybeSingle();
+    const { data: oldUser } = await dbAdmin.from('users').select('id, xp').eq('email', email).maybeSingle();
     if (oldUser) {
       userId = oldUser.id;
       oldXp = oldUser.xp || 0;
-      if (supabaseUpdate.xp !== undefined) {
-        const newXp = supabaseUpdate.xp;
+      if (dbUpdate.xp !== undefined) {
+        const newXp = dbUpdate.xp;
         if (newXp > oldXp) {
           xpDiff = newXp - oldXp;
         }
@@ -766,28 +766,28 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     if (alreadyCompleted) {
       console.log(`[Flash Quiz Secure Block] Email ${email} blocked from gaining duplicate quiz XP.`);
       // Reset XP back to old rate
-      supabaseUpdate.xp = oldXp;
-      supabaseUpdate.total_xp = oldXp;
+      dbUpdate.xp = oldXp;
+      dbUpdate.total_xp = oldXp;
       xpDiff = 0;
     } else {
       // First completion: mark in database
-      supabaseUpdate.flash_quiz_completed = true;
+      dbUpdate.flash_quiz_completed = true;
     }
   }
 
   try {
     const targetTable = isAdmin ? 'admin_users' : 'users';
     const updatePayload = isAdmin 
-      ? { name: supabaseUpdate.name, email: supabaseUpdate.email }
-      : supabaseUpdate;
+      ? { name: dbUpdate.name, email: dbUpdate.email }
+      : dbUpdate;
 
-    const { data, error } = await supabaseAdmin.from(targetTable).update(updatePayload).eq('email', email).select().single();
+    const { data, error } = await dbAdmin.from(targetTable).update(updatePayload).eq('email', email).select().single();
     if (error && error.code === 'PGRST116') {
       if (!isAdmin) {
-        supabaseUpdate.password_hash = 'managed_by_auth';
-        const ins = await supabaseAdmin.from('users').insert([supabaseUpdate]).select().single();
+        dbUpdate.password_hash = 'managed_by_auth';
+        const ins = await dbAdmin.from('users').insert([dbUpdate]).select().single();
         if (ins.data && ins.data.xp > 0) {
-          await supabaseAdmin.from('xp_logs').insert([{
+          await dbAdmin.from('xp_logs').insert([{
             user_id: ins.data.id,
             amount: ins.data.xp,
             reason: 'XP Inicial',
@@ -804,7 +804,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        const ins = await supabaseAdmin.from('admin_users').insert([newAdminPayload]).select().single();
+        const ins = await dbAdmin.from('admin_users').insert([newAdminPayload]).select().single();
         return res.json({ success: true, user: getUserWithRole(ins.data) });
       }
     }
@@ -812,7 +812,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
 
     // If there is an XP increase, insert an entry in xp_logs to feed weekly charts
     if (!isAdmin && userId && xpDiff > 0) {
-      await supabaseAdmin.from('xp_logs').insert([{
+      await dbAdmin.from('xp_logs').insert([{
         user_id: userId,
         amount: xpDiff,
         reason: updateData.xpReason || (isFlashQuizUpdate ? 'Flash Quiz: Maranhão' : 'Conclusão de Simulado / Atividade'),
@@ -836,22 +836,22 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   try {
-    const { data: userData } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+    const { data: userData } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
     if (userData?.id) {
       const userId = userData.id;
       // Clean up linked data in other tables to avoid foreign key violations
-      await supabaseAdmin.from('xp_logs').delete().eq('user_id', userId);
-      await supabaseAdmin.from('answers').delete().eq('user_id', userId);
-      await supabaseAdmin.from('notifications').delete().eq('user_id', userId);
-      await supabaseAdmin.from('users').delete().eq('email', cleanEmail);
+      await dbAdmin.from('xp_logs').delete().eq('user_id', userId);
+      await dbAdmin.from('answers').delete().eq('user_id', userId);
+      await dbAdmin.from('notifications').delete().eq('user_id', userId);
+      await dbAdmin.from('users').delete().eq('email', cleanEmail);
     }
 
-    await supabaseAdmin.from('admin_users').delete().eq('email', cleanEmail);
+    await dbAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
-    const { data: authResult } = await supabaseAdmin.auth.admin.listUsers();
+    const { data: authResult } = await dbAdmin.auth.admin.listUsers();
     const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
     if (target) {
-      await supabaseAdmin.auth.admin.deleteUser(target.id);
+      await dbAdmin.auth.admin.deleteUser(target.id);
     }
 
     res.json({ success: true });
@@ -874,10 +874,10 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
   }
 
   try {
-    let query = supabaseAdmin.from('notifications').select('*');
+    let query = dbAdmin.from('notifications').select('*');
 
     if (cleanEmail) {
-      const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+      const { data: user } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
       if (user) {
         query = query.eq('user_id', user.id);
       } else {
@@ -930,14 +930,14 @@ app.get('/api/user/stats', requireAuth, async (req, res) => {
 
   try {
     // Busca o user id
-    const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+    const { data: user } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
     if (!user) return res.json({ weekly: [], summary: { average: 0, best: 0, total: 0 } });
 
     // Busca logs de XP dos últimos 7 dias
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data: logs } = await supabaseAdmin
+    const { data: logs } = await dbAdmin
       .from('xp_logs')
       .select('*')
       .eq('user_id', user.id)
@@ -971,7 +971,7 @@ app.get('/api/user/stats', requireAuth, async (req, res) => {
     const best = Math.max(...xps, 0);
     const average = Math.round(total / 7);
 
-    const { data: lastQuizLog } = await supabaseAdmin
+    const { data: lastQuizLog } = await dbAdmin
       .from('xp_logs')
       .select('created_at')
       .eq('user_id', user.id)
@@ -1007,7 +1007,7 @@ app.get('/api/user/stats', requireAuth, async (req, res) => {
 // LEADERBOARD (Real Users Ranking)
 app.get('/api/leaderboard', async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('users')
       .select('name, email, city, xp, level, role, show_in_leaderboard');
 
@@ -1040,7 +1040,7 @@ app.get('/api/leaderboard', async (req, res) => {
 // ADMIN ENDPOINTS
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('users')
       .select('*')
       .order('xp', { ascending: false });
@@ -1088,8 +1088,8 @@ app.get('/api/admin/activities', requireAdmin, async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const [mats, recs] = await Promise.all([
-      supabaseAdmin.from('materials').select('uploadedAt').gte('uploadedAt', sevenDaysAgo.toISOString().split('T')[0]),
-      supabaseAdmin.from('mural').select('created_at').gte('created_at', sevenDaysAgo.toISOString())
+      dbAdmin.from('materials').select('uploadedAt').gte('uploadedAt', sevenDaysAgo.toISOString().split('T')[0]),
+      dbAdmin.from('mural').select('created_at').gte('created_at', sevenDaysAgo.toISOString())
     ]);
 
     const production: any = {};
@@ -1135,10 +1135,10 @@ app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
   }
 
   try {
-    let query = supabaseAdmin.from('notifications').update({ is_read: true }).eq('is_read', false);
+    let query = dbAdmin.from('notifications').update({ is_read: true }).eq('is_read', false);
 
     if (cleanEmail) {
-      const { data: user } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+      const { data: user } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
       if (user) {
         query = query.eq('user_id', user.id);
       } else {
@@ -1158,7 +1158,7 @@ app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
 app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
   try {
     // Valida que a notificação pertence ao usuário logado
-    const { data: notif } = await supabaseAdmin
+    const { data: notif } = await dbAdmin
       .from('notifications')
       .select('user_id')
       .eq('id', req.params.id)
@@ -1168,7 +1168,7 @@ app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
     }
 
-    const { error } = await supabaseAdmin.from('notifications').update({ is_read: true }).eq('id', req.params.id);
+    const { error } = await dbAdmin.from('notifications').update({ is_read: true }).eq('id', req.params.id);
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
@@ -1177,7 +1177,7 @@ app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
   }
 });
 
-// UPLOAD DE ARQUIVOS (PDF, ETC) COM SUPABASE STORAGE
+// UPLOAD DE ARQUIVOS (PDF, ETC) COM LOCAL STORAGE MOCKED
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -1219,7 +1219,7 @@ app.post('/api/upload', requireAdmin, (req: any, res: any, next: any) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const filename = `${baseName}-${uniqueSuffix}${fileExt}`;
 
-    const { data, error } = await supabaseAdmin.storage
+    const { data, error } = await dbAdmin.storage
       .from('materials')
       .upload(filename, file.buffer, {
         contentType: file.mimetype,
@@ -1228,11 +1228,11 @@ app.post('/api/upload', requireAdmin, (req: any, res: any, next: any) => {
       });
 
     if (error) {
-      console.error('[Supabase Storage] Upload error:', error);
-      return res.status(500).json({ error: 'Erro ao fazer upload no Supabase Storage: ' + error.message });
+      console.error('[Storage] Upload error:', error);
+      return res.status(500).json({ error: 'Erro ao fazer upload no Storage: ' + error.message });
     }
 
-    const { data: { publicUrl } } = supabaseAdmin.storage
+    const { data: { publicUrl } } = dbAdmin.storage
       .from('materials')
       .getPublicUrl(filename);
 
@@ -1246,7 +1246,7 @@ app.post('/api/upload', requireAdmin, (req: any, res: any, next: any) => {
 // MATERIALS
 app.get('/api/materials', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin.from('materials').select('*').order('id', { ascending: false });
+    const { data, error } = await dbAdmin.from('materials').select('*').order('id', { ascending: false });
     if (error) throw error;
 
     const mapped = (data || []).map(mat => ({
@@ -1275,7 +1275,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
       subject: req.body.foco || req.body.subject || 'ENEM geral',
       description: req.body.description || ''
     };
-    const { data, error } = await supabaseAdmin.from('materials').insert([dbRecord]).select().single();
+    const { data, error } = await dbAdmin.from('materials').insert([dbRecord]).select().single();
     if (error) throw error;
 
     const mappedResult = {
@@ -1299,7 +1299,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
 
 app.delete('/api/materials/:id', requireAdmin, async (req, res) => {
   try {
-    await supabaseAdmin.from('materials').delete().eq('id', req.params.id);
+    await dbAdmin.from('materials').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) { res.status(204).end(); }
 });
@@ -1313,7 +1313,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
       subject: req.body.foco || req.body.subject || 'ENEM geral',
       description: req.body.description || ''
     };
-    const { data, error } = await supabaseAdmin.from('materials').update(dbRecord).eq('id', req.params.id).select().single();
+    const { data, error } = await dbAdmin.from('materials').update(dbRecord).eq('id', req.params.id).select().single();
     if (error) throw error;
 
     const mappedResult = {
@@ -1336,7 +1336,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
 // MURAL
 app.get('/api/recados', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin.from('mural').select('*').order('created_at', { ascending: false });
+    const { data, error } = await dbAdmin.from('mural').select('*').order('created_at', { ascending: false });
     if (error) throw error;
 
     const mapped = (data || []).map(item => ({
@@ -1363,9 +1363,9 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('mural').insert([dbBody]).select().single();
+    const { data, error } = await dbAdmin.from('mural').insert([dbBody]).select().single();
     if (error) {
-      console.error('[POST /api/recados] Supabase insertion error:', error);
+      console.error('[POST /api/recados] Database insertion error:', error);
       throw error;
     }
 
@@ -1389,7 +1389,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
 
 app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
-    const { error } = await supabaseAdmin.from('mural').delete().eq('id', req.params.id);
+    const { error } = await dbAdmin.from('mural').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) {
     res.status(204).end();
@@ -1404,7 +1404,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
       type: req.body.category ? req.body.category.toUpperCase() : 'GERAL'
     };
 
-    const { data, error } = await supabaseAdmin.from('mural').update(dbBody).eq('id', req.params.id).select().single();
+    const { data, error } = await dbAdmin.from('mural').update(dbBody).eq('id', req.params.id).select().single();
     if (error) throw error;
 
     const mappedResult = {
@@ -1426,7 +1426,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
 // EVENTOS
 app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('eventos')
       .select('*')
       .order('date', { ascending: true });
@@ -1465,7 +1465,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
       observation: req.body.observation || ''
     };
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('eventos')
       .insert([dbRecord])
       .select()
@@ -1496,7 +1496,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
 
 app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await dbAdmin
       .from('eventos')
       .delete()
       .eq('id', req.params.id);
@@ -1522,7 +1522,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
       observation: req.body.observation || ''
     };
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('eventos')
       .update(dbRecord)
       .eq('id', req.params.id)
@@ -1556,7 +1556,7 @@ app.get('/api/questoes', requireAuth, async (req, res) => {
   const { year, limit = 50, offset = 0 } = req.query;
   if (!year) return res.status(400).json({ error: 'Ano necessário' });
   try {
-    const { data: dbData } = await supabaseAdmin.from('questions').select('*, question_options(*)').eq('year', year).order('index', { ascending: true }).range(Number(offset), Number(offset) + Number(limit) - 1);
+    const { data: dbData } = await dbAdmin.from('questions').select('*, question_options(*)').eq('year', year).order('index', { ascending: true }).range(Number(offset), Number(offset) + Number(limit) - 1);
     if (dbData?.length) return res.json({ questions: dbData.map(q => ({ ...q, alternatives: q.question_options?.sort((a: any, b: any) => a.letter.localeCompare(b.letter)) || [] })) });
     const response = await fetch(`https://api.enem.dev/v1/exams/${year}/questions?limit=${limit}&offset=${offset}`);
     const data = await response.json();
@@ -1567,7 +1567,7 @@ app.get('/api/questoes', requireAuth, async (req, res) => {
 app.post('/api/answers', requireAuth, async (req, res) => {
   const { userId, questionId, isCorrect } = req.body;
   try {
-    await supabaseAdmin.from('answers').insert([{ user_id: userId, question_id: questionId, is_correct: isCorrect, created_at: new Date().toISOString() }]);
+    await dbAdmin.from('answers').insert([{ user_id: userId, question_id: questionId, is_correct: isCorrect, created_at: new Date().toISOString() }]);
     res.json({ success: true });
   } catch (err) {
     console.error('[POST /api/answers] Error logging answer:', err);
@@ -1583,13 +1583,12 @@ app.get('/api/imagem', async (req, res) => {
     const hostname = parsedUrl.hostname.toLowerCase();
     
     // Allowlist de domínios seguros contra SSRF
-    const SUPABASE_URL = process.env.SUPABASE_URL || '';
-    let supabaseHostname = '';
-    try { supabaseHostname = new URL(SUPABASE_URL).hostname.toLowerCase(); } catch (e) {}
-
+    const allowedHostsEnv = process.env.ALLOWED_IMAGE_HOSTS || '';
+    const extraHosts = allowedHostsEnv.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+    
     const isAllowedHost = hostname === 'enem.dev' || 
                           hostname === 'api.enem.dev' || 
-                          (supabaseHostname && hostname === supabaseHostname);
+                          extraHosts.includes(hostname);
 
     if (!isAllowedHost) {
       return res.status(403).send('Acesso negado: domínio não permitido.');

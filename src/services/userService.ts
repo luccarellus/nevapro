@@ -1,5 +1,4 @@
 import { UserProfile } from '../types';
-import { supabase } from '../lib/supabase';
 
 export const userService = {
   async getProfile(email?: string): Promise<UserProfile> {

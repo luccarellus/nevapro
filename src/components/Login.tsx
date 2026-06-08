@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Mail, Lock, UserPlus, MapPin, School, Flag, Loader2, Check, AlertCircle } from 'lucide-react';
 import Logo from './Logo';
-import { supabase } from '../lib/supabase';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import cidadesEscolasData from '../data/cidades_escolas.json';
@@ -63,13 +62,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
     try {
       if (isResettingPassword) {
-        // Reset password remains with Supabase (only for Admins)
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-        if (error) throw error;
-        setSuccessMessage('Se as informações estiverem corretas, você receberá um e-mail com as instruções para redefinir sua senha.');
-        setIsResettingPassword(false);
+        throw new Error("Recuperação desativada. Por favor, contate a administração.");
       } else if (isRegistering) {
         // Register Common User in DB table
         const res = await userService.register({
