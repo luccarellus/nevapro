@@ -5,7 +5,11 @@ export const userService = {
     try {
       const url = email ? `/api/user/profile?email=${email}` : '/api/user/profile';
       const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch profile');
+      if (!response.ok) {
+        const error = new Error('Failed to fetch profile') as any;
+        error.status = response.status;
+        throw error;
+      }
       return response.json();
     } catch (error) {
       console.error('Error fetching profile:', error);

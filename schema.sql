@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS public.users (
     email_notifications BOOLEAN DEFAULT true,
     browser_notifications BOOLEAN DEFAULT true,
     points INTEGER DEFAULT 0,
+    answered_questions INTEGER DEFAULT 0,
+    correct_answers INTEGER DEFAULT 0,
+    streak INTEGER DEFAULT 0,
+    flash_quiz_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -69,6 +73,7 @@ CREATE TABLE IF NOT EXISTS public.events (
 -- 5. NOTIFICATIONS (Avisos / Mural)
 CREATE TABLE IF NOT EXISTS public.notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     content TEXT,
     sender VARCHAR(255),
@@ -76,6 +81,8 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     category VARCHAR(100),
     tag VARCHAR(100),
     priority VARCHAR(50),
+    type VARCHAR(50),
+    is_read BOOLEAN DEFAULT false,
     read BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -90,6 +97,8 @@ CREATE TABLE IF NOT EXISTS public.questions (
     explanation TEXT,
     difficulty VARCHAR(50),
     xp_reward INTEGER DEFAULT 10,
+    year INTEGER,
+    index INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -99,6 +108,7 @@ CREATE TABLE IF NOT EXISTS public.question_options (
     question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
     image_url TEXT,
+    letter VARCHAR(10),
     is_correct BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -213,6 +223,15 @@ CREATE TABLE IF NOT EXISTS public.login_attempts (
     attempts INTEGER DEFAULT 1,
     lock_until TIMESTAMP WITH TIME ZONE,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 18. MURAL
+CREATE TABLE IF NOT EXISTS public.mural (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    content TEXT,
+    type VARCHAR(50) DEFAULT 'GERAL',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- INSERIR UM ADMINISTRADOR MASTER PADRÃO

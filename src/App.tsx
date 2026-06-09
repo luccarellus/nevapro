@@ -93,8 +93,11 @@ export default function App() {
           setActiveTab('admin');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch user:', error);
+      if (error.status === 401) {
+        handleLogout();
+      }
     }
   };
 
@@ -127,7 +130,7 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
+  async function handleLogout() {
     if (isSimulationActive) {
       setPendingTab('logout');
       return;
@@ -140,7 +143,7 @@ export default function App() {
     localStorage.removeItem('neva_student_session');
     setIsLoggedIn(false);
     setActiveTab('dashboard');
-  };
+  }
 
   const handleConfirmExit = async () => {
     setIsSimulationActive(false);

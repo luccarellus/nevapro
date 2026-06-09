@@ -717,28 +717,33 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   const isAdmin = !!adminExists;
 
   const dbUpdate: any = { email };
-  const allowedFields = ['name', 'city', 'school', 'gremio', 'languagePreference', 'showInLeaderboard'];
   
+  // Mapeamento explícito de campos permitidos para as colunas do banco de dados (snake_case)
+  const fieldMapping: Record<string, string> = {
+    name: 'name',
+    city: 'city',
+    school: 'school',
+    gremio: 'gremio',
+    showInLeaderboard: 'show_in_leaderboard',
+    languagePreference: 'language_preference'
+  };
+
   if (req.user.role === 'admin') {
-    allowedFields.push('xp', 'level', 'role', 'answeredQuestions', 'correctAnswers', 'streak');
+    fieldMapping.xp = 'xp';
+    fieldMapping.level = 'level';
+    fieldMapping.role = 'role';
+    fieldMapping.answeredQuestions = 'answered_questions';
+    fieldMapping.correctAnswers = 'correct_answers';
+    fieldMapping.streak = 'streak';
   }
 
-  allowedFields.forEach(field => {
-    if (updateData[field] !== undefined) dbUpdate[field] = updateData[field];
+  Object.entries(fieldMapping).forEach(([camelKey, snakeKey]) => {
+    if (updateData[camelKey] !== undefined) {
+      dbUpdate[snakeKey] = updateData[camelKey];
+    }
   });
 
-  if (updateData.showInLeaderboard !== undefined) {
-    dbUpdate.show_in_leaderboard = updateData.showInLeaderboard;
-  }
-  if (updateData.languagePreference !== undefined) {
-    dbUpdate.language_preference = updateData.languagePreference;
-  }
-
   const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;
-
-  if (dbUpdate.xp !== undefined) {
-    dbUpdate.total_xp = dbUpdate.xp;
-  }
 
   // Fetch the old user profile from database to determine if XP has increased
   let xpDiff = 0;
@@ -767,7 +772,6 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
       console.log(`[Flash Quiz Secure Block] Email ${email} blocked from gaining duplicate quiz XP.`);
       // Reset XP back to old rate
       dbUpdate.xp = oldXp;
-      dbUpdate.total_xp = oldXp;
       xpDiff = 0;
     } else {
       // First completion: mark in database
@@ -874,18 +878,18 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
   }
 
   try {
-    let query = dbAdmin.from('notifications').select('*');
+    let dbQuery = dbAdmin.from('notifications').select('*');
 
     if (cleanEmail) {
       const { data: user } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
       if (user) {
-        query = query.eq('user_id', user.id);
+        dbQuery = dbQuery.eq('user_id', user.id);
       } else {
         return res.json([]);
       }
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await dbQuery.order('created_at', { ascending: false });
     if (error) throw error;
 
     const mapped = (data || []).map(n => ({
@@ -1617,6 +1621,11 @@ app.post('/api/lgpd/consent-log', (req, res) => {
   // Retorna 200 OK para evitar erro de 404 no console do navegador
   console.log('[LGPD] Consent preferences received:', req.body);
   res.json({ success: true });
+});
+
+// Rota de Health Check para o Docker Compose
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 async function initVite() {

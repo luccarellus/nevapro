@@ -139,7 +139,7 @@ class PostgresQueryBuilder {
            const cleanCol = c.replace('__gte', '').replace('__lte', '');
            const safeCol = sanitizeIdentifier(cleanCol);
            const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
-           return `${safeCol} ${offset + i + 1}`;
+           return `${safeCol} ${op} $${offset + i + 1}`;
         }).join(' AND ');
         sql += ` WHERE ${whereClause}`;
         params.push(...this.whereVals);
