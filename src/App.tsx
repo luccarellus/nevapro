@@ -20,6 +20,7 @@ import Settings from './components/Settings';
 import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import CookiePolicy from './components/CookiePolicy';
+import Maintenance from './components/Maintenance';
 import { UserProfile } from './types';
 import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen } from 'lucide-react';
 import { userService } from './services/userService';
@@ -246,6 +247,13 @@ export default function App() {
   };
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
+
+  // Toggle this flag to true to enable the maintenance screen and block the entire system
+  const IS_UNDER_MAINTENANCE = true;
+
+  if (IS_UNDER_MAINTENANCE) {
+    return <Maintenance />;
+  }
 
   return (
     <div className="min-h-screen bg-bg-main transition-colors duration-300">
