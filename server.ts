@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
 import { dbAdmin } from './src/lib/dbQueryBuilder.js';
-import { query } from './src/lib/db.js';
+import pool, { query } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -1646,5 +1646,31 @@ initVite();
 
 if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT || 3000);
-  app.listen(PORT, '0.0.0.0', () => console.log(`Server production-ready on port ${PORT}`));
+  const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server production-ready on port ${PORT}`));
+
+  // Graceful shutdown: garante zero downtime em rolling updates (Docker Swarm / EasyPanel).
+  // Ao receber SIGTERM, para de aceitar novas conexões, drena as requisições em voo
+  // e fecha o pool do Postgres antes de encerrar o processo.
+  const shutdown = (signal: string) => {
+    console.log(`${signal} recebido. Encerrando graciosamente...`);
+    server.close(async () => {
+      try {
+        await pool.end();
+        console.log('Pool do Postgres fechado. Processo encerrado.');
+        process.exit(0);
+      } catch (err) {
+        console.error('Erro ao fechar o pool do Postgres:', err);
+        process.exit(1);
+      }
+    });
+
+    // Failsafe: se o drain travar, força a saída antes do SIGKILL do orquestrador.
+    setTimeout(() => {
+      console.error('Shutdown forçado após timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
