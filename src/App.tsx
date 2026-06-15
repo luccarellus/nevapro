@@ -249,7 +249,7 @@ export default function App() {
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
 
   // Toggle this flag to true to enable the maintenance screen and block the entire system
-  const IS_UNDER_MAINTENANCE = true;
+  const IS_UNDER_MAINTENANCE = false;
 
   if (IS_UNDER_MAINTENANCE) {
     return <Maintenance />;
