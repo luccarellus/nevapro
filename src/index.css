@@ -72,6 +72,20 @@ body {
   background-color: var(--bg-main);
 }
 
+/* Tailwind v4 removeu o cursor:pointer padrão de botões.
+   Restaura a "mãozinha" em elementos clicáveis (exceto desabilitados). */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+label[for],
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"]:disabled {
+  cursor: not-allowed;
+}
+
 @utility glass {
   @apply backdrop-blur-md transition-all duration-300;
   background-color: color-mix(in srgb, var(--bg-card) 70%, transparent);
