@@ -244,7 +244,7 @@ export default function App() {
             title="Redação Inteligente" 
             icon={PenTool} 
             description="Nossa inteligência artificial para correção e feedback de redações está sendo preparada para impulsionar suas notas."
-            accentColor="#fb7185"
+            variant="rose"
           />
         );
       case 'professor_ia':
@@ -253,7 +253,7 @@ export default function App() {
             title="Professor IA" 
             icon={Sparkles} 
             description="Um tutor personalizado disponível 24/7 para tirar dúvidas, explicar matérias e ajudar nos seus estudos."
-            accentColor="#818cf8"
+            variant="indigo"
           />
         );
       case 'admin':
