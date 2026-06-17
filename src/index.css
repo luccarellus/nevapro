@@ -40,6 +40,21 @@
   --card-shadow: rgba(15, 23, 42, 0.08);
 }
 
+
+
+[data-theme='olhar_jovem'] {
+  --bg-main: #061113;
+  --bg-card: #0f2225;
+  --bg-sidebar: #0a191c;
+  --text-main: #eefdff;
+  --text-secondary: #749296;
+  --border-color: rgba(0, 203, 209, 0.15);
+  --brand-primary: #00cbd1;
+  --brand-secondary: #ec008c;
+  --input-bg: #142a2d;
+  --card-shadow: rgba(0, 203, 209, 0.08);
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   

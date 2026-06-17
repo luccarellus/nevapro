@@ -33,6 +33,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [customTheme, setCustomTheme] = useState<string>(() => localStorage.getItem('neva_custom_theme') || 'default');
   const [user, setUser] = useState<UserProfile>({
     id: 'loading',
     name: 'Carregando...',
@@ -105,14 +106,24 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.setAttribute('data-theme', 'dark');
+    if (customTheme === 'olhar_jovem') {
+      document.documentElement.setAttribute('data-theme', 'olhar_jovem');
       document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.setAttribute('data-theme', 'light');
-      document.documentElement.classList.remove('dark');
+      if (isDarkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.classList.remove('dark');
+      }
     }
-  }, [isDarkMode]);
+  }, [customTheme, isDarkMode]);
+
+  const handleCustomThemeChange = (newTheme: string) => {
+    setCustomTheme(newTheme);
+    localStorage.setItem('neva_custom_theme', newTheme);
+  };
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   
@@ -262,7 +273,15 @@ export default function App() {
       case 'admin':
         return user.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
       case 'profile':
-        return <Settings user={user} onUpdateUser={setUser} onClose={() => handleTabChange('dashboard')} />;
+        return (
+          <Settings 
+            user={user} 
+            onUpdateUser={setUser} 
+            onClose={() => handleTabChange('dashboard')} 
+            theme={customTheme}
+            onThemeChange={handleCustomThemeChange}
+          />
+        );
       default:
         return <Dashboard user={user} onEarnXp={handleEarnXp} />;
     }

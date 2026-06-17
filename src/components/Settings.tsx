@@ -19,11 +19,13 @@ interface SettingsProps {
   user: UserProfile;
   onUpdateUser: (user: UserProfile) => void;
   onClose: () => void;
+  theme: string;
+  onThemeChange: (theme: string) => void;
 }
 
 type SettingsTab = 'perfil' | 'notificacoes' | 'aparencia' | 'privacidade';
 
-export default function Settings({ user, onUpdateUser, onClose }: SettingsProps) {
+export default function Settings({ user, onUpdateUser, onClose, theme, onThemeChange }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
   const [displayName, setDisplayName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || 'admin@neva.pro');
@@ -451,19 +453,102 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-xl"
+              className="max-w-xl w-full"
             >
               <h3 className="text-2xl font-black text-text-main mb-10">Aparência</h3>
               
               <div className="space-y-8">
-                <div className="bg-bg-sidebar/50 border border-border-color p-8 rounded-[32px] space-y-6 opacity-50">
-                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-black text-text-main uppercase tracking-widest text-xs">Temas Personalizados</h4>
-                      <p className="text-text-secondary text-[11px] font-bold mt-1">Escolha entre o modo claro, escuro ou automatizado.</p>
-                    </div>
-                    <span className="text-[9px] font-black bg-text-main/5 text-text-secondary px-3 py-1.5 rounded-full uppercase tracking-widest">Em breve</span>
-                  </div>
+                <div>
+                  <h4 className="font-black text-text-main uppercase tracking-widest text-xs mb-2">Temas Personalizados</h4>
+                  <p className="text-text-secondary text-[11px] font-bold mb-6">Personalize sua experiência escolhendo uma das opções de temas abaixo.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { 
+                      id: 'default', 
+                      name: 'Padrão', 
+                      description: 'Utiliza os esquemas originais Claro e Escuro do aplicativo.',
+                      primaryColor: '#00b094',
+                      colors: ['#0a0f1a', '#f8fafc'],
+                    },
+                    { 
+                      id: 'olhar_jovem', 
+                      name: 'Olhar Jovem', 
+                      description: 'Tema premium suave baseado na estética do Olhar Jovem.',
+                      primaryColor: '#00cbd1',
+                      colors: ['#061113', '#0f2225'],
+                    },
+                  ].map((t) => {
+                    const isSelected = theme === t.id;
+                    return (
+                      <motion.button
+                        key={t.id}
+                        whileHover={{ scale: 1.01, y: -2 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => onThemeChange(t.id)}
+                        className={`w-full text-left p-5 rounded-[24px] border-2 transition-all flex flex-col justify-between h-40 cursor-pointer relative overflow-hidden ${
+                          isSelected 
+                            ? 'bg-bg-sidebar/90 shadow-xl' 
+                            : 'bg-bg-sidebar/30 border-transparent hover:bg-bg-sidebar/50'
+                        }`}
+                        style={{
+                          borderColor: isSelected ? t.primaryColor : 'transparent'
+                        }}
+                      >
+                        {isSelected && (
+                          <div 
+                            className="absolute -right-10 -bottom-10 w-28 h-28 rounded-full blur-3xl opacity-20 transition-all pointer-events-none"
+                            style={{
+                              background: t.primaryColor
+                            }}
+                          />
+                        )}
+
+                        <div className="flex items-start justify-between w-full">
+                          <div>
+                            <h5 className="font-black text-text-main text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                              {t.name}
+                              {isSelected && (
+                                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: t.primaryColor }} />
+                              )}
+                            </h5>
+                            <p className="text-text-secondary text-[10px] font-bold leading-normal max-w-[170px] opacity-85">
+                              {t.description}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1 bg-black/20 p-1.5 rounded-xl border border-white/5 flex-shrink-0">
+                            <span 
+                              className="w-3 h-3 rounded-full border border-white/10" 
+                              style={{ backgroundColor: t.primaryColor }}
+                            />
+                            <span 
+                              className="w-3 h-3 rounded-full border border-white/10" 
+                              style={{ backgroundColor: t.colors[0] }}
+                            />
+                            <span 
+                              className="w-3 h-3 rounded-full border border-white/10" 
+                              style={{ backgroundColor: t.colors[1] }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="w-full h-8 rounded-lg bg-black/10 border border-white/5 p-1.5 flex gap-1.5 items-center mt-3">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: t.colors[0] }} />
+                          <div className="flex-1 space-y-1">
+                            <div className="w-10 h-1 rounded-full" style={{ backgroundColor: t.primaryColor }} />
+                            <div className="w-6 h-0.5 rounded-full opacity-20" style={{ backgroundColor: t.colors[1] }} />
+                          </div>
+                          {isSelected && (
+                            <div className="w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: t.primaryColor }}>
+                              <Check size={10} className="stroke-[3]" />
+                            </div>
+                          )}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
                 </div>
               </div>
             </motion.div>
@@ -612,7 +697,7 @@ export default function Settings({ user, onUpdateUser, onClose }: SettingsProps)
             </motion.div>
           )}
 
-          {activeTab !== 'perfil' && activeTab !== 'privacidade' && activeTab !== 'notificacoes' && (
+          {activeTab !== 'perfil' && activeTab !== 'privacidade' && activeTab !== 'notificacoes' && activeTab !== 'aparencia' && (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="bg-text-main/5 p-8 rounded-full mb-6 text-text-secondary">
                 <Shield size={48} />
