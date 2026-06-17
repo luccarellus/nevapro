@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import helmet from 'helmet';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
+import fs from 'fs';
 import { dbAdmin } from './src/lib/dbQueryBuilder.js';
 import pool, { query } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
@@ -1569,13 +1570,141 @@ app.get('/api/questoes', requireAuth, async (req, res) => {
 });
 
 app.post('/api/answers', requireAuth, async (req, res) => {
-  const { userId, questionId, isCorrect } = req.body;
+  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
   try {
-    await dbAdmin.from('answers').insert([{ user_id: userId, question_id: questionId, is_correct: isCorrect, created_at: new Date().toISOString() }]);
+    // 1. Verificar se a questão já existe no banco
+    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
+    
+    if (qCheck.rows.length === 0 && questionData) {
+      console.log(`[POST /api/answers] Caching question ${questionId}...`);
+      // Inserir a questão
+      await query(
+        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          questionId,
+          questionData.subject || 'Geral',
+          questionData.text,
+          questionData.imageUrl || null,
+          questionData.correctOptionIndex,
+          questionData.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
+          questionData.difficulty || 'médio',
+          questionData.xpReward || 50,
+          questionData.year || 2023,
+          questionData.index || 0
+        ]
+      );
+
+      // Inserir as alternativas
+      if (Array.isArray(questionData.options)) {
+        for (let idx = 0; idx < questionData.options.length; idx++) {
+          const optText = questionData.options[idx];
+          const optImg = questionData.optionImages?.[idx] || null;
+          const letter = String.fromCharCode(65 + idx); // A, B, C, D, E...
+          const isCorrectOption = idx === questionData.correctOptionIndex;
+
+          await query(
+            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
+             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)`,
+            [questionId, optText, optImg, letter, isCorrectOption]
+          );
+        }
+      }
+    }
+
+    // 2. Inserir a resposta do aluno
+    await query(
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
+       VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW())`,
+      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect]
+    );
+
     res.json({ success: true });
   } catch (err) {
     console.error('[POST /api/answers] Error logging answer:', err);
-    res.json({ success: true });
+    res.status(500).json({ error: 'Erro ao registrar resposta.' });
+  }
+});
+
+app.get('/api/user/errors', requireAuth, async (req, res) => {
+  let email = req.query.email as string;
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
+
+  try {
+    // 1. Obter o ID do usuário pelo e-mail
+    const userRes = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [cleanEmail]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    const userId = userRes.rows[0].id;
+
+    // 2. Buscar as últimas respostas incorretas (rn = 1 e is_correct = false)
+    const errorsQuery = `
+      WITH latest_answers AS (
+        SELECT *,
+               ROW_NUMBER() OVER(PARTITION BY question_id ORDER BY created_at DESC) as rn
+        FROM public.answers
+        WHERE user_id = $1
+      )
+      SELECT 
+        la.id as answer_id,
+        la.selected_option_index,
+        la.created_at as answered_at,
+        q.id as question_id,
+        q.subject,
+        q.text as question_text,
+        q.image_url,
+        q.correct_option_index,
+        q.explanation,
+        q.difficulty,
+        q.year,
+        q.index
+      FROM latest_answers la
+      JOIN public.questions q ON la.question_id = q.id
+      WHERE la.rn = 1 AND la.is_correct = false
+      ORDER BY la.created_at DESC;
+    `;
+
+    const errorsRes = await query(errorsQuery, [userId]);
+    const errorsList = errorsRes.rows;
+
+    // 3. Para cada erro, carregar suas alternativas
+    const result = [];
+    for (const errRow of errorsList) {
+      const optsRes = await query(
+        'SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC',
+        [errRow.question_id]
+      );
+      
+      result.push({
+        id: errRow.question_id,
+        subject: errRow.subject,
+        text: errRow.question_text,
+        imageUrl: errRow.image_url,
+        correctOptionIndex: errRow.correct_option_index,
+        explanation: errRow.explanation,
+        difficulty: errRow.difficulty,
+        year: errRow.year,
+        index: errRow.index,
+        selectedOptionIndex: errRow.selected_option_index,
+        answeredAt: errRow.answered_at,
+        options: optsRes.rows.map(opt => opt.text),
+        optionImages: optsRes.rows.map(opt => opt.image_url),
+      });
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('[GET /api/user/errors] Error:', err);
+    res.status(500).json({ error: 'Erro ao buscar caderno de erros.' });
   }
 });
 
@@ -1628,6 +1757,34 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+async function applyDbMigration() {
+  try {
+    console.log('[DB Migration] Checking database schema...');
+    // Verificar se o tipo da coluna 'id' em public.questions já é varchar
+    const typeCheck = await query(`
+      SELECT data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'questions' AND column_name = 'id'
+    `);
+    
+    if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'uuid') {
+      console.log('[DB Migration] Found uuid column in questions table. Applying migration...');
+      const sqlPath = path.join(process.cwd(), 'migration_caderno_erros.sql');
+      if (fs.existsSync(sqlPath)) {
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+        await query(sql);
+        console.log('[DB Migration] Database migration applied successfully!');
+      } else {
+        console.error('[DB Migration] migration_caderno_erros.sql file not found!');
+      }
+    } else {
+      console.log('[DB Migration] Database schema is already up to date.');
+    }
+  } catch (err) {
+    console.error('[DB Migration] Failed to run database migration:', err);
+  }
+}
+
 async function initVite() {
   if (process.env.VERCEL) return;
 
@@ -1641,6 +1798,10 @@ async function initVite() {
     app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 }
+
+(async () => {
+  await applyDbMigration();
+})();
 
 initVite();
 

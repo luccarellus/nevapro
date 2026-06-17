@@ -94,7 +94,19 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
           questionId: q.id,
           selectedOption: userAnswers[idx],
           isCorrect,
-          xpReward: q.xpReward
+          xpReward: q.xpReward,
+          questionData: {
+            subject: q.subject,
+            text: q.text,
+            options: q.options,
+            optionImages: q.optionImages || [],
+            imageUrl: q.imageUrl || null,
+            correctOptionIndex: q.correctOptionIndex,
+            explanation: q.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
+            difficulty: q.difficulty || 'médio',
+            year: Number(selectedYear || q.id.split('-')[0] || 2023),
+            index: Number(q.id.split('-')[1] || idx + 1)
+          }
         })
       }).catch(err => console.error('Failed to log answer:', err));
     });

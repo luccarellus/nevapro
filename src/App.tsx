@@ -17,6 +17,7 @@ import Simulados from './components/Simulados';
 import Materiais from './components/Materiais';
 import Mural from './components/Mural';
 import Settings from './components/Settings';
+import ErrorsBook from './components/ErrorsBook';
 import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import CookiePolicy from './components/CookiePolicy';
@@ -230,6 +231,8 @@ export default function App() {
             onConfirmExit={handleConfirmExit}
           />
         );
+      case 'errors':
+        return <ErrorsBook user={user} onEarnXp={handleEarnXp} />;
       case 'ranking':
         return <Leaderboard user={user} />;
       case 'materiais':

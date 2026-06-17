@@ -178,6 +178,37 @@ export default function Simulados({
         score: correctOnes,
         timestamp: new Date().toISOString()
       }));
+
+      // Salva as respostas individuais no banco de dados para alimentar o Caderno de Erros
+      questions.forEach((q, idx) => {
+        const isCorrect = userAnswers[idx] === q.correctOptionIndex;
+        // Para o simulado, se o aluno não respondeu, conta como incorreto no caderno de erros
+        const selectedOption = userAnswers[idx];
+        
+        fetch('/api/answers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id || 'u1',
+            questionId: q.id,
+            selectedOption: selectedOption !== undefined ? selectedOption : null,
+            isCorrect: selectedOption !== undefined ? isCorrect : false,
+            xpReward: q.xpReward || 50,
+            questionData: {
+              subject: q.subject,
+              text: q.text,
+              options: q.options,
+              optionImages: q.optionImages || [],
+              imageUrl: q.imageUrl || null,
+              correctOptionIndex: q.correctOptionIndex,
+              explanation: q.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
+              difficulty: q.difficulty || 'médio',
+              year: Number(selectedYear),
+              index: Number(q.id.split('-')[1] || idx + 1)
+            }
+          })
+        }).catch(err => console.error('Failed to log simulated answer:', err));
+      });
     }
     setView('result');
   };

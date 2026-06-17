@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon } from 'lucide-react';
 import Logo from './Logo';
 
 interface NavigationProps {
@@ -17,6 +17,7 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-[#00e5ff]', bgColor: 'bg-[#00e5ff]/10', hex: '#00e5ff' },
     { id: 'questions', label: 'Questões', icon: BookOpen, color: 'text-blue-500', bgColor: 'bg-blue-500/10', hex: '#3b82f6' },
     { id: 'simulados', label: 'Simulados', icon: ClipboardList, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#38bdf8' },
+    { id: 'errors', label: 'Caderno de Erros', icon: AlertOctagon, color: 'text-rose-500', bgColor: 'bg-rose-500/10', hex: '#f43f5e' },
     { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-500', bgColor: 'bg-amber-500/10', hex: '#f59e0b' },
     { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', hex: '#10b981' },
     { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-500', bgColor: 'bg-purple-500/10', hex: '#a855f7' },
