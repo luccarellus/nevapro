@@ -108,7 +108,11 @@ export default function App() {
   useEffect(() => {
     if (customTheme && customTheme !== 'default') {
       document.documentElement.setAttribute('data-theme', customTheme);
-      document.documentElement.classList.add('dark');
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     } else {
       if (isDarkMode) {
         document.documentElement.setAttribute('data-theme', 'dark');
