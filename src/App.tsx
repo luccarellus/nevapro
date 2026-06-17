@@ -106,8 +106,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (customTheme === 'olhar_jovem') {
-      document.documentElement.setAttribute('data-theme', 'olhar_jovem');
+    if (customTheme && customTheme !== 'default') {
+      document.documentElement.setAttribute('data-theme', customTheme);
       document.documentElement.classList.add('dark');
     } else {
       if (isDarkMode) {

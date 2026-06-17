@@ -469,15 +469,51 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       id: 'default', 
                       name: 'Padrão', 
                       description: 'Utiliza os esquemas originais Claro e Escuro do aplicativo.',
-                      primaryColor: '#00b094',
-                      colors: ['#0a0f1a', '#f8fafc'],
+                      primaryBgClass: 'bg-[#00b094]',
+                      borderClass: 'border-[#00b094]',
+                      bgPreviewClass: 'bg-[#0a0f1a]',
+                      cardPreviewClass: 'bg-[#1e293b]',
+                      glowClass: 'bg-[#00b094]',
                     },
                     { 
                       id: 'olhar_jovem', 
                       name: 'Olhar Jovem', 
                       description: 'Tema premium suave baseado na estética do Olhar Jovem.',
-                      primaryColor: '#00cbd1',
-                      colors: ['#061113', '#0f2225'],
+                      primaryBgClass: 'bg-[#0dccd6]',
+                      borderClass: 'border-[#0dccd6]',
+                      bgPreviewClass: 'bg-[#061113]',
+                      cardPreviewClass: 'bg-[#0f2225]',
+                      glowClass: 'bg-[#0dccd6]',
+                    },
+                    { 
+                      id: 'cyberpunk', 
+                      name: 'Cyberpunk', 
+                      description: 'Tema escuro futurista com tons vibrantes neon.',
+                      primaryBgClass: 'bg-[#d946ef]',
+                      borderClass: 'border-[#d946ef]',
+                      bgPreviewClass: 'bg-[#0c0517]',
+                      cardPreviewClass: 'bg-[#170a2c]',
+                      glowClass: 'bg-[#d946ef]',
+                    },
+                    { 
+                      id: 'forest', 
+                      name: 'Moss Forest', 
+                      description: 'Tema de tons verdes relaxantes e confortáveis.',
+                      primaryBgClass: 'bg-[#10b981]',
+                      borderClass: 'border-[#10b981]',
+                      bgPreviewClass: 'bg-[#06120c]',
+                      cardPreviewClass: 'bg-[#0e2418]',
+                      glowClass: 'bg-[#10b981]',
+                    },
+                    { 
+                      id: 'dracula', 
+                      name: 'Dracula', 
+                      description: 'O clássico tema dracula com acento lilás.',
+                      primaryBgClass: 'bg-[#cba6f7]',
+                      borderClass: 'border-[#cba6f7]',
+                      bgPreviewClass: 'bg-[#1e1e2e]',
+                      cardPreviewClass: 'bg-[#252538]',
+                      glowClass: 'bg-[#cba6f7]',
                     },
                   ].map((t) => {
                     const isSelected = theme === t.id;
@@ -491,17 +527,11 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                           isSelected 
                             ? 'bg-bg-sidebar/90 shadow-xl' 
                             : 'bg-bg-sidebar/30 border-transparent hover:bg-bg-sidebar/50'
-                        }`}
-                        style={{
-                          borderColor: isSelected ? t.primaryColor : 'transparent'
-                        }}
+                        } ${isSelected ? t.borderClass : 'border-transparent'}`}
                       >
                         {isSelected && (
                           <div 
-                            className="absolute -right-10 -bottom-10 w-28 h-28 rounded-full blur-3xl opacity-20 transition-all pointer-events-none"
-                            style={{
-                              background: t.primaryColor
-                            }}
+                            className={`absolute -right-10 -bottom-10 w-28 h-28 rounded-full blur-3xl opacity-20 transition-all pointer-events-none ${t.glowClass}`}
                           />
                         )}
 
@@ -510,7 +540,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                             <h5 className="font-black text-text-main text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                               {t.name}
                               {isSelected && (
-                                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: t.primaryColor }} />
+                                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${t.primaryBgClass}`} />
                               )}
                             </h5>
                             <p className="text-text-secondary text-[10px] font-bold leading-normal max-w-[170px] opacity-85">
@@ -519,29 +549,20 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                           </div>
 
                           <div className="flex items-center gap-1 bg-black/20 p-1.5 rounded-xl border border-white/5 flex-shrink-0">
-                            <span 
-                              className="w-3 h-3 rounded-full border border-white/10" 
-                              style={{ backgroundColor: t.primaryColor }}
-                            />
-                            <span 
-                              className="w-3 h-3 rounded-full border border-white/10" 
-                              style={{ backgroundColor: t.colors[0] }}
-                            />
-                            <span 
-                              className="w-3 h-3 rounded-full border border-white/10" 
-                              style={{ backgroundColor: t.colors[1] }}
-                            />
+                            <span className={`w-3 h-3 rounded-full border border-white/10 ${t.primaryBgClass}`} />
+                            <span className={`w-3 h-3 rounded-full border border-white/10 ${t.bgPreviewClass}`} />
+                            <span className={`w-3 h-3 rounded-full border border-white/10 ${t.cardPreviewClass}`} />
                           </div>
                         </div>
 
                         <div className="w-full h-8 rounded-lg bg-black/10 border border-white/5 p-1.5 flex gap-1.5 items-center mt-3">
-                          <div className="w-4 h-4 rounded" style={{ backgroundColor: t.colors[0] }} />
+                          <div className={`w-4 h-4 rounded ${t.bgPreviewClass}`} />
                           <div className="flex-1 space-y-1">
-                            <div className="w-10 h-1 rounded-full" style={{ backgroundColor: t.primaryColor }} />
-                            <div className="w-6 h-0.5 rounded-full opacity-20" style={{ backgroundColor: t.colors[1] }} />
+                            <div className={`w-10 h-1 rounded-full ${t.primaryBgClass}`} />
+                            <div className={`w-6 h-0.5 rounded-full opacity-20 ${t.cardPreviewClass}`} />
                           </div>
                           {isSelected && (
-                            <div className="w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: t.primaryColor }}>
+                            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-white ${t.primaryBgClass}`}>
                               <Check size={10} className="stroke-[3]" />
                             </div>
                           )}

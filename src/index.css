@@ -42,17 +42,56 @@
 
 
 
+[data-theme='cyberpunk'] {
+  --bg-main: #0c0517;
+  --bg-card: #170a2c;
+  --bg-sidebar: #120723;
+  --text-main: #ffffff;
+  --text-secondary: #a78bfa;
+  --border-color: rgba(217, 70, 239, 0.15);
+  --brand-primary: #d946ef;
+  --brand-secondary: #a855f7;
+  --input-bg: #22123c;
+  --card-shadow: rgba(217, 70, 239, 0.15);
+}
+
+[data-theme='forest'] {
+  --bg-main: #06120c;
+  --bg-card: #0e2418;
+  --bg-sidebar: #0a1b12;
+  --text-main: #e6f4ed;
+  --text-secondary: #7fa490;
+  --border-color: rgba(16, 185, 129, 0.15);
+  --brand-primary: #10b981;
+  --brand-secondary: #34d399;
+  --input-bg: #143222;
+  --card-shadow: rgba(16, 185, 129, 0.1);
+}
+
+[data-theme='dracula'] {
+  --bg-main: #1e1e2e;
+  --bg-card: #252538;
+  --bg-sidebar: #181825;
+  --text-main: #cdd6f4;
+  --text-secondary: #bac2de;
+  --border-color: rgba(203, 166, 247, 0.15);
+  --brand-primary: #cba6f7;
+  --brand-secondary: #f5c2e7;
+  --input-bg: #313244;
+  --card-shadow: rgba(203, 166, 247, 0.08);
+}
+
 [data-theme='olhar_jovem'] {
   --bg-main: #061113;
   --bg-card: #0f2225;
   --bg-sidebar: #0a191c;
   --text-main: #eefdff;
   --text-secondary: #749296;
-  --border-color: rgba(0, 203, 209, 0.15);
-  --brand-primary: #00cbd1;
-  --brand-secondary: #ec008c;
+  --border-color: rgba(13, 204, 214, 0.15);
+  --brand-primary: #0dccd6;
+  --brand-secondary: #ff007f;
   --input-bg: #142a2d;
-  --card-shadow: rgba(0, 203, 209, 0.08);
+  --card-shadow: rgba(13, 204, 214, 0.08);
 }
 
 @theme {
