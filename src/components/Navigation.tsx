@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles } from 'lucide-react';
 import Logo from './Logo';
 
 interface NavigationProps {
@@ -21,6 +21,8 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
     { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', hex: '#10b981' },
     { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-500', bgColor: 'bg-purple-500/10', hex: '#a855f7' },
     { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' },
+    { id: 'redacao', label: 'Redação', icon: PenTool, color: 'text-rose-400', bgColor: 'bg-rose-400/10', hex: '#fb7185' },
+    { id: 'professor_ia', label: 'Professor IA', icon: Sparkles, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#818cf8' },
   ];
 
   if (isAdmin) {

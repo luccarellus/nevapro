@@ -21,8 +21,9 @@ import CookieBanner from './components/CookieBanner';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import CookiePolicy from './components/CookiePolicy';
 import Maintenance from './components/Maintenance';
+import ComingSoon from './components/ComingSoon';
 import { UserProfile } from './types';
-import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen } from 'lucide-react';
+import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen, PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
@@ -237,6 +238,24 @@ export default function App() {
         return <Mural />;
       case 'calendar':
         return <Calendar />;
+      case 'redacao':
+        return (
+          <ComingSoon 
+            title="Redação Inteligente" 
+            icon={PenTool} 
+            description="Nossa inteligência artificial para correção e feedback de redações está sendo preparada para impulsionar suas notas."
+            accentColor="#fb7185"
+          />
+        );
+      case 'professor_ia':
+        return (
+          <ComingSoon 
+            title="Professor IA" 
+            icon={Sparkles} 
+            description="Um tutor personalizado disponível 24/7 para tirar dúvidas, explicar matérias e ajudar nos seus estudos."
+            accentColor="#818cf8"
+          />
+        );
       case 'admin':
         return user.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
       case 'profile':
