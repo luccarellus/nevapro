@@ -1,17 +1,5 @@
 <div align="center">
-
-<img width="1200" height="475" alt="Neva Logo" src="public/neva-logo-banner.png" />
-
-# Neva — Plataforma de Estudos Inteligente
-
-**Prepare-se para o ENEM com gamificação, IA e simulados completos.**
-
-[![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Latest-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com)
-
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
 ---
@@ -68,6 +56,7 @@ nevapro/
 ### Stack Tecnológica
 
 **Frontend**
+
 - **React 19** com TypeScript
 - **Vite 6** como bundler
 - **Tailwind CSS 4** para estilização
@@ -76,6 +65,7 @@ nevapro/
 - **Lucide React** para ícones
 
 **Backend**
+
 - **Express.js** com TypeScript
 - **PostgreSQL** como banco de dados principal
 - **bcryptjs** para hash de senhas
@@ -83,6 +73,7 @@ nevapro/
 - **Multer** para upload de arquivos
 
 **Infraestrutura**
+
 - **Docker + Docker Compose** com 3 réplicas da API
 - **Nginx** como reverse proxy e load balancer
 - **Let's Encrypt / Certbot** para HTTPS
@@ -254,6 +245,7 @@ A Neva utiliza um sistema de XP (pontos de experiência) para engajar os estudan
 ## 🌐 Rotas da API
 
 ### Autenticação
+
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/api/auth/login` | Login de usuário ou administrador |
@@ -263,12 +255,13 @@ A Neva utiliza um sistema de XP (pontos de experiência) para engajar os estudan
 | `POST` | `/api/auth/delete-user` | Exclusão de conta |
 
 ### Usuário
+
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/api/user/profile` | Buscar perfil |
 | `POST` | `/api/user/profile` | Atualizar perfil e XP |
 
-### Questões, Simulados, Materiais, Eventos e mais — gerenciados via painel Admin.
+### Questões, Simulados, Materiais, Eventos e mais — gerenciados via painel Admin
 
 ---
 
