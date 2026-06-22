@@ -120,7 +120,7 @@
   --card-shadow: rgba(136, 57, 239, 0.04);
 }
 
-[data-theme='olhar_jovem'] {
+[data-theme='neva'] {
   --bg-main: #060b0d;
   --bg-card: #0f181c;
   --bg-sidebar: #0b1114;
@@ -133,7 +133,7 @@
   --card-shadow: rgba(13, 204, 214, 0.06);
 }
 
-[data-theme='olhar_jovem']:not(.dark) {
+[data-theme='neva']:not(.dark) {
   --bg-main: #f0f8fa;
   --bg-card: #ffffff;
   --bg-sidebar: #e1f3f5;

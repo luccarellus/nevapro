@@ -391,7 +391,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
             </button>
           </div>
           <p className="text-[9px] text-text-secondary font-black uppercase tracking-[0.3em] opacity-40">
-            &copy; 2026 Olhar Jovem &bull; Instituto de Educação
+            &copy; 2026 Neva
           </p>
         </div>
       </motion.div>

@@ -1800,6 +1800,19 @@ async function initVite() {
 }
 
 (async () => {
+  try {
+    const srcLogo = path.join(process.cwd(), 'dist', 'assets', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png');
+    const destLogo = path.join(process.cwd(), 'src', 'components', 'logo.png');
+    const destFavicon = path.join(process.cwd(), 'public', 'icon-512.png');
+    
+    if (fs.existsSync(srcLogo)) {
+      fs.copyFileSync(srcLogo, destLogo);
+      fs.copyFileSync(srcLogo, destFavicon);
+      console.log('[Logo Setup] Copied new logo and favicon successfully.');
+    }
+  } catch (err) {
+    console.error('[Logo Setup] Error copying logo/favicon:', err);
+  }
   await applyDbMigration();
 })();
 

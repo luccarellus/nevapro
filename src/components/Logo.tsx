@@ -13,17 +13,17 @@ export default function Logo({ className = "h-8" }: LogoProps) {
       {!hasError ? (
         <img 
           src={logoOriginal} 
-          alt="Olhar Jovem Logo" 
+          alt="Neva Logo" 
           className="h-full w-auto object-contain"
           onError={() => setHasError(true)}
         />
       ) : (
         <div className="flex items-center justify-center h-full">
           <div className="h-full aspect-square bg-[#00b094] rounded-lg flex items-center justify-center text-white font-black text-xs min-h-[32px] min-w-[32px]">
-            OJ
+            N
           </div>
           <span className="text-white font-black tracking-tighter text-lg ml-2 whitespace-nowrap">
-            Olhar Jovem
+            Neva
           </span>
         </div>
       )}

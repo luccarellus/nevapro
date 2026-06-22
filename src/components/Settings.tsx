@@ -476,9 +476,9 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       glowClass: 'bg-[#00b094]',
                     },
                     { 
-                      id: 'olhar_jovem', 
-                      name: 'Olhar Jovem', 
-                      description: 'Tema premium suave baseado na estética do Olhar Jovem.',
+                      id: 'neva', 
+                      name: 'Neva', 
+                      description: 'Tema premium suave baseado na estética Neva.',
                       primaryBgClass: 'bg-[#0dccd6]',
                       borderClass: 'border-[#0dccd6]',
                       bgPreviewClass: 'bg-[#060b0d]',
