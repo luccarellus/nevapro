@@ -1801,14 +1801,39 @@ async function initVite() {
 
 (async () => {
   try {
-    const srcLogo = path.join(process.cwd(), 'dist', 'assets', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png');
-    const destLogo = path.join(process.cwd(), 'src', 'components', 'logo.png');
-    const destFavicon = path.join(process.cwd(), 'public', 'icon-512.png');
+    const possibleSrcs = [
+      path.join(process.cwd(), 'dist', 'assets', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png'),
+      path.join(process.cwd(), 'dist', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png')
+    ];
     
-    if (fs.existsSync(srcLogo)) {
-      fs.copyFileSync(srcLogo, destLogo);
-      fs.copyFileSync(srcLogo, destFavicon);
-      console.log('[Logo Setup] Copied new logo and favicon successfully.');
+    let srcLogo = '';
+    for (const p of possibleSrcs) {
+      if (fs.existsSync(p)) {
+        srcLogo = p;
+        break;
+      }
+    }
+    
+    if (srcLogo) {
+      const targets = [
+        path.join(process.cwd(), 'src', 'components', 'logo.png'),
+        path.join(process.cwd(), 'public', 'icon-512.png'),
+        path.join(process.cwd(), 'public', 'favicon.ico'),
+        path.join(process.cwd(), 'dist', 'icon-512.png'),
+        path.join(process.cwd(), 'dist', 'favicon.ico'),
+        path.join(process.cwd(), 'dist', 'assets', 'icon-512.png'),
+      ];
+
+      for (const target of targets) {
+        const dir = path.dirname(target);
+        if (fs.existsSync(dir)) {
+          fs.copyFileSync(srcLogo, target);
+          console.log(`[Logo Setup] Copied logo to ${target}`);
+        }
+      }
+      console.log('[Logo Setup] Copied new logo and favicons successfully to all targets.');
+    } else {
+      console.log('[Logo Setup] Source logo file not found in dist/assets or dist/.');
     }
   } catch (err) {
     console.error('[Logo Setup] Error copying logo/favicon:', err);
