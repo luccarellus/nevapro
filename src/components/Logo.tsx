@@ -9,12 +9,12 @@ export default function Logo({ className = "h-8" }: LogoProps) {
   const [hasError, setHasError] = useState(false);
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center justify-center gap-3 ${className}`}>
       {!hasError ? (
         <img 
           src={logoOriginal} 
           alt="Neva Pro Logo" 
-          className="h-full w-auto object-contain"
+          className="h-full w-auto object-contain scale-[1.08] origin-center"
           onError={() => setHasError(true)}
         />
       ) : (

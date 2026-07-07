@@ -113,7 +113,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
         className="w-full max-w-lg z-10"
       >
         <div className="text-center mb-10">
-          <Logo className="h-32 justify-center" />
+          <Logo className="h-32 w-full justify-center" />
           <p className="text-text-secondary mt-4 font-medium uppercase tracking-[0.2em] text-[10px]">A evolução dos seus estudos começa aqui.</p>
         </div>
 

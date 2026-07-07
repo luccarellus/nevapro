@@ -1822,11 +1822,9 @@ async function initVite() {
 
     if (fs.existsSync(faviconSource)) {
       const faviconTargets = [
-        path.join(process.cwd(), 'public', 'icon-512.png'),
-        path.join(process.cwd(), 'public', 'favicon.ico'),
-        path.join(process.cwd(), 'dist', 'icon-512.png'),
-        path.join(process.cwd(), 'dist', 'favicon.ico'),
-        path.join(process.cwd(), 'dist', 'assets', 'icon-512.png'),
+        path.join(process.cwd(), 'public', 'logotopo.png'),
+        path.join(process.cwd(), 'dist', 'logotopo.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'logotopo.png'),
       ];
 
       for (const target of faviconTargets) {
