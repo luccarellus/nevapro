@@ -52,7 +52,7 @@ export default function CookieBanner() {
                 </div>
                 <div className="flex-1">
                   <p className="text-[11px] text-text-secondary leading-relaxed font-bold">
-                    Respeitamos sua privacidade. Utilizamos cookies para otimizar sua experiência de aprendizado no Neva.
+                    Respeitamos sua privacidade. Utilizamos cookies para otimizar sua experiência de aprendizado no Neva Pro.
                   </p>
                   <div className="mt-1.5 flex gap-3">
                     <button onClick={() => window.open('/privacidade', '_blank')} className="text-[9px] font-black uppercase text-brand-primary/60 hover:text-brand-primary tracking-widest transition-colors">Privacidade</button>

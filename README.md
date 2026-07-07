@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
@@ -6,7 +6,7 @@
 
 ## 📖 Sobre o Projeto
 
-A **Neva** é uma plataforma web full-stack voltada para a preparação de estudantes para o **ENEM**, com foco especial no estado do **Maranhão**. Combinando gamificação, inteligência artificial e uma experiência de usuário moderna, a Neva transforma os estudos em uma jornada engajante e eficiente.
+A **Neva Pro** é uma plataforma web full-stack voltada para a preparação de estudantes para o **ENEM**, com foco especial no estado do **Maranhão**. Combinando gamificação, inteligência artificial e uma experiência de usuário moderna, a Neva Pro transforma os estudos em uma jornada engajante e eficiente.
 
 ### ✨ Funcionalidades Principais
 
@@ -83,7 +83,7 @@ nevapro/
 
 ## 🔐 Segurança
 
-A Neva implementa um conjunto robusto de proteções de segurança:
+A Neva Pro implementa um conjunto robusto de proteções de segurança:
 
 - **Autenticação por Cookie HttpOnly** — tokens de sessão assinados com HMAC-SHA256
 - **Proteção contra Força Bruta** — bloqueio de conta após 5 tentativas falhas (15 min)
@@ -231,7 +231,7 @@ docker image prune -f
 
 ## 🎮 Sistema de Gamificação
 
-A Neva utiliza um sistema de XP (pontos de experiência) para engajar os estudantes:
+A Neva Pro utiliza um sistema de XP (pontos de experiência) para engajar os estudantes:
 
 - **Questões** — XP variável por dificuldade
 - **Simulados** — Recompensa de XP ao concluir
@@ -297,10 +297,13 @@ A plataforma implementa:
 
 ## 📄 Licença
 
-Este projeto é proprietário. Todos os direitos reservados © Neva.
+Este projeto é proprietário. Todos os direitos reservados © Neva Pro.
 
 ---
 
 <div align="center">
-  <p><strong>Neva • Educando com Inteligência</strong></p>
+  <p><strong>Neva Pro • Educando com Inteligência</strong></p>
 </div>
+
+
+

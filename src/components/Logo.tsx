@@ -13,7 +13,7 @@ export default function Logo({ className = "h-8" }: LogoProps) {
       {!hasError ? (
         <img 
           src={logoOriginal} 
-          alt="Neva Logo" 
+          alt="Neva Pro Logo" 
           className="h-full w-auto object-contain"
           onError={() => setHasError(true)}
         />
@@ -23,7 +23,7 @@ export default function Logo({ className = "h-8" }: LogoProps) {
             N
           </div>
           <span className="text-white font-black tracking-tighter text-lg ml-2 whitespace-nowrap">
-            Neva
+            Neva Pro
           </span>
         </div>
       )}

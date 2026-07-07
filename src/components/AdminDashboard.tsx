@@ -984,7 +984,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               </div>
               <h1 className="text-4xl md:text-5xl font-black text-text-main tracking-tight leading-none mb-4">Backoffice</h1>
               <p className="text-text-secondary font-medium max-w-xl text-sm leading-relaxed opacity-80">
-                Coordene estrategicamente o projeto, centralizando eventos, conteúdos e avisos para toda a comunidade estudantil do Neva.
+                Coordene estrategicamente o projeto, centralizando eventos, conteúdos e avisos para toda a comunidade estudantil do Neva Pro.
               </p>
             </div>
 

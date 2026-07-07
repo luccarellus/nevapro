@@ -477,8 +477,8 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                     },
                     { 
                       id: 'neva', 
-                      name: 'Neva', 
-                      description: 'Tema premium suave baseado na estética Neva.',
+                      name: 'Neva Pro', 
+                      description: 'Tema premium suave baseado na estética Neva Pro.',
                       primaryBgClass: 'bg-[#0dccd6]',
                       borderClass: 'border-[#0dccd6]',
                       bgPreviewClass: 'bg-[#060b0d]',

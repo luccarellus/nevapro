@@ -96,7 +96,7 @@ export default function ComingSoon({
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${styles.dot}`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${styles.dot}`}></span>
             </span>
-            Em breve no Neva
+            Em breve no Neva Pro
           </div>
         </div>
       </motion.div>

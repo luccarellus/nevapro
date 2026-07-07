@@ -1,4 +1,4 @@
-# 🚀 Manual de Operações e Produção - Neva NESTJS
+﻿# 🚀 Manual de Operações e Produção - Neva Pro NESTJS
 
 ## 🛡️ Checklist de Segurança de Produção
 - [ ] **Firewall (UFW):** `ufw allow 80/tcp && ufw allow 443/tcp && ufw enable`
@@ -40,3 +40,4 @@ DATABASE_URL="postgres://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]?connection_lim
 ## 💾 Estratégia de Backup
 - **PostgreSQL:** Backups automáticos diários (pg_dump ou backup gerenciado).
 - **Arquivos:** Backups semanais da pasta `/nginx` e `.env` em repositório privado ou S3.
+

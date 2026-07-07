@@ -34,7 +34,7 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
           <section>
             <h2 className="text-xl font-black text-text-main uppercase tracking-widest mb-4">1. Introdução</h2>
             <p className="leading-relaxed">
-              Respeitamos sua privacidade e estamos comprometidos em proteger seus dados pessoais. Esta política descreve como coletamos, usamos e protegemos suas informações ao utilizar o portal Neva.
+              Respeitamos sua privacidade e estamos comprometidos em proteger seus dados pessoais. Esta política descreve como coletamos, usamos e protegemos suas informações ao utilizar o portal Neva Pro.
             </p>
           </section>
 

@@ -334,7 +334,7 @@ export default function App() {
             {/* Footer / Cookie Button */}
             {isLoggedIn && !isFullPageTab && (
                <footer className="max-w-6xl mx-auto px-6 py-12 border-t border-border-color/50 mt-12 mb-20 md:mb-12 flex flex-col md:flex-row justify-center items-center gap-6">
-                  <p className="text-[9px] font-black uppercase text-text-secondary/30 tracking-[0.3em]">Neva • Educando com Inteligência</p>
+                  <p className="text-[9px] font-black uppercase text-text-secondary/30 tracking-[0.3em]">Neva Pro • Educando com Inteligência</p>
                </footer>
             )}
           </motion.div>
