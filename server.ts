@@ -1801,22 +1801,27 @@ async function initVite() {
 
 (async () => {
   try {
-    const possibleSrcs = [
-      path.join(process.cwd(), 'dist', 'assets', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png'),
-      path.join(process.cwd(), 'dist', '823ea1eb-24be-4d95-9a6d-50bc9a050abb (1).png')
-    ];
-    
-    let srcLogo = '';
-    for (const p of possibleSrcs) {
-      if (fs.existsSync(p)) {
-        srcLogo = p;
-        break;
+    const logoSource = path.join(process.cwd(), 'src', 'components', 'logo.png');
+    const faviconSource = path.join(process.cwd(), 'src', 'components', 'logotopo.png');
+
+    if (fs.existsSync(logoSource)) {
+      const logoTargets = [
+        path.join(process.cwd(), 'dist', 'assets', 'logo.png'),
+      ];
+
+      for (const target of logoTargets) {
+        const dir = path.dirname(target);
+        if (fs.existsSync(dir)) {
+          fs.copyFileSync(logoSource, target);
+          console.log(`[Logo Setup] Copied main logo to ${target}`);
+        }
       }
+    } else {
+      console.log('[Logo Setup] Main logo not found at src/components/logo.png.');
     }
-    
-    if (srcLogo) {
-      const targets = [
-        path.join(process.cwd(), 'src', 'components', 'logo.png'),
+
+    if (fs.existsSync(faviconSource)) {
+      const faviconTargets = [
         path.join(process.cwd(), 'public', 'icon-512.png'),
         path.join(process.cwd(), 'public', 'favicon.ico'),
         path.join(process.cwd(), 'dist', 'icon-512.png'),
@@ -1824,16 +1829,16 @@ async function initVite() {
         path.join(process.cwd(), 'dist', 'assets', 'icon-512.png'),
       ];
 
-      for (const target of targets) {
+      for (const target of faviconTargets) {
         const dir = path.dirname(target);
         if (fs.existsSync(dir)) {
-          fs.copyFileSync(srcLogo, target);
-          console.log(`[Logo Setup] Copied logo to ${target}`);
+          fs.copyFileSync(faviconSource, target);
+          console.log(`[Logo Setup] Copied favicon asset to ${target}`);
         }
       }
-      console.log('[Logo Setup] Copied new logo and favicons successfully to all targets.');
+      console.log('[Logo Setup] Copied favicon assets successfully.');
     } else {
-      console.log('[Logo Setup] Source logo file not found in dist/assets or dist/.');
+      console.log('[Logo Setup] Favicon source not found at src/components/logotopo.png.');
     }
   } catch (err) {
     console.error('[Logo Setup] Error copying logo/favicon:', err);
