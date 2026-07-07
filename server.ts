@@ -1752,6 +1752,202 @@ app.post('/api/lgpd/consent-log', (req, res) => {
   res.json({ success: true });
 });
 
+// QUESTOES
+app.get('/api/questoes', requireAuth, async (req, res) => {
+  const { year, limit = 50, offset = 0 } = req.query;
+  if (!year) return res.status(400).json({ error: 'Ano necessário' });
+  try {
+    const { data: dbData } = await dbAdmin.from('questions').select('*, question_options(*)').eq('year', year).order('index', { ascending: true }).range(Number(offset), Number(offset) + Number(limit) - 1);
+    if (dbData?.length) return res.json({ questions: dbData.map(q => ({ ...q, alternatives: q.question_options?.sort((a: any, b: any) => a.letter.localeCompare(b.letter)) || [] })) });
+    const response = await fetch(`https://api.enem.dev/v1/exams/${year}/questions?limit=${limit}&offset=${offset}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (error) { res.status(500).json({ error: 'Erro ao buscar questões' }); }
+});
+
+app.post('/api/answers', requireAuth, async (req, res) => {
+  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  try {
+    // 1. Verificar se a questão já existe no banco
+    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
+    
+    if (qCheck.rows.length === 0 && questionData) {
+      console.log(`[POST /api/answers] Caching question ${questionId}...`);
+      // Inserir a questão
+      await query(
+        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          questionId,
+          questionData.subject || 'Geral',
+          questionData.text,
+          questionData.imageUrl || null,
+          questionData.correctOptionIndex,
+          questionData.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
+          questionData.difficulty || 'médio',
+          questionData.xpReward || 50,
+          questionData.year || 2023,
+          questionData.index || 0
+        ]
+      );
+
+      // Inserir as alternativas
+      if (Array.isArray(questionData.options)) {
+        for (let idx = 0; idx < questionData.options.length; idx++) {
+          const optText = questionData.options[idx];
+          const optImg = questionData.optionImages?.[idx] || null;
+          const letter = String.fromCharCode(65 + idx); // A, B, C, D, E...
+          const isCorrectOption = idx === questionData.correctOptionIndex;
+
+          await query(
+            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
+             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)`,
+            [questionId, optText, optImg, letter, isCorrectOption]
+          );
+        }
+      }
+    }
+
+    // 2. Inserir a resposta do aluno
+    await query(
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
+       VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW())`,
+      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[POST /api/answers] Error logging answer:', err);
+    res.status(500).json({ error: 'Erro ao registrar resposta.' });
+  }
+});
+
+app.get('/api/user/errors', requireAuth, async (req, res) => {
+  let email = req.query.email as string;
+  if (!email) {
+    email = req.user.email;
+  }
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
+    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  }
+
+  try {
+    // 1. Obter o ID do usuário pelo e-mail
+    const userRes = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [cleanEmail]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuário não encontrado' });
+    }
+    const userId = userRes.rows[0].id;
+
+    // 2. Buscar as últimas respostas incorretas (rn = 1 e is_correct = false)
+    const errorsQuery = `
+      WITH latest_answers AS (
+        SELECT *,
+               ROW_NUMBER() OVER(PARTITION BY question_id ORDER BY created_at DESC) as rn
+        FROM public.answers
+        WHERE user_id = $1
+      )
+      SELECT 
+        la.id as answer_id,
+        la.selected_option_index,
+        la.created_at as answered_at,
+        q.id as question_id,
+        q.subject,
+        q.text as question_text,
+        q.image_url,
+        q.correct_option_index,
+        q.explanation,
+        q.difficulty,
+        q.year,
+        q.index
+      FROM latest_answers la
+      JOIN public.questions q ON la.question_id = q.id
+      WHERE la.rn = 1 AND la.is_correct = false
+      ORDER BY la.created_at DESC;
+    `;
+
+    const errorsRes = await query(errorsQuery, [userId]);
+    const errorsList = errorsRes.rows;
+
+    // 3. Para cada erro, carregar suas alternativas
+    const result = [];
+    for (const errRow of errorsList) {
+      const optsRes = await query(
+        'SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC',
+        [errRow.question_id]
+      );
+      
+      result.push({
+        id: errRow.question_id,
+        subject: errRow.subject,
+        text: errRow.question_text,
+        imageUrl: errRow.image_url,
+        correctOptionIndex: errRow.correct_option_index,
+        explanation: errRow.explanation,
+        difficulty: errRow.difficulty,
+        year: errRow.year,
+        index: errRow.index,
+        selectedOptionIndex: errRow.selected_option_index,
+        answeredAt: errRow.answered_at,
+        options: optsRes.rows.map(opt => opt.text),
+        optionImages: optsRes.rows.map(opt => opt.image_url),
+      });
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('[GET /api/user/errors] Error:', err);
+    res.status(500).json({ error: 'Erro ao buscar caderno de erros.' });
+  }
+});
+
+app.get('/api/imagem', async (req, res) => {
+  const urlStr = req.query.url as string;
+  if (!urlStr) return res.status(400).send('URL missing');
+  try {
+    const parsedUrl = new URL(urlStr);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    
+    // Allowlist de domínios seguros contra SSRF
+    const allowedHostsEnv = process.env.ALLOWED_IMAGE_HOSTS || '';
+    const extraHosts = allowedHostsEnv.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+    
+    const isAllowedHost = hostname === 'enem.dev' || 
+                          hostname === 'api.enem.dev' || 
+                          extraHosts.includes(hostname);
+
+    if (!isAllowedHost) {
+      return res.status(403).send('Acesso negado: domínio não permitido.');
+    }
+
+    const response = await fetch(urlStr, { 
+      headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' },
+      redirect: 'manual'
+    });
+    
+    // Bloqueia redirecionamentos para evitar desvio de DNS/Allowlist (SSRF)
+    if (response.status >= 300 && response.status < 400) {
+      return res.status(403).send('Acesso negado: redirecionamentos não são permitidos.');
+    }
+    
+    if (!response.ok) return res.status(response.status).send('Fetch error');
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch (error) { res.status(500).send('Proxy error'); }
+});
+
+// LGPD Consent log endpoint
+app.post('/api/lgpd/consent-log', (req, res) => {
+  // Retorna 200 OK para evitar erro de 404 no console do navegador
+  console.log('[LGPD] Consent preferences received:', req.body);
+  res.json({ success: true });
+});
+
 // Rota de Health Check para o Docker Compose
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
@@ -1802,10 +1998,13 @@ async function initVite() {
 (async () => {
   try {
     const logoSource = path.join(process.cwd(), 'src', 'components', 'logo.png');
-    const faviconSource = path.join(process.cwd(), 'src', 'components', 'logotopo.png');
+    const faviconSourcePng = path.join(process.cwd(), 'src', 'components', 'logotopo.png');
+    const faviconSourceIco = path.join(process.cwd(), 'src', 'components', 'favicon.ico');
 
     if (fs.existsSync(logoSource)) {
       const logoTargets = [
+        path.join(process.cwd(), 'public', 'logo.png'),
+        path.join(process.cwd(), 'dist', 'logo.png'),
         path.join(process.cwd(), 'dist', 'assets', 'logo.png'),
       ];
 
@@ -1820,31 +2019,49 @@ async function initVite() {
       console.log('[Logo Setup] Main logo not found at src/components/logo.png.');
     }
 
-    if (fs.existsSync(faviconSource)) {
-      const faviconTargets = [
+    if (fs.existsSync(faviconSourcePng)) {
+      const faviconPngTargets = [
         path.join(process.cwd(), 'public', 'logotopo.png'),
         path.join(process.cwd(), 'dist', 'logotopo.png'),
         path.join(process.cwd(), 'dist', 'assets', 'logotopo.png'),
+        path.join(process.cwd(), 'public', 'icon-512.png'),
+        path.join(process.cwd(), 'dist', 'icon-512.png'),
+        path.join(process.cwd(), 'dist', 'assets', 'icon-512.png'),
       ];
 
-      for (const target of faviconTargets) {
+      for (const target of faviconPngTargets) {
         const dir = path.dirname(target);
         if (fs.existsSync(dir)) {
-          fs.copyFileSync(faviconSource, target);
-          console.log(`[Logo Setup] Copied favicon asset to ${target}`);
+          fs.copyFileSync(faviconSourcePng, target);
+          console.log(`[Logo Setup] Copied PNG favicon asset to ${target}`);
         }
       }
-      console.log('[Logo Setup] Copied favicon assets successfully.');
     } else {
-      console.log('[Logo Setup] Favicon source not found at src/components/logotopo.png.');
+      console.log('[Logo Setup] PNG favicon source not found at src/components/logotopo.png.');
+    }
+
+    if (fs.existsSync(faviconSourceIco)) {
+      const faviconIcoTargets = [
+        path.join(process.cwd(), 'public', 'favicon.ico'),
+        path.join(process.cwd(), 'dist', 'favicon.ico'),
+        path.join(process.cwd(), 'dist', 'assets', 'favicon.ico'),
+      ];
+
+      for (const target of faviconIcoTargets) {
+        const dir = path.dirname(target);
+        if (fs.existsSync(dir)) {
+          fs.copyFileSync(faviconSourceIco, target);
+          console.log(`[Logo Setup] Copied ICO favicon asset to ${target}`);
+        }
+      }
+    } else {
+      console.log('[Logo Setup] ICO favicon source not found at src/components/favicon.ico.');
     }
   } catch (err) {
-    console.error('[Logo Setup] Error copying logo/favicon:', err);
+    console.error('[Logo Setup] Error copying logo/favicon assets:', err);
   }
   await applyDbMigration();
 })();
-
-initVite();
 
 if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT || 3000);
