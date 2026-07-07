@@ -5,7 +5,7 @@ interface LogoProps {
   className?: string;
 }
 
-export default function Logo({ className = "h-8" }: LogoProps) {
+export default function Logo({ className = "h-10" }: LogoProps) {
   const [hasError, setHasError] = useState(false);
 
   return (
@@ -14,7 +14,7 @@ export default function Logo({ className = "h-8" }: LogoProps) {
         <img 
           src={logoOriginal} 
           alt="Neva Pro Logo" 
-          className="h-full w-auto object-contain scale-[1.08] origin-center"
+          className="h-full w-auto object-contain scale-[1.12] origin-center"
           onError={() => setHasError(true)}
         />
       ) : (

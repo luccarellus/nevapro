@@ -99,7 +99,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
     <header className="fixed top-0 left-0 right-0 z-40 bg-bg-main/50 backdrop-blur-xl">
       <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
         <div className="lg:hidden">
-          <Logo className="h-12" />
+          <Logo className="h-14" />
         </div>
         <div className="flex-1 lg:flex justify-end hidden">
            {/* In desktop the logo is in the sidebar, so we leave space or add search */}
