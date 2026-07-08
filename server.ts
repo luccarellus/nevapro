@@ -22,6 +22,7 @@ declare global {
 
 export const app = express();
 app.set('trust proxy', 1);
+app.disable('etag');
 
 // Configuração nativa de CORS
 app.use((req, res, next) => {
@@ -34,6 +35,15 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
+  next();
+});
+
+
+// Evita 304 em rotas din�micas da API, garantindo respostas sempre frescas.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   next();
 });
 
