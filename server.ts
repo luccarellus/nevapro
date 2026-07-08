@@ -779,6 +779,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     .maybeSingle();
 
   const isAdmin = !!adminExists;
+  const targetTable = isAdmin ? 'admin_users' : 'users';
 
   const dbUpdate: any = { email };
   
@@ -807,27 +808,25 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     }
   });
 
-  const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;
-
-  // Fetch the old user profile from database to determine if XP has increased
-  let xpDiff = 0;
-  let userId = null;
-  let oldXp = 0;
-  try {
-    const { data: oldUser } = await dbAdmin.from('users').select('id, xp').eq('email', email).maybeSingle();
-    if (oldUser) {
-      userId = oldUser.id;
-      oldXp = oldUser.xp || 0;
-      if (dbUpdate.xp !== undefined) {
-        const newXp = dbUpdate.xp;
-        if (newXp > oldXp) {
-          xpDiff = newXp - oldXp;
+  const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;    // Fetch the old user profile from database to determine if XP has increased
+    let xpDiff = 0;
+    let userId = null;
+    let oldXp = 0;
+    try {
+      const { data: oldUser } = await dbAdmin.from(targetTable).select('id, xp').eq('email', email).maybeSingle();
+      if (oldUser) {
+        userId = oldUser.id;
+        oldXp = oldUser.xp || 0;
+        if (dbUpdate.xp !== undefined) {
+          const newXp = dbUpdate.xp;
+          if (newXp > oldXp) {
+            xpDiff = newXp - oldXp;
+          }
         }
       }
+    } catch (e) {
+      console.error('[Profile Update] Error fetching old user:', e);
     }
-  } catch (e) {
-    console.error('[Profile Update] Error fetching old user:', e);
-  }
 
   // Check flash quiz protection on server side
   if (isFlashQuizUpdate) {
@@ -844,9 +843,8 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
   }
 
   try {
-    const targetTable = isAdmin ? 'admin_users' : 'users';
-    const updatePayload = isAdmin 
-      ? { name: dbUpdate.name, email: dbUpdate.email }
+    const updatePayload = isAdmin
+      ? { name: dbUpdate.name, email: dbUpdate.email, xp: dbUpdate.xp, level: dbUpdate.level, answered_questions: dbUpdate.answered_questions, correct_answers: dbUpdate.correct_answers, streak: dbUpdate.streak }
       : dbUpdate;
 
     const { data, error } = await dbAdmin.from(targetTable).update(updatePayload).eq('email', email).select().single();
@@ -879,7 +877,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     if (error) throw error;
 
     // If there is an XP increase, insert an entry in xp_logs to feed weekly charts
-    if (!isAdmin && userId && xpDiff > 0) {
+    if (userId && xpDiff > 0) {
       await dbAdmin.from('xp_logs').insert([{
         user_id: userId,
         amount: xpDiff,
