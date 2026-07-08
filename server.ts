@@ -302,79 +302,71 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   }
 
   try {
-    // 1. PostgreSQL (Para Administradores)
+    // 1. Administradores via Supabase Auth
     try {
-      const { rows: adminRows } = await query('SELECT * FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
-      const adminUser = adminRows[0];
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+        const { data: authData, error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
 
-      if (adminUser) {
-        let isAdminValid = false;
-        let authUserId: string | null = adminUser.auth_user_id || null;
+        const { data: adminRow, error: adminRowError } = await dbAdmin
+          .from('admin_users')
+          .select('*')
+          .eq('email', cleanEmail)
+          .maybeSingle();
 
-        if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-          try {
-            const { data: authData, error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
+        if (adminRowError) throw adminRowError;
+
+        const isAuthAdmin = !!authData.user && (
+          adminRow ||
+          authData.user.app_metadata?.role === 'admin' ||
+          authData.user.user_metadata?.role === 'admin'
+        );
+
+        if (authData.user && isAuthAdmin) {
+          const adminName = authData.user.user_metadata?.name
+            || authData.user.user_metadata?.full_name
+            || authData.user.email?.split('@')[0]
+            || cleanEmail.split('@')[0];
+
+          if (!adminRow) {
+            await dbAdmin.from('admin_users').insert([{
+              id: crypto.randomUUID(),
               email: cleanEmail,
-              password,
-            });
-
-            if (!authError && authData.user) {
-              isAdminValid = true;
-              authUserId = authData.user.id;
-
-              if (!adminUser.auth_user_id || adminUser.auth_user_id !== authData.user.id) {
-                try {
-                  await query('UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2', [authData.user.id, cleanEmail]);
-                } catch (syncErr) {
-                  console.error('[Auth Admin] Erro ao sincronizar auth_user_id:', syncErr);
-                }
-              }
-            }
-          } catch (authErr) {
-            console.error('[Auth Admin] Supabase Auth indisponível:', authErr);
-          }
-        }
-
-        if (!isAdminValid) {
-          const dbPassword = adminUser.password_hash;
-          let needsHashUpgrade = false;
-
-          if (dbPassword) {
-            if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
-              isAdminValid = await bcrypt.compare(password, dbPassword);
-            } else {
-              isAdminValid = dbPassword === password;
-              if (isAdminValid) needsHashUpgrade = true;
-            }
+              name: adminName,
+              role: 'admin',
+              auth_user_id: authData.user.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }]);
+          } else if (adminRow.auth_user_id !== authData.user.id) {
+            await query(
+              'UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2',
+              [authData.user.id, cleanEmail]
+            );
           }
 
-          if (isAdminValid && needsHashUpgrade) {
-            try {
-              const salt = await bcrypt.genSalt(10);
-              const hashedPassword = await bcrypt.hash(password, salt);
-              await query('UPDATE admin_users SET password_hash = $1 WHERE email = $2', [hashedPassword, cleanEmail]);
-              console.log(`[Security] Senha em texto puro do admin ${cleanEmail} convertida para BCrypt.`);
-            } catch (e) {
-              console.error('[Security] Erro ao converter senha de admin:', e);
-            }
-          }
-        }
-
-        if (isAdminValid) {
           const userObj = getUserWithRole({
-            ...adminUser,
-            id: authUserId || adminUser.id
+            ...(adminRow || {
+              id: authData.user.id,
+              email: cleanEmail,
+              name: adminName,
+              role: 'admin',
+            }),
+            id: authData.user.id,
+            email: cleanEmail,
+            name: adminName,
+            role: 'admin'
           });
 
-          if (userObj) {
-            const token = generateToken(userObj.id, userObj.email, userObj.role);
-            res.cookie('session_token', token, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'strict',
-              maxAge: 24 * 60 * 60 * 1000
-            });
-          }
+          const token = generateToken(userObj.id, userObj.email, userObj.role);
+          res.cookie('session_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000
+          });
 
           try {
             await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]);
@@ -382,8 +374,8 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
           return res.json({ success: true, user: userObj });
         }
       }
-    } catch (dbErr) {
-      console.error('[Auth Admin] Erro DB:', dbErr);
+    } catch (authErr) {
+      console.error('[Auth Admin] Erro ao autenticar via Supabase:', authErr);
     }
 
     // 2. Tabela de Alunos
@@ -598,51 +590,58 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
     const isAdmin = !!adminExists;
 
-    // 1. Administrador (PostgreSQL)
+    // 1. Administrador (Supabase Auth)
     if (isAdmin) {
-      const { rows } = await query('SELECT id, auth_user_id, password_hash FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
-      if (rows.length === 0) {
-        return res.status(404).json({ error: 'Administrador não encontrado.' });
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(500).json({ error: 'Supabase Auth n�o configurado para admins.' });
       }
-      
-      const dbPassword = rows[0].password_hash;
-      let isValid = false;
-      if (dbPassword) {
-        if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
-          isValid = await bcrypt.compare(currentPassword, dbPassword);
-        } else {
-          isValid = dbPassword === currentPassword;
+
+      try {
+        const { data: authData, error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
+          email: cleanEmail,
+          password: currentPassword,
+        });
+
+        if (authError || !authData.user) {
+          return res.status(401).json({ error: 'Senha atual incorreta.' });
         }
-      }
 
-      if (!isValid) {
-        return res.status(401).json({ error: 'Senha atual incorreta.' });
-      }
+        const adminName = authData.user.user_metadata?.name
+          || authData.user.user_metadata?.full_name
+          || authData.user.email?.split('@')[0]
+          || cleanEmail.split('@')[0];
 
-      const adminRow = rows[0];
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(newPassword, salt);
+        const { data: adminRow, error: adminRowError } = await dbAdmin
+          .from('admin_users')
+          .select('id, auth_user_id')
+          .eq('email', cleanEmail)
+          .maybeSingle();
 
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          const adminAuth = dbAdmin.auth.admin;
-          if (adminRow.auth_user_id) {
-            await adminAuth.updateUserById(adminRow.auth_user_id, { password: newPassword });
-          } else {
-            const { data: authResult } = await adminAuth.listUsers();
-            const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-            if (target) {
-              await adminAuth.updateUserById(target.id, { password: newPassword });
-            }
-          }
-        } catch (authErr) {
-          console.error('[Change Password] Erro ao atualizar senha no Supabase Auth:', authErr);
+        if (adminRowError) throw adminRowError;
+
+        const adminAuth = dbAdmin.auth.admin;
+        const targetUserId = adminRow?.auth_user_id || authData.user.id;
+        await adminAuth.updateUserById(targetUserId, { password: newPassword });
+
+        if (!adminRow) {
+          await dbAdmin.from('admin_users').insert([{
+            id: crypto.randomUUID(),
+            email: cleanEmail,
+            name: adminName,
+            role: 'admin',
+            auth_user_id: authData.user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }]);
+        } else if (!adminRow.auth_user_id) {
+          await query('UPDATE admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2', [authData.user.id, cleanEmail]);
         }
+
+        return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+      } catch (authErr) {
+        console.error('[Change Password] Erro ao atualizar senha no Supabase Auth:', authErr);
+        return res.status(500).json({ error: 'Erro ao alterar senha via Supabase Auth.' });
       }
-
-      await query('UPDATE admin_users SET password_hash = $1 WHERE email = $2', [hashedPassword, cleanEmail]);
-
-      return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
     }
 
     // 2. Estudante (Tabela public.users)
@@ -2156,3 +2155,7 @@ if (!process.env.VERCEL) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
+
+
+
+

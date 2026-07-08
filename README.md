@@ -181,8 +181,9 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 ### Supabase e Admins
 
 - Os admins devem ser criados no **Supabase Auth** e vinculados à tabela `public.admin_users`.
+- No Supabase Auth, marque o usuário com `app_metadata.role = "admin"` ou mantenha o e-mail correspondente em `public.admin_users`.
 - A primeira autenticação do admin sincroniza `admin_users.auth_user_id` automaticamente.
-- O backend ainda mantém uma fallback de migração com `password_hash` só para não quebrar contas legadas.
+- O login e a troca de senha do admin dependem exclusivamente do Supabase Auth.
 
 ### Deploy na Vercel
 

@@ -35,7 +35,8 @@ DISABLE_DB_SSL="false"
 - O backend está preparado para a Vercel via [`api/index.ts`](C:/Users/bruno/OneDrive/Documents/GitHub/nevapro/nevapro/api/index.ts).
 - O build precisa gerar `dist/server.cjs` antes da função subir.
 - Use as variáveis `APP_URL`, `FRONTEND_URL`, `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no projeto da Vercel.
-- Admins devem ser criados no Supabase Auth e associados a `public.admin_users.auth_user_id`.
+- Admins devem ser criados no Supabase Auth com `app_metadata.role = admin` ou associados a `public.admin_users`.
+- No primeiro login válido, o backend sincroniza `public.admin_users.auth_user_id`.
 
 ## 🧱 Autenticação (JWT + Refresh Token)
 - **Access Token:** JWT de vida curta (15 min) enviado via HttpOnly Cookie.
