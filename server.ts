@@ -302,7 +302,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
   }
 
   try {
-    // 1. Administradores via Supabase Auth
+    // 1. Supabase Auth — Auto-cria admin_users para qualquer auth user que não seja estudante
     try {
       if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
         const { data: authData, error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
@@ -310,27 +310,49 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
           password,
         });
 
-        const { data: adminRow, error: adminRowError } = await dbAdmin
-          .from('admin_users')
-          .select('*')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+        if (authData.user && !authError) {
+          const { data: adminRow } = await dbAdmin
+            .from('admin_users')
+            .select('*')
+            .eq('email', cleanEmail)
+            .maybeSingle();
 
-        if (adminRowError) throw adminRowError;
+          const { data: studentRow } = await dbAdmin
+            .from('users')
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
 
-        const isAuthAdmin = !!authData.user && (
-          adminRow ||
-          authData.user.app_metadata?.role === 'admin' ||
-          authData.user.user_metadata?.role === 'admin'
-        );
+          if (adminRow) {
+            // Já é admin registrado — atualiza auth_user_id se necessário
+            if (adminRow.auth_user_id !== authData.user.id) {
+              await query(
+                'UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2',
+                [authData.user.id, cleanEmail]
+              );
+            }
+            const userObj = getUserWithRole({
+              ...adminRow,
+              id: authData.user.id,
+            });
+            const token = generateToken(userObj.id, userObj.email, userObj.role);
+            res.cookie('session_token', token, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict',
+              maxAge: 24 * 60 * 60 * 1000
+            });
+            await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
+            return res.json({ success: true, user: userObj });
+          }
 
-        if (authData.user && isAuthAdmin) {
-          const adminName = authData.user.user_metadata?.name
-            || authData.user.user_metadata?.full_name
-            || authData.user.email?.split('@')[0]
-            || cleanEmail.split('@')[0];
+          if (!studentRow) {
+            // Todo auth user que não é estudante vira admin automaticamente
+            const adminName = authData.user.user_metadata?.name
+              || authData.user.user_metadata?.full_name
+              || authData.user.email?.split('@')[0]
+              || cleanEmail.split('@')[0];
 
-          if (!adminRow) {
             await dbAdmin.from('admin_users').insert([{
               id: crypto.randomUUID(),
               email: cleanEmail,
@@ -340,38 +362,24 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             }]);
-          } else if (adminRow.auth_user_id !== authData.user.id) {
-            await query(
-              'UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2',
-              [authData.user.id, cleanEmail]
-            );
-          }
 
-          const userObj = getUserWithRole({
-            ...(adminRow || {
+            const userObj = getUserWithRole({
               id: authData.user.id,
               email: cleanEmail,
               name: adminName,
               role: 'admin',
-            }),
-            id: authData.user.id,
-            email: cleanEmail,
-            name: adminName,
-            role: 'admin'
-          });
-
-          const token = generateToken(userObj.id, userObj.email, userObj.role);
-          res.cookie('session_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000
-          });
-
-          try {
-            await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]);
-          } catch (e) {}
-          return res.json({ success: true, user: userObj });
+            });
+            const token = generateToken(userObj.id, userObj.email, userObj.role);
+            res.cookie('session_token', token, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict',
+              maxAge: 24 * 60 * 60 * 1000
+            });
+            await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
+            return res.json({ success: true, user: userObj });
+          }
+          // Se é estudante registrado, cai fora do bloco Supabase e segue para autenticação de estudante
         }
       }
     } catch (authErr) {
@@ -593,7 +601,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     // 1. Administrador (Supabase Auth)
     if (isAdmin) {
       if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        return res.status(500).json({ error: 'Supabase Auth n�o configurado para admins.' });
+        return res.status(500).json({ error: 'Supabase Auth n�o configurado para admins.' });
       }
 
       try {
@@ -1120,6 +1128,81 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     res.json(regularStudents);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Endpoint para sincronizar manualmente auth.users → admin_users
+app.post('/api/admin/sync-auth-users', requireAdmin, async (req, res) => {
+  try {
+    const { data: authResult, error: authError } = await dbAdmin.auth.admin.listUsers();
+    if (authError) throw authError;
+
+    const authUsers = authResult?.users || [];
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const au of authUsers) {
+      if (!au.email) { skipped++; continue; }
+
+      const email = au.email.toLowerCase().trim();
+
+      // Verifica se já existe como admin
+      const { data: existingAdmin } = await dbAdmin
+        .from('admin_users')
+        .select('id, auth_user_id')
+        .eq('email', email)
+        .maybeSingle();
+
+      // Verifica se é estudante
+      const { data: existingStudent } = await dbAdmin
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingStudent) {
+        skipped++;
+        continue;
+      }
+
+      if (existingAdmin) {
+        if (!existingAdmin.auth_user_id || existingAdmin.auth_user_id !== au.id) {
+          await query(
+            'UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2',
+            [au.id, email]
+          );
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        const adminName = au.raw_user_meta_data?.name
+          || au.raw_user_meta_data?.full_name
+          || au.email?.split('@')[0]
+          || email.split('@')[0];
+
+        await dbAdmin.from('admin_users').insert([{
+          id: crypto.randomUUID(),
+          email,
+          name: adminName,
+          role: 'admin',
+          auth_user_id: au.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }]);
+        created++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Sincronização concluída. ${created} criados, ${updated} atualizados, ${skipped} ignorados.`,
+      stats: { created, updated, skipped, total: authUsers.length }
+    });
+  } catch (err: any) {
+    console.error('[POST /api/admin/sync-auth-users] Error:', err);
+    res.status(500).json({ error: 'Erro ao sincronizar usuários do Auth.', details: err?.message });
   }
 });
 
