@@ -1,4 +1,50 @@
+import { createClient } from '@supabase/supabase-js';
 import { query } from './db.js';
+
+let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
+let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
+
+export function getSupabaseAdminClient() {
+  if (supabaseAdminClient) return supabaseAdminClient;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios para Auth/Storage.');
+  }
+
+  supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  return supabaseAdminClient;
+}
+
+export function getSupabaseAnonClient() {
+  if (supabaseAnonClient) return supabaseAnonClient;
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórios para login com Supabase Auth.');
+  }
+
+  supabaseAnonClient = createClient(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  return supabaseAnonClient;
+}
 
 function sanitizeIdentifier(name: string): string {
   if (!name) return name;
@@ -196,21 +242,39 @@ export const dbAdmin = {
   },
   auth: {
     admin: {
-      async listUsers() { return { data: { users: [] }, error: null }; },
-      async deleteUser(id: string) { return { error: null }; },
-      async updateUserById(id: string, data: any) { return { error: null }; }
+      async listUsers(params?: { page?: number; perPage?: number }) {
+        try {
+          const { data, error } = await getSupabaseAdminClient().auth.admin.listUsers({
+            page: params?.page,
+            perPage: params?.perPage,
+          });
+          return { data, error };
+        } catch (error: any) {
+          return { data: { users: [] }, error };
+        }
+      },
+      async deleteUser(id: string, shouldSoftDelete = false) {
+        const { data, error } = await getSupabaseAdminClient().auth.admin.deleteUser(id, shouldSoftDelete);
+        return { data, error };
+      },
+      async updateUserById(id: string, data: any) {
+        const result = await getSupabaseAdminClient().auth.admin.updateUserById(id, data);
+        return result;
+      }
     }
   },
   storage: {
     from(bucket: string) {
+      const storageBucket = getSupabaseAdminClient().storage.from(bucket);
       return {
         async upload(path: string, file: any, options?: any) {
-          return { data: null, error: new Error('Storage natively disabled. Switch to AWS S3/Vercel Blob.') };
+          const { data, error } = await storageBucket.upload(path, file, options);
+          return { data, error };
         },
-        getPublicUrl(path: string) {
-          return { data: { publicUrl: '/placeholder-url.pdf' } };
+        getPublicUrl(path: string, options?: any) {
+          return storageBucket.getPublicUrl(path, options);
         }
-      }
+      };
     }
   }
 };

@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import multer from 'multer';
 import cookieParser from 'cookie-parser';
 import fs from 'fs';
-import { dbAdmin } from './src/lib/dbQueryBuilder.js';
+import { dbAdmin, getSupabaseAnonClient } from './src/lib/dbQueryBuilder.js';
 import pool, { query } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
 
@@ -308,21 +308,47 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
       const adminUser = adminRows[0];
 
       if (adminUser) {
-        const dbPassword = adminUser.password_hash;
         let isAdminValid = false;
-        let needsHashUpgrade = false;
+        let authUserId: string | null = adminUser.auth_user_id || null;
 
-        if (dbPassword) {
-          if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
-            isAdminValid = await bcrypt.compare(password, dbPassword);
-          } else {
-            isAdminValid = dbPassword === password;
-            if (isAdminValid) needsHashUpgrade = true;
+        if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+          try {
+            const { data: authData, error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
+              email: cleanEmail,
+              password,
+            });
+
+            if (!authError && authData.user) {
+              isAdminValid = true;
+              authUserId = authData.user.id;
+
+              if (!adminUser.auth_user_id || adminUser.auth_user_id !== authData.user.id) {
+                try {
+                  await query('UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2', [authData.user.id, cleanEmail]);
+                } catch (syncErr) {
+                  console.error('[Auth Admin] Erro ao sincronizar auth_user_id:', syncErr);
+                }
+              }
+            }
+          } catch (authErr) {
+            console.error('[Auth Admin] Supabase Auth indisponível:', authErr);
           }
         }
 
-        if (isAdminValid) {
-          if (needsHashUpgrade) {
+        if (!isAdminValid) {
+          const dbPassword = adminUser.password_hash;
+          let needsHashUpgrade = false;
+
+          if (dbPassword) {
+            if (dbPassword.startsWith('$2a$') || dbPassword.startsWith('$2b$')) {
+              isAdminValid = await bcrypt.compare(password, dbPassword);
+            } else {
+              isAdminValid = dbPassword === password;
+              if (isAdminValid) needsHashUpgrade = true;
+            }
+          }
+
+          if (isAdminValid && needsHashUpgrade) {
             try {
               const salt = await bcrypt.genSalt(10);
               const hashedPassword = await bcrypt.hash(password, salt);
@@ -332,8 +358,14 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
               console.error('[Security] Erro ao converter senha de admin:', e);
             }
           }
-          const userObj = getUserWithRole(adminUser);
-          
+        }
+
+        if (isAdminValid) {
+          const userObj = getUserWithRole({
+            ...adminUser,
+            id: authUserId || adminUser.id
+          });
+
           if (userObj) {
             const token = generateToken(userObj.id, userObj.email, userObj.role);
             res.cookie('session_token', token, {
@@ -343,7 +375,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
               maxAge: 24 * 60 * 60 * 1000
             });
           }
-          
+
           try {
             await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]);
           } catch (e) {}
@@ -516,6 +548,8 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
   }
 
   try {
+    const { rows: adminRows } = await query('SELECT auth_user_id FROM public.admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+    const authUserId = adminRows[0]?.auth_user_id;
     const { data: userData } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
     if (userData?.id) {
       const userId = userData.id;
@@ -527,9 +561,13 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
     await dbAdmin.from('users').delete().eq('email', cleanEmail);
     await dbAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
-    const { data: authResult } = await dbAdmin.auth.admin.listUsers();
-    const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-    if (target) await dbAdmin.auth.admin.deleteUser(target.id);
+    if (authUserId) {
+      await dbAdmin.auth.admin.deleteUser(authUserId);
+    } else {
+      const { data: authResult } = await dbAdmin.auth.admin.listUsers();
+      const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+      if (target) await dbAdmin.auth.admin.deleteUser(target.id);
+    }
 
     res.json({ success: true });
   } catch (err: any) {
@@ -562,7 +600,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
     // 1. Administrador (PostgreSQL)
     if (isAdmin) {
-      const { rows } = await query('SELECT password_hash FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+      const { rows } = await query('SELECT id, auth_user_id, password_hash FROM admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Administrador não encontrado.' });
       }
@@ -581,8 +619,26 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
         return res.status(401).json({ error: 'Senha atual incorreta.' });
       }
 
+      const adminRow = rows[0];
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const adminAuth = dbAdmin.auth.admin;
+          if (adminRow.auth_user_id) {
+            await adminAuth.updateUserById(adminRow.auth_user_id, { password: newPassword });
+          } else {
+            const { data: authResult } = await adminAuth.listUsers();
+            const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+            if (target) {
+              await adminAuth.updateUserById(target.id, { password: newPassword });
+            }
+          }
+        } catch (authErr) {
+          console.error('[Change Password] Erro ao atualizar senha no Supabase Auth:', authErr);
+        }
+      }
 
       await query('UPDATE admin_users SET password_hash = $1 WHERE email = $2', [hashedPassword, cleanEmail]);
 
@@ -842,6 +898,9 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
 
   try {
     const { data: userData } = await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
+    const { rows: adminRows } = await query('SELECT auth_user_id FROM public.admin_users WHERE email = $1 LIMIT 1', [cleanEmail]);
+    const authUserId = adminRows[0]?.auth_user_id;
+
     if (userData?.id) {
       const userId = userData.id;
       // Clean up linked data in other tables to avoid foreign key violations
@@ -853,10 +912,14 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
 
     await dbAdmin.from('admin_users').delete().eq('email', cleanEmail);
 
-    const { data: authResult } = await dbAdmin.auth.admin.listUsers();
-    const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
-    if (target) {
-      await dbAdmin.auth.admin.deleteUser(target.id);
+    if (authUserId) {
+      await dbAdmin.auth.admin.deleteUser(authUserId);
+    } else {
+      const { data: authResult } = await dbAdmin.auth.admin.listUsers();
+      const target = authResult?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+      if (target) {
+        await dbAdmin.auth.admin.deleteUser(target.id);
+      }
     }
 
     res.json({ success: true });
@@ -1093,7 +1156,7 @@ app.get('/api/admin/activities', requireAdmin, async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const [mats, recs] = await Promise.all([
-      dbAdmin.from('materials').select('uploadedAt').gte('uploadedAt', sevenDaysAgo.toISOString().split('T')[0]),
+      dbAdmin.from('materials').select('uploaded_at').gte('uploaded_at', sevenDaysAgo.toISOString().split('T')[0]),
       dbAdmin.from('mural').select('created_at').gte('created_at', sevenDaysAgo.toISOString())
     ]);
 
@@ -1106,7 +1169,7 @@ app.get('/api/admin/activities', requireAdmin, async (req, res) => {
     }
 
     (mats.data || []).forEach((m: any) => {
-      const d = new Date(m.uploadedAt);
+      const d = new Date(m.uploaded_at);
       const day = days[d.getDay()];
       if (production[day] !== undefined) production[day]++;
     });
@@ -1432,7 +1495,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
 app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
     const { data, error } = await dbAdmin
-      .from('eventos')
+      .from('events')
       .select('*')
       .order('date', { ascending: true });
     if (error) throw error;
@@ -1471,7 +1534,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await dbAdmin
-      .from('eventos')
+      .from('events')
       .insert([dbRecord])
       .select()
       .single();
@@ -1502,7 +1565,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
 app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
     const { error } = await dbAdmin
-      .from('eventos')
+      .from('events')
       .delete()
       .eq('id', req.params.id);
     if (error) throw error;
@@ -1528,7 +1591,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
     };
 
     const { data, error } = await dbAdmin
-      .from('eventos')
+      .from('events')
       .update(dbRecord)
       .eq('id', req.params.id)
       .select()

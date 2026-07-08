@@ -19,12 +19,23 @@ docker-compose up -d --build --scale api=3
 docker image prune -f
 ```
 
-## 🔋 Configuração de Banco (PostgreSQL)
-Conecte-se ao seu banco de dados PostgreSQL na VPS:
+## 🔋 Configuração de Banco (PostgreSQL ou Supabase)
+Conecte-se ao seu banco de dados PostgreSQL na VPS ou use o banco do Supabase:
 ```env
 # DATABASE_URL no .env
 DATABASE_URL="postgres://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]?connection_limit=10"
+
+# Exemplo Supabase
+DATABASE_URL="postgresql://postgres:[SENHA]@db.[PROJECT_REF].supabase.co:5432/postgres"
+DISABLE_DB_SSL="false"
 ```
+
+## 🚀 Deploy na Vercel
+
+- O backend está preparado para a Vercel via [`api/index.ts`](C:/Users/bruno/OneDrive/Documents/GitHub/nevapro/nevapro/api/index.ts).
+- O build precisa gerar `dist/server.cjs` antes da função subir.
+- Use as variáveis `APP_URL`, `FRONTEND_URL`, `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no projeto da Vercel.
+- Admins devem ser criados no Supabase Auth e associados a `public.admin_users.auth_user_id`.
 
 ## 🧱 Autenticação (JWT + Refresh Token)
 - **Access Token:** JWT de vida curta (15 min) enviado via HttpOnly Cookie.

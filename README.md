@@ -165,13 +165,40 @@ APP_URL="http://localhost:3000"
 JWT_SECRET="um_segredo_muito_seguro_aqui"
 
 # String de conexão com o PostgreSQL
-DATABASE_URL="postgres://usuario:senha@localhost:5432/nevapro"
+# No Supabase, use a connection string do banco do projeto e mantenha SSL habilitado.
+DATABASE_URL="postgresql://postgres:senha@db.seu-projeto-ref.supabase.co:5432/postgres"
+
+# SSL do banco
+DISABLE_DB_SSL="false"
 
 # URL do frontend (para CORS)
 FRONTEND_URL="http://localhost:5173"
 
 # Hosts permitidos para proxy de imagens
 ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
+```
+
+### Supabase e Admins
+
+- Os admins devem ser criados no **Supabase Auth** e vinculados à tabela `public.admin_users`.
+- A primeira autenticação do admin sincroniza `admin_users.auth_user_id` automaticamente.
+- O backend ainda mantém uma fallback de migração com `password_hash` só para não quebrar contas legadas.
+
+### Deploy na Vercel
+
+Configure estas variáveis no painel da Vercel:
+
+```env
+APP_URL="https://seu-dominio.vercel.app"
+FRONTEND_URL="https://seu-dominio.vercel.app"
+DATABASE_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
+DISABLE_DB_SSL="false"
+SUPABASE_URL="https://gsbsfckiqqejifwystit.supabase.co"
+SUPABASE_ANON_KEY="[anon key]"
+SUPABASE_SERVICE_ROLE_KEY="[service role key]"
+JWT_SECRET="[seu-secret]"
+SESSION_SECRET="[seu-secret]"
 ```
 
 ### 4. Configure o banco de dados

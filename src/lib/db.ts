@@ -3,9 +3,21 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+const connectionString = process.env.DATABASE_URL;
+const isSupabaseDatabase =
+  !!connectionString &&
+  /supabase/i.test(connectionString);
+
+const ssl =
+  process.env.DISABLE_DB_SSL === 'true'
+    ? false
+    : isSupabaseDatabase || process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: false }
+      : undefined;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DISABLE_DB_SSL === 'true' ? false : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined),
+  connectionString,
+  ssl,
 });
 
 export const query = async (text: string, params?: any[]) => {
