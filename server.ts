@@ -1417,7 +1417,7 @@ app.get('/api/materials', requireAuth, async (req, res) => {
       subject: mat.subject,
       foco: mat.subject,
       description: mat.description,
-      url: mat.content_url || mat.url,
+      url: mat.url,
       type: mat.type,
       uploadedAt: mat.created_at ? mat.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
     }));
@@ -1432,7 +1432,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
-      content_url: req.body.url,
+      url: req.body.url,
       type: req.body.type,
       subject: req.body.foco || req.body.subject || 'ENEM geral',
       description: req.body.description || ''
@@ -1446,7 +1446,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
       subject: data.subject,
       foco: data.subject,
       description: data.description,
-      url: data.content_url || data.url,
+      url: data.url,
       type: data.type,
       uploadedAt: data.created_at ? data.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
     };
@@ -1470,7 +1470,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
-      content_url: req.body.url,
+      url: req.body.url,
       type: req.body.type,
       subject: req.body.foco || req.body.subject || 'ENEM geral',
       description: req.body.description || ''
@@ -1484,7 +1484,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
       subject: data.subject,
       foco: data.subject,
       description: data.description,
-      url: data.content_url || data.url,
+      url: data.url,
       type: data.type,
       uploadedAt: data.created_at ? data.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
     };
