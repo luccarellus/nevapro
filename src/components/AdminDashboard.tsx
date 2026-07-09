@@ -1109,7 +1109,7 @@ export default function AdminDashboard({
               {/* Header Title Section */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-text-main/[0.03] border border-text-main/[0.06] flex items-center justify-center text-brand-primary/80 shrink-0 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-500 shrink-0 shadow-sm">
                     <ShieldCheck size={22} />
                   </div>
                   <div>
@@ -1119,7 +1119,7 @@ export default function AdminDashboard({
                 </div>
                 <button 
                   onClick={() => setActiveTab('alunos')}
-                  className="bg-bg-card/60 border border-text-main/[0.06] hover:bg-text-main/[0.04] text-text-main/90 px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  className="bg-bg-card border border-border-color hover:bg-slate-800 text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <Users size={15} />
                   Ver alunos
@@ -1127,21 +1127,21 @@ export default function AdminDashboard({
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-                <div className="lg:col-span-5 bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
                   <div>
                     <h3 className="text-base font-black text-text-main mb-1.5">Publicacao para alunos</h3>
                     <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Atalhos para atualizar biblioteca, mural e agenda.</p>
-                    <div className="flex gap-3 bg-bg-main/50 p-1.5 rounded-xl border border-text-main/[0.04] mb-6">
+                    <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
                       <button
                         onClick={() => setShowModal('material')}
-                        className="flex-1 bg-text-main/[0.03] border border-text-main/[0.05] py-2.5 rounded-lg text-xs font-black text-text-main/85 shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/[0.06] transition-all cursor-pointer"
+                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-all cursor-pointer"
                       >
-                        <Library size={14} className="text-brand-primary/80" />
+                        <Library size={14} className="text-blue-500" />
                         Material
                       </button>
                       <button
                         onClick={() => setShowModal('recado')}
-                        className="flex-1 bg-brand-primary/[0.07] border border-brand-primary/15 py-2.5 rounded-lg text-xs font-black text-brand-primary/85 flex items-center justify-center gap-2 hover:bg-brand-primary/12 transition-all cursor-pointer"
+                        className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer"
                       >
                         <Megaphone size={14} />
                         Mural
@@ -1153,7 +1153,7 @@ export default function AdminDashboard({
                   </p>
                 </div>
 
-                <div className="lg:col-span-7 bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
+                <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between gap-6 mb-6">
                     <div>
                       <h3 className="text-base font-black text-text-main mb-1.5">Resumo academico</h3>
@@ -1161,7 +1161,7 @@ export default function AdminDashboard({
                     </div>
                     <button
                       onClick={() => setShowModal('evento')}
-                      className="bg-brand-primary/[0.07] text-brand-primary/85 border border-brand-primary/15 px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider hover:bg-brand-primary/15 hover:text-brand-primary transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                     >
                       <Calendar size={14} />
                       Novo evento
@@ -1169,15 +1169,15 @@ export default function AdminDashboard({
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
+                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Materiais</p>
                       <p className="text-2xl font-black text-text-main">{materials.length}</p>
                     </div>
-                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
+                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Avisos</p>
                       <p className="text-2xl font-black text-text-main">{recados.length}</p>
                     </div>
-                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
+                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Eventos</p>
                       <p className="text-2xl font-black text-text-main">{eventos.length}</p>
                     </div>
@@ -1317,13 +1317,13 @@ export default function AdminDashboard({
               {/* Stat Cards Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
                 {/* KPI 1: Alunos ativos */}
-                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALUNOS ATIVOS</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{activeStudentsCount}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
                       <Users size={18} />
                     </div>
                   </div>
@@ -1333,32 +1333,32 @@ export default function AdminDashboard({
                 </div>
 
                 {/* KPI 2: XP total */}
-                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP TOTAL</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
                       <Trophy size={18} />
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
                     <span className="text-[10px] font-bold text-text-secondary opacity-60">{averageXp.toLocaleString()} XP de media</span>
-                    <span className="bg-brand-primary/[0.06] border border-brand-primary/15 text-brand-primary/85 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                    <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       REDE
                     </span>
                   </div>
                 </div>
 
                 {/* KPI 3: Top aluno */}
-                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">TOP ALUNO</span>
                       <span className="text-2xl font-black text-text-main leading-none block truncate max-w-[170px]" title={topStudent?.name || '-'}>{topStudent?.name || '-'}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
                       <Activity size={18} />
                     </div>
                   </div>
@@ -1368,13 +1368,13 @@ export default function AdminDashboard({
                 </div>
 
                 {/* KPI 4: Escolas */}
-                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-bg-sidebar/60 border border-text-main/[0.05] flex items-center justify-center text-brand-primary/80 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
                       <Library size={18} />
                     </div>
                   </div>
@@ -1389,7 +1389,7 @@ export default function AdminDashboard({
                 {/* Column 1 (Left - 8 cols) */}
                 <div className="lg:col-span-8 space-y-8">
                   {/* Chart 1: Alunos mais engajados */}
-                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Alunos mais engajados</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Ranking por XP acumulado</p>
@@ -1409,7 +1409,7 @@ export default function AdminDashboard({
                           >
                             <div className="flex items-center justify-between gap-4 mb-2">
                               <div className="flex items-center gap-3 min-w-0">
-                                <span className="w-7 h-7 rounded-lg bg-brand-primary/[0.06] border border-brand-primary/15 text-brand-primary/80 text-[10px] font-black flex items-center justify-center shrink-0">
+                                <span className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-black flex items-center justify-center shrink-0">
                                   {idx + 1}
                                 </span>
                                 <div className="min-w-0">
@@ -1417,10 +1417,10 @@ export default function AdminDashboard({
                                   <p className="text-[9px] font-bold text-text-secondary opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola nao informada'}</p>
                                 </div>
                               </div>
-                              <span className="text-[10px] font-black text-brand-primary/85 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
+                              <span className="text-[10px] font-black text-blue-500 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
                             </div>
-                            <div className="h-2 bg-bg-sidebar/70 rounded-full overflow-hidden border border-text-main/[0.04]">
-                              <div ref={(el) => { if (el) el.style.width = `${percentage}%`; }} className="h-full bg-brand-primary/70 rounded-full transition-all group-hover:bg-brand-primary/90" />
+                            <div className="h-2 bg-bg-main rounded-full overflow-hidden border border-border-color">
+                              <div ref={(el) => { if (el) el.style.width = `${percentage}%`; }} className="h-full bg-blue-600 rounded-full transition-all group-hover:bg-blue-500" />
                             </div>
                           </button>
                         );
@@ -1434,7 +1434,7 @@ export default function AdminDashboard({
                   </div>
 
                   {/* Chart 2: Escolas mais engajadas */}
-                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Escolas mais engajadas</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Soma de XP dos alunos por escola</p>
@@ -1454,8 +1454,17 @@ export default function AdminDashboard({
                             className="h-full flex flex-col justify-end gap-3 group min-w-0"
                           >
                             <div className="flex-1 w-full flex items-end">
-                              <div className="w-full bg-bg-sidebar/70 rounded-xl border border-text-main/[0.04] overflow-hidden flex items-end min-h-[44px]">
-                                <div ref={(el) => { if (el) el.style.height = `${height}%`; }} className="w-full bg-brand-primary/55 group-hover:bg-brand-primary/75 transition-colors" />
+                              <div className="w-full bg-bg-main rounded-xl border border-border-color overflow-hidden flex items-end min-h-[44px]">
+                                <div
+                                  ref={(el) => { if (el) el.style.height = `${height}%`; }}
+                                  className={`w-full transition-colors ${
+                                    idx % 3 === 0
+                                      ? 'bg-purple-500 group-hover:bg-purple-400'
+                                      : idx % 3 === 1
+                                        ? 'bg-blue-600 group-hover:bg-blue-500'
+                                        : 'bg-brand-primary group-hover:bg-brand-secondary'
+                                  }`}
+                                />
                               </div>
                             </div>
                             <div className="min-h-[48px]">
@@ -1472,7 +1481,7 @@ export default function AdminDashboard({
                 {/* Column 2 (Right - 4 cols) */}
                 <div className="lg:col-span-4 space-y-8">
                   {/* Chart 3: Distribuicao de engajamento */}
-                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Distribuicao de engajamento</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Alunos com XP registrado na plataforma</p>
@@ -1480,17 +1489,29 @@ export default function AdminDashboard({
 
                     <div className="flex justify-center items-center h-40">
                       <svg width="120" height="120" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgb(var(--text-main-rgb) / 0.05)" strokeWidth="12" />
+                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
                         <circle 
                           cx="50" 
                           cy="50" 
                           r="35" 
                           fill="none" 
-                          stroke="var(--brand-primary)"
+                          stroke="#3b82f6"
                           strokeWidth="12" 
                           strokeDasharray={`${activeStudentsPercentage * 2.2} 220`}
                           strokeDashoffset="0"
                           transform="rotate(-90 50 50)" 
+                          strokeLinecap="round"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="35"
+                          fill="none"
+                          stroke="#f97316"
+                          strokeWidth="12"
+                          strokeDasharray={`${(100 - activeStudentsPercentage) * 2.2} 220`}
+                          strokeDashoffset={`-${activeStudentsPercentage * 2.2}`}
+                          transform="rotate(-90 50 50)"
                           strokeLinecap="round"
                         />
                         <text x="50" y="47" textAnchor="middle" fill="var(--text-main)" fontSize="18" fontWeight="900">{activeStudentsPercentage}%</text>
@@ -1500,18 +1521,18 @@ export default function AdminDashboard({
 
                     <div className="flex justify-center gap-4 text-[10px] font-bold text-text-secondary opacity-80 mt-4">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-brand-primary/70 rounded-sm shrink-0" />
+                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-sm shrink-0" />
                         <span>{activeStudentsCount} ativos</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-text-main/10 rounded-sm shrink-0" />
+                        <span className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0" />
                         <span>{students.length - activeStudentsCount} sem XP</span>
                       </div>
                     </div>
                   </div>
 
                   {/* List 4: Rankings */}
-                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6 flex justify-between items-start">
                       <div>
                         <h3 className="text-sm font-black text-text-main mb-1">Destaques da rede</h3>
@@ -1524,7 +1545,7 @@ export default function AdminDashboard({
                       {filteredStudents.slice(0, 3).map((student, idx) => (
                         <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-brand-primary/70 shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name}</div>
                               <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
@@ -1537,7 +1558,7 @@ export default function AdminDashboard({
                               setActiveTab('alunos');
                               setSearchTerm(student.name || '');
                             }}
-                            className="text-brand-primary/80 hover:text-brand-primary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
                             Ver aluno
                           </button>
@@ -1548,7 +1569,7 @@ export default function AdminDashboard({
                       {schoolRanking.slice(0, 2).map((school) => (
                         <div key={school.name} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-brand-primary/60 shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{school.name}</div>
                               <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
@@ -1561,7 +1582,7 @@ export default function AdminDashboard({
                               setActiveTab('alunos');
                               setFilterSchool(school.name);
                             }}
-                            className="text-brand-primary/80 hover:text-brand-primary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
                             Ver escola
                           </button>
