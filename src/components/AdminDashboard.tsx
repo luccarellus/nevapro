@@ -2253,8 +2253,16 @@ export default function AdminDashboard({
                             <tr key={student.id} className="group hover:bg-text-main/[0.02] transition-colors relative">
                               <td className="py-6 pl-4">
                                 <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
-                                    {student.name?.charAt(0) || '?'}
+                                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
+                                    {student.avatarUrl || student.avatar ? (
+                                      <img 
+                                        src={student.avatarUrl || student.avatar || ''} 
+                                        alt="" 
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      student.name?.charAt(0) || '?'
+                                    )}
                                   </div>
                                   <div className="min-w-0">
                                     <div className="text-text-main font-bold text-sm truncate">{student.name}</div>
@@ -2305,8 +2313,16 @@ export default function AdminDashboard({
                      {filteredStudents.map((student) => (
                        <div key={student.id} className="bg-bg-sidebar/30 border border-border-color rounded-[32px] p-6">
                          <div className="flex items-center gap-4 mb-6">
-                           <div className="w-12 h-12 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-lg shrink-0">
-                             {student.name?.charAt(0) || '?'}
+                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-lg shrink-0">
+                             {student.avatarUrl || student.avatar ? (
+                               <img 
+                                 src={student.avatarUrl || student.avatar || ''} 
+                                 alt="" 
+                                 className="w-full h-full object-cover"
+                               />
+                             ) : (
+                               student.name?.charAt(0) || '?'
+                             )}
                            </div>
                            <div className="min-w-0">
                              <div className="text-text-main font-black text-base truncate">{student.name}</div>
