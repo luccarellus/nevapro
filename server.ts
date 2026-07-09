@@ -1136,7 +1136,10 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
     const regularStudents = (data || []).filter(u => {
       const isAdmin = u.role === 'admin';
       return !isAdmin;
-    });
+    }).map(u => ({
+      ...u,
+      avatarUrl: u.avatar_url || u.avatarUrl || u.avatar || ''
+    }));
     res.json(regularStudents);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
