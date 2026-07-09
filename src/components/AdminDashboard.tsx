@@ -279,6 +279,18 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return Object.values(schoolData).sort((a, b) => b.xp - a.xp);
   }, [students, schoolMap]);
 
+  const topStudents = useMemo(() => {
+    return [...students]
+      .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+      .slice(0, 6);
+  }, [students]);
+
+  const totalXp = useMemo(() => students.reduce((sum, student) => sum + (student.xp || 0), 0), [students]);
+  const activeStudentsCount = useMemo(() => students.filter(student => (student.xp || 0) > 0).length, [students]);
+  const averageXp = students.length ? Math.round(totalXp / students.length) : 0;
+  const activeStudentsPercentage = students.length ? Math.round((activeStudentsCount / students.length) * 100) : 0;
+  const topStudent = topStudents[0];
+
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -1049,12 +1061,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               {/* Header Title Section */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-600 shrink-0 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0 shadow-sm">
                     <ShieldCheck size={22} />
                   </div>
                   <div>
                     <h1 className="text-3xl font-black text-text-main tracking-tight leading-none mb-1.5 flex items-center gap-2">Painel Neva Pro</h1>
-                    <p className="text-xs text-text-secondary font-medium">Visão geral do Neva Pro — KPIs, crescimento e alertas em tempo real.</p>
+                    <p className="text-xs text-text-secondary font-medium">Visao geral de alunos, engajamento e conteudos do projeto.</p>
                   </div>
                 </div>
                 <button 
@@ -1066,8 +1078,66 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </button>
               </div>
 
-              {/* Two Large Configuration Cards (Top Grid) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                <div className="lg:col-span-5 bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-text-main mb-1.5">Publicacao para alunos</h3>
+                    <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Atalhos para atualizar biblioteca, mural e agenda.</p>
+                    <div className="flex gap-3 bg-bg-main/60 p-1.5 rounded-xl border border-border-color mb-6">
+                      <button
+                        onClick={() => setShowModal('material')}
+                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-bg-sidebar transition-all cursor-pointer"
+                      >
+                        <Library size={14} className="text-brand-primary" />
+                        Material
+                      </button>
+                      <button
+                        onClick={() => setShowModal('recado')}
+                        className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer"
+                      >
+                        <Megaphone size={14} />
+                        Mural
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
+                    Use estes atalhos para publicar conteudos e comunicados sem sair do panorama.
+                  </p>
+                </div>
+
+                <div className="lg:col-span-7 bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between gap-6 mb-6">
+                    <div>
+                      <h3 className="text-base font-black text-text-main mb-1.5">Resumo academico</h3>
+                      <p className="text-[11px] text-text-secondary font-medium opacity-80">Dados operacionais do backoffice educacional.</p>
+                    </div>
+                    <button
+                      onClick={() => setShowModal('evento')}
+                      className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider hover:bg-brand-primary hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Calendar size={14} />
+                      Novo evento
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Materiais</p>
+                      <p className="text-2xl font-black text-text-main">{materials.length}</p>
+                    </div>
+                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Avisos</p>
+                      <p className="text-2xl font-black text-text-main">{recados.length}</p>
+                    </div>
+                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Eventos</p>
+                      <p className="text-2xl font-black text-text-main">{eventos.length}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hidden">
                 {/* Column 1 (Left - 40% width / lg:col-span-5) */}
                 <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
                   <div>
@@ -1198,73 +1268,70 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
               {/* Stat Cards Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-                {/* KPI 1: MRR */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                {/* KPI 1: Alunos ativos */}
+                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MRR</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">R$ 0,00</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALUNOS ATIVOS</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{activeStudentsCount}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                      <Users size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
+                    <span>{students.length} alunos cadastrados</span>
+                  </div>
+                </div>
+
+                {/* KPI 2: XP total */}
+                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP TOTAL</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                      <Trophy size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{averageXp.toLocaleString()} XP de media</span>
+                    <span className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      REDE
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI 3: Top aluno */}
+                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">TOP ALUNO</span>
+                      <span className="text-2xl font-black text-text-main leading-none block truncate max-w-[170px]" title={topStudent?.name || '-'}>{topStudent?.name || '-'}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                      <Activity size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{(topStudent?.xp || 0).toLocaleString()} XP acumulado</span>
+                  </div>
+                </div>
+
+                {/* KPI 4: Escolas */}
+                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-bg-sidebar border border-border-color flex items-center justify-center text-brand-primary shrink-0">
                       <Library size={18} />
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
-                    <span>0 Assinaturas ativas</span>
-                  </div>
-                </div>
-
-                {/* KPI 2: Empresas */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">EMPRESAS</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">{students.length}</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
-                      <Users size={18} />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
-                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{students.length} no total - 4 novas em 30d</span>
-                    <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                      ↗ 100.0%
-                    </span>
-                  </div>
-                </div>
-
-                {/* KPI 3: Volume Processado */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">VOLUME PROCESSADO</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">R$ 478k</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
-                      <Calendar size={18} />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
-                    <span className="text-[10px] font-bold text-text-secondary opacity-60">138 créditos - 48 ativos</span>
-                    <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                      ↘ 59.0%
-                    </span>
-                  </div>
-                </div>
-
-                {/* KPI 4: Alertas */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALERTAS</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">4</span>
-                    </div>
-                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
-                      <Megaphone size={18} />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
-                    <span>Ações pendentes</span>
+                    <span>{mostEngagedSchool.name} lidera em XP</span>
                   </div>
                 </div>
               </div>
@@ -1273,157 +1340,134 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
                 {/* Column 1 (Left - 8 cols) */}
                 <div className="lg:col-span-8 space-y-8">
-                  {/* Chart 1: Crescimento de empresas */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                  {/* Chart 1: Alunos mais engajados */}
+                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Crescimento de empresas</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Novas empresas por mês (últimos 6)</p>
+                      <h3 className="text-sm font-black text-text-main mb-1">Alunos mais engajados</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Ranking por XP acumulado</p>
                     </div>
 
-                    <div className="relative h-48 w-full mt-4">
-                      <svg className="w-full h-full" viewBox="0 0 600 180" preserveAspectRatio="none">
-                        <defs>
-                          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-
-                        {/* Grid lines */}
-                        <line x1="40" y1="26" x2="580" y2="26" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="40" y1="54.5" x2="580" y2="54.5" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="40" y1="83" x2="580" y2="83" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="40" y1="111.5" x2="580" y2="111.5" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="40" y1="140" x2="580" y2="140" stroke="rgba(255,255,255,0.05)" />
-
-                        {/* Y Axis Text */}
-                        <text x="25" y="30" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">8</text>
-                        <text x="25" y="58.5" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">6</text>
-                        <text x="25" y="87" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">4</text>
-                        <text x="25" y="115.5" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">2</text>
-                        <text x="25" y="144" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">0</text>
-
-                        {/* Area */}
-                        <path d="M 50,140 C 150,140 250,140 310,135 C 370,120 410,52.5 450,52.5 C 490,52.5 510,125 550,140 L 550,140 L 50,140 Z" fill="url(#areaGradient)" />
-
-                        {/* Curve */}
-                        <path d="M 50,140 C 150,140 250,140 310,135 C 370,120 410,52.5 450,52.5 C 490,52.5 510,125 550,140" fill="none" stroke="#2563eb" strokeWidth="2" />
-
-                        {/* X Axis Labels */}
-                        <text x="50" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">fev</text>
-                        <text x="150" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mar</text>
-                        <text x="250" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">abr</text>
-                        <text x="350" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mai</text>
-                        <text x="450" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jun</text>
-                        <text x="550" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jul</text>
-                      </svg>
+                    <div className="space-y-4">
+                      {topStudents.map((student, idx) => {
+                        const percentage = topStudent?.xp ? Math.max(((student.xp || 0) / topStudent.xp) * 100, 4) : 4;
+                        return (
+                          <button
+                            key={student.id}
+                            onClick={() => {
+                              setActiveTab('alunos');
+                              setSearchTerm(student.name || '');
+                            }}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="w-7 h-7 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black flex items-center justify-center shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black text-text-main truncate">{student.name || 'Aluno sem nome'}</p>
+                                  <p className="text-[9px] font-bold text-text-secondary opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola nao informada'}</p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black text-brand-primary shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
+                            </div>
+                            <div className="h-2 bg-bg-sidebar rounded-full overflow-hidden border border-border-color/40">
+                              <div className="h-full bg-brand-primary rounded-full transition-all group-hover:bg-brand-secondary" style={{ width: `${percentage}%` }} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {topStudents.length === 0 && (
+                        <div className="h-48 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">
+                          Nenhum aluno cadastrado
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Chart 2: Volume de créditos emitidos */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                  {/* Chart 2: Escolas mais engajadas */}
+                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Volume de créditos emitidos</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Por mês — valor total e quantidade</p>
+                      <h3 className="text-sm font-black text-text-main mb-1">Escolas mais engajadas</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Soma de XP dos alunos por escola</p>
                     </div>
 
-                    <div className="relative h-48 w-full mt-4">
-                      <svg className="w-full h-full" viewBox="0 0 600 180" preserveAspectRatio="none">
-                        <defs>
-                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#a855f7" />
-                            <stop offset="100%" stopColor="#7c3aed" />
-                          </linearGradient>
-                        </defs>
-
-                        {/* Grid lines */}
-                        <line x1="50" y1="30" x2="580" y2="30" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="50" y1="70" x2="580" y2="70" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="50" y1="110" x2="580" y2="110" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-                        <line x1="50" y1="150" x2="580" y2="150" stroke="rgba(255,255,255,0.05)" />
-
-                        {/* Y Axis Text */}
-                        <text x="35" y="34" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 100k</text>
-                        <text x="35" y="74" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 75k</text>
-                        <text x="35" y="114" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 50k</text>
-
-                        {/* Bars */}
-                        <rect x="75" y="100" width="30" height="50" rx="3" fill="url(#barGradient)" />
-                        <rect x="155" y="80" width="30" height="70" rx="3" fill="url(#barGradient)" />
-                        <rect x="235" y="50" width="30" height="100" rx="3" fill="url(#barGradient)" />
-                        <rect x="315" y="35" width="30" height="115" rx="3" fill="url(#barGradient)" />
-                        <rect x="395" y="60" width="30" height="90" rx="3" fill="url(#barGradient)" />
-                        <rect x="475" y="45" width="30" height="105" rx="3" fill="url(#barGradient)" />
-
-                        {/* X Axis Labels */}
-                        <text x="90" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">fev</text>
-                        <text x="170" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mar</text>
-                        <text x="250" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">abr</text>
-                        <text x="330" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mai</text>
-                        <text x="410" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jun</text>
-                        <text x="490" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jul</text>
-                      </svg>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 h-56 items-end">
+                      {schoolRanking.slice(0, 6).map((school, idx) => {
+                        const topSchoolXp = schoolRanking[0]?.xp || 1;
+                        const height = Math.max((school.xp / topSchoolXp) * 100, 10);
+                        return (
+                          <button
+                            key={school.name}
+                            onClick={() => {
+                              setActiveTab('alunos');
+                              setFilterSchool(school.name);
+                            }}
+                            className="h-full flex flex-col justify-end gap-3 group min-w-0"
+                          >
+                            <div className="flex-1 w-full flex items-end">
+                              <div className="w-full bg-bg-sidebar rounded-xl border border-border-color overflow-hidden flex items-end min-h-[44px]">
+                                <div className="w-full bg-brand-primary/80 group-hover:bg-brand-primary transition-colors" style={{ height: `${height}%` }} />
+                              </div>
+                            </div>
+                            <div className="min-h-[48px]">
+                              <p className="text-[10px] font-black text-text-main truncate" title={school.name}>{idx + 1}. {school.name}</p>
+                              <p className="text-[9px] font-bold text-text-secondary opacity-60">{school.xp.toLocaleString()} XP • {school.studentsCount} alunos</p>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
                 {/* Column 2 (Right - 4 cols) */}
                 <div className="lg:col-span-4 space-y-8">
-                  {/* Chart 3: Distribuição de assinaturas */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                  {/* Chart 3: Distribuicao de engajamento */}
+                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Distribuição de assinaturas</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Status atual das contas</p>
+                      <h3 className="text-sm font-black text-text-main mb-1">Distribuicao de engajamento</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Alunos com XP registrado na plataforma</p>
                     </div>
 
                     <div className="flex justify-center items-center h-40">
                       <svg width="120" height="120" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
+                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgb(var(--text-main-rgb) / 0.05)" strokeWidth="12" />
                         <circle 
                           cx="50" 
                           cy="50" 
                           r="35" 
                           fill="none" 
-                          stroke="#3b82f6" 
+                          stroke="var(--brand-primary)"
                           strokeWidth="12" 
-                          strokeDasharray="140 220" 
+                          strokeDasharray={`${activeStudentsPercentage * 2.2} 220`}
                           strokeDashoffset="0"
                           transform="rotate(-90 50 50)" 
                           strokeLinecap="round"
                         />
-                        <circle 
-                          cx="50" 
-                          cy="50" 
-                          r="35" 
-                          fill="none" 
-                          stroke="#f97316" 
-                          strokeWidth="12" 
-                          strokeDasharray="75 220" 
-                          strokeDashoffset="-142"
-                          transform="rotate(-90 50 50)" 
-                          strokeLinecap="round"
-                        />
+                        <text x="50" y="47" textAnchor="middle" fill="var(--text-main)" fontSize="18" fontWeight="900">{activeStudentsPercentage}%</text>
+                        <text x="50" y="60" textAnchor="middle" fill="var(--text-secondary)" fontSize="7" fontWeight="800">ATIVOS</text>
                       </svg>
                     </div>
 
                     <div className="flex justify-center gap-4 text-[10px] font-bold text-text-secondary opacity-80 mt-4">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0" />
-                        <span>Aguardando pagamento</span>
+                        <span className="w-2.5 h-2.5 bg-brand-primary rounded-sm shrink-0" />
+                        <span>{activeStudentsCount} ativos</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-sm shrink-0" />
-                        <span>Avaliação</span>
+                        <span className="w-2.5 h-2.5 bg-text-main/10 rounded-sm shrink-0" />
+                        <span>{students.length - activeStudentsCount} sem XP</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* List 4: Rankings (Empresas em alerta layout) */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                  {/* List 4: Rankings */}
+                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6 flex justify-between items-start">
                       <div>
-                        <h3 className="text-sm font-black text-text-main mb-1">Empresas em alerta</h3>
-                        <p className="text-[10px] text-text-secondary font-medium opacity-60">Ações que precisam de atenção</p>
+                        <h3 className="text-sm font-black text-text-main mb-1">Destaques da rede</h3>
+                        <p className="text-[10px] text-text-secondary font-medium opacity-60">Atalhos para os maiores engajamentos</p>
                       </div>
                     </div>
 
@@ -1432,7 +1476,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       {filteredStudents.slice(0, 3).map((student, idx) => (
                         <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name}</div>
                               <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
@@ -1445,9 +1489,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                               setActiveTab('alunos');
                               setSearchTerm(student.name || '');
                             }}
-                            className="text-blue-500 hover:text-blue-600 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-brand-primary hover:text-brand-secondary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
-                            Atuar ↗
+                            Ver aluno
                           </button>
                         </div>
                       ))}
@@ -1456,7 +1500,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       {schoolRanking.slice(0, 2).map((school) => (
                         <div key={school.name} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-brand-primary/60 shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{school.name}</div>
                               <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
@@ -1469,9 +1513,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                               setActiveTab('alunos');
                               setFilterSchool(school.name);
                             }}
-                            className="text-blue-500 hover:text-blue-600 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-brand-primary hover:text-brand-secondary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
-                            Atuar ↗
+                            Ver escola
                           </button>
                         </div>
                       ))}
