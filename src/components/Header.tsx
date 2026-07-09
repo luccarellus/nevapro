@@ -110,31 +110,33 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
         
         <div className="flex items-center gap-2 md:gap-4">
             {/* User Avatar / Badge */}
-            <button
-              onClick={() => onTabChange?.('profile')}
-              className="flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-bg-card/50 hover:bg-bg-card/80 transition-all group"
-              title="Configurações"
-            >
-              <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0">
-                {user?.avatarUrl || user?.avatar ? (
-                  <img 
-                    src={user?.avatarUrl || user?.avatar || ''} 
-                    alt="" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-brand-primary flex items-center justify-center text-white font-black text-xs">
-                    {user?.name?.charAt(0)?.toUpperCase() || (isAdmin ? 'A' : '?')}
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => onTabChange?.('profile')}
+                  className="flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-bg-card/50 hover:bg-bg-card/80 transition-all group"
+                  title="Configurações"
+                >
+                  <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0">
+                    {user?.avatarUrl || user?.avatar ? (
+                      <img 
+                        src={user?.avatarUrl || user?.avatar || ''} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-brand-primary flex items-center justify-center text-white font-black text-xs">
+                        {user?.name?.charAt(0)?.toUpperCase() || 'A'}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              {isAdmin && (
-                <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold text-yellow-400">
-                  Admin
-                </span>
-              )}
-            </button>
-            <div className="h-8 w-px bg-transparent mx-1" />
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold text-yellow-400">
+                    Admin
+                  </span>
+                </button>
+                <div className="h-8 w-px bg-transparent mx-1" />
+              </>
+            )}
            
            <div className="relative">
              <button 
