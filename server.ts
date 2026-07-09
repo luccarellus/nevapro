@@ -1405,6 +1405,17 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
   }
 });
 
+const formatDbDate = (date: any): string => {
+  if (!date) return new Date().toISOString().split('T')[0];
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  if (typeof date === 'string') {
+    return date.split('T')[0];
+  }
+  return String(date).split('T')[0];
+};
+
 // MATERIALS
 app.get('/api/materials', requireAuth, async (req, res) => {
   try {
@@ -1419,7 +1430,7 @@ app.get('/api/materials', requireAuth, async (req, res) => {
       description: mat.description,
       url: mat.url,
       type: mat.type,
-      uploadedAt: mat.created_at ? mat.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+      uploadedAt: formatDbDate(mat.created_at)
     }));
 
     res.json(mapped);
@@ -1448,7 +1459,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
       description: data.description,
       url: data.url,
       type: data.type,
-      uploadedAt: data.created_at ? data.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+      uploadedAt: formatDbDate(data.created_at)
     };
 
     await addNotification('Novo Material', `"${req.body.title}" em ${dbRecord.subject}.`, 'material', { id: data?.id });
@@ -1486,7 +1497,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
       description: data.description,
       url: data.url,
       type: data.type,
-      uploadedAt: data.created_at ? data.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+      uploadedAt: formatDbDate(data.created_at)
     };
     res.json(mappedResult);
   } catch (error) {
