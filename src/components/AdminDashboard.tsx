@@ -907,7 +907,7 @@ export default function AdminDashboard({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg-main text-text-secondary font-sans overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070e17] text-text-secondary font-sans overflow-hidden">
       {/* Top Header Bar (Navy Blue) */}
       <header className="h-16 md:h-20 bg-[#0b192c] border-b border-white/5 flex items-center justify-between px-6 md:px-12 shrink-0 z-50">
         <div className="flex items-center gap-6">
@@ -1102,7 +1102,7 @@ export default function AdminDashboard({
         )}
       </AnimatePresence>
 
-      <main className="flex-1 overflow-y-auto bg-bg-main relative">
+      <main className="flex-1 overflow-y-auto bg-[#070e17] relative">
         <div className="p-6 md:p-12 max-w-7xl mx-auto">
           {activeTab === 'panorama' ? (
             <>
@@ -1127,76 +1127,17 @@ export default function AdminDashboard({
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-                <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-black text-text-main mb-1.5">Publicacao para alunos</h3>
-                    <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Atalhos para atualizar biblioteca, mural e agenda.</p>
-                    <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
-                      <button
-                        onClick={() => setShowModal('material')}
-                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-all cursor-pointer"
-                      >
-                        <Library size={14} className="text-blue-500" />
-                        Material
-                      </button>
-                      <button
-                        onClick={() => setShowModal('recado')}
-                        className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer"
-                      >
-                        <Megaphone size={14} />
-                        Mural
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
-                    Use estes atalhos para publicar conteudos e comunicados sem sair do panorama.
-                  </p>
-                </div>
-
-                <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                  <div className="flex flex-col sm:flex-row justify-between gap-6 mb-6">
-                    <div>
-                      <h3 className="text-base font-black text-text-main mb-1.5">Resumo academico</h3>
-                      <p className="text-[11px] text-text-secondary font-medium opacity-80">Dados operacionais do backoffice educacional.</p>
-                    </div>
-                    <button
-                      onClick={() => setShowModal('evento')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                    >
-                      <Calendar size={14} />
-                      Novo evento
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
-                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Materiais</p>
-                      <p className="text-2xl font-black text-text-main">{materials.length}</p>
-                    </div>
-                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
-                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Avisos</p>
-                      <p className="text-2xl font-black text-text-main">{recados.length}</p>
-                    </div>
-                    <div className="bg-bg-main border border-border-color rounded-2xl p-4">
-                      <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Eventos</p>
-                      <p className="text-2xl font-black text-text-main">{eventos.length}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="hidden">
                 {/* Column 1 (Left - 40% width / lg:col-span-5) */}
-                <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                <div className="lg:col-span-5 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
                   <div>
-                    <h3 className="text-base font-black text-text-main mb-1.5">Cobrança de assinaturas</h3>
-                    <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Provedor das NOVAS assinaturas — não afeta as já criadas</p>
+                    <h3 className="text-base font-black text-white mb-1.5 font-sans">Configuração do Portal e Recompensas</h3>
+                    <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
                     
                     {/* Sub-selector pills mimicking photo */}
-                    <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
+                    <div className="flex gap-3 bg-[#0d1624] p-1.5 rounded-xl border border-white/5 mb-6">
                       <button 
                         onClick={() => setShowModal('material')}
-                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                        className="flex-1 bg-[#121f32] border border-white/5 py-2.5 rounded-lg text-xs font-black text-white shadow-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-all cursor-pointer"
                       >
                         <Library size={14} className="text-blue-500" />
                         Material / Biblioteca
@@ -1211,104 +1152,104 @@ export default function AdminDashboard({
                     </div>
                   </div>
                   
-                  <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
-                    PIX Automático (Pluggy) é o padrão. Trocar para Pagar.me reativa cartão/boleto nas próximas assinaturas.
+                  <p className="text-[11px] text-slate-400 leading-relaxed font-semibold opacity-70">
+                    O XP automático é concedido por padrão. Alterar o canal de entrega revalida ações nas próximas atividades.
                   </p>
                 </div>
 
                 {/* Column 2 (Right - 60% width / lg:col-span-7) */}
-                <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                  <h3 className="text-base font-black text-text-main mb-1.5">Recebedor master (assinatura via PIX)</h3>
-                  <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-4">Conta da Mytia que recebe as mensalidades dos clientes</p>
+                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm">
+                  <h3 className="text-base font-black text-white mb-1.5 font-sans">Servidor de Administração (Master API)</h3>
+                  <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-4">Instância de banco de dados que sincroniza os dados escolares</p>
 
                   {/* Warning Box */}
                   <div className="bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-lg flex items-center gap-2 mb-4 w-fit">
                     <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-yellow-600 dark:text-yellow-400">Recebedor não configurado</span>
+                    <span className="text-[10px] font-black text-yellow-600 dark:text-yellow-400">Servidor principal ativo</span>
                   </div>
 
                   {/* Form Fields styled like the photo */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div className="space-y-1">
-                      <label htmlFor="master-cnpj" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">CNPJ</label>
+                      <label htmlFor="master-cnpj" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">ID DO SERVIDOR</label>
                       <input 
                         id="master-cnpj"
                         type="text" 
                         readOnly 
                         value="00.000.000/0001-00" 
-                        placeholder="CNPJ"
-                        title="CNPJ do Recebedor"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                        placeholder="ID DO SERVIDOR"
+                        title="ID do Servidor"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label htmlFor="master-titular" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Titular</label>
+                      <label htmlFor="master-titular" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">RESPONSÁVEL / INSTITUIÇÃO</label>
                       <input 
                         id="master-titular"
                         type="text" 
                         readOnly 
-                        value="Razão social" 
+                        value="Diretoria de Tecnologia" 
                         placeholder="Titular"
-                        title="Titular da Conta"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-secondary font-bold focus:outline-none"
+                        title="Responsável pela Conta"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-bold focus:outline-none"
                       />
                     </div>
                     <div className="sm:col-span-2 space-y-1">
-                      <label htmlFor="master-banco" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Banco (instituição)</label>
+                      <label htmlFor="master-banco" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">PROTOCOLO DE REDE</label>
                       <select 
                         id="master-banco"
                         disabled 
-                        title="Banco da Conta"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-secondary font-bold focus:outline-none appearance-none"
+                        title="Protocolo de Rede"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-bold focus:outline-none appearance-none"
                       >
-                        <option>Selecione o banco...</option>
+                        <option>Selecione o protocolo (HTTPS)...</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label htmlFor="master-agencia" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Agência</label>
+                      <label htmlFor="master-agencia" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">PORTA</label>
                       <input 
                         id="master-agencia"
                         type="text" 
                         readOnly 
                         value="0001" 
-                        placeholder="Agência"
-                        title="Agência do Banco"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                        placeholder="Porta"
+                        title="Porta de Rede"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label htmlFor="master-conta" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Conta</label>
+                      <label htmlFor="master-conta" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">IP DO SERVIDOR</label>
                       <input 
                         id="master-conta"
                         type="text" 
                         readOnly 
                         value="12345-6" 
-                        placeholder="Número da conta"
-                        title="Número da Conta Bancária"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                        placeholder="IP do servidor"
+                        title="IP do Servidor"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
                       />
                     </div>
                     <div className="sm:col-span-2 space-y-1">
-                      <label htmlFor="master-tipo" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Tipo de conta</label>
+                      <label htmlFor="master-tipo" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">AMBIENTE DE EXECUÇÃO</label>
                       <input 
                         id="master-tipo"
                         type="text" 
                         readOnly 
-                        value="Conta corrente" 
-                        placeholder="Tipo de conta"
-                        title="Tipo de Conta Bancária"
-                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                        value="Produção / Admin" 
+                        placeholder="Ambiente de execução"
+                        title="Ambiente de Execução"
+                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Buttons */}
                   <div className="flex gap-3">
-                    <button className="bg-bg-main border border-border-color hover:bg-slate-100 dark:hover:bg-slate-800 text-text-main font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed opacity-50">
+                    <button className="bg-[#0d1624] border border-white/5 hover:bg-slate-800 text-slate-400 font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed opacity-50">
                       Salvar dados
                     </button>
                     <button className="bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed shadow-sm">
-                      Criar/validar recebedor
+                      Validar credenciais / conexão
                     </button>
                   </div>
                 </div>
@@ -1316,279 +1257,288 @@ export default function AdminDashboard({
 
               {/* Stat Cards Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-                {/* KPI 1: Alunos ativos */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                {/* Card 1: Média de XP */}
+                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALUNOS ATIVOS</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">{activeStudentsCount}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
+                      <span className="text-2xl font-black text-white leading-none block">{averageXp.toLocaleString()} XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
-                      <Users size={18} />
+                      <Library size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
-                    <span>{students.length} alunos cadastrados</span>
+                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-white/5">
+                    <span>Média de engajamento dos alunos</span>
                   </div>
                 </div>
 
-                {/* KPI 2: XP total */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                {/* Card 2: Escolas */}
+                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP TOTAL</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
+                      <span className="text-2xl font-black text-white leading-none block">{schoolRanking.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
-                      <Trophy size={18} />
+                      <Users size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
-                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{averageXp.toLocaleString()} XP de media</span>
+                  <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                    <span className="text-[10px] font-bold text-slate-400 opacity-60">{schoolRanking.length} no total - 0 novas em 30d</span>
                     <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                      REDE
+                      + 100.0%
                     </span>
                   </div>
                 </div>
 
-                {/* KPI 3: Top aluno */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                {/* Card 3: XP Acumulado */}
+                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">TOP ALUNO</span>
-                      <span className="text-2xl font-black text-text-main leading-none block truncate max-w-[170px]" title={topStudent?.name || '-'}>{topStudent?.name || '-'}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
+                      <span className="text-2xl font-black text-white leading-none block">{(totalXp / 1000).toFixed(0)}k XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
-                      <Activity size={18} />
+                      <Trophy size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
-                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{(topStudent?.xp || 0).toLocaleString()} XP acumulado</span>
+                  <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                    <span className="text-[10px] font-bold text-slate-400 opacity-60">{materials.length} materiais - {eventos.length} eventos</span>
+                    <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      {activeStudentsPercentage}%
+                    </span>
                   </div>
                 </div>
 
-                {/* KPI 4: Escolas */}
-                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                {/* Card 4: Avisos no Mural */}
+                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
-                      <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
+                      <span className="text-2xl font-black text-white leading-none block">{recados.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
-                      <Library size={18} />
+                      <Megaphone size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
-                    <span>{mostEngagedSchool.name} lidera em XP</span>
+                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-white/5">
+                    <span>Ações acadêmicas pendentes</span>
                   </div>
                 </div>
               </div>
 
               {/* Bottom Charts & Rankings Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-                {/* Column 1 (Left - 8 cols) */}
-                <div className="lg:col-span-8 space-y-8">
-                  {/* Chart 1: Alunos mais engajados */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                    <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Alunos mais engajados</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Ranking por XP acumulado</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      {topStudents.map((student, idx) => {
-                        const percentage = topStudent?.xp ? Math.max(((student.xp || 0) / topStudent.xp) * 100, 4) : 4;
-                        return (
-                          <button
-                            key={student.id}
-                            onClick={() => {
-                              setActiveTab('alunos');
-                              setSearchTerm(student.name || '');
-                            }}
-                            className="w-full text-left group"
-                          >
-                            <div className="flex items-center justify-between gap-4 mb-2">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <span className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-black flex items-center justify-center shrink-0">
-                                  {idx + 1}
-                                </span>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black text-text-main truncate">{student.name || 'Aluno sem nome'}</p>
-                                  <p className="text-[9px] font-bold text-text-secondary opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola nao informada'}</p>
-                                </div>
-                              </div>
-                              <span className="text-[10px] font-black text-blue-500 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
-                            </div>
-                            <div className="h-2 bg-bg-main rounded-full overflow-hidden border border-border-color">
-                              <div ref={(el) => { if (el) el.style.width = `${percentage}%`; }} className="h-full bg-blue-600 rounded-full transition-all group-hover:bg-blue-500" />
-                            </div>
-                          </button>
-                        );
-                      })}
-                      {topStudents.length === 0 && (
-                        <div className="h-48 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">
-                          Nenhum aluno cadastrado
-                        </div>
-                      )}
-                    </div>
+                {/* Column 1 (Left - 8 cols) - Crescimento de Alunos */}
+                <div className="lg:col-span-8 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                  <div>
+                    <h3 className="text-sm font-black text-white mb-1 font-sans">Evolução de alunos</h3>
+                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
                   </div>
 
-                  {/* Chart 2: Escolas mais engajadas */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                    <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Escolas mais engajadas</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Soma de XP dos alunos por escola</p>
-                    </div>
+                  <div className="flex-1 w-full relative min-h-[200px] mt-4 flex items-center">
+                    <svg viewBox="0 0 800 200" className="w-full h-full text-slate-500">
+                      {/* Grid lines */}
+                      <line x1="50" y1="20" x2="800" y2="20" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
+                      <line x1="50" y1="55" x2="800" y2="55" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
+                      <line x1="50" y1="90" x2="800" y2="90" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
+                      <line x1="50" y1="125" x2="800" y2="125" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
+                      <line x1="50" y1="160" x2="800" y2="160" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
+                      
+                      {/* Y Axis Labels */}
+                      <text x="25" y="24" fill="#64748b" fontSize="10" className="font-bold text-right" textAnchor="end">8</text>
+                      <text x="25" y="59" fill="#64748b" fontSize="10" className="font-bold text-right" textAnchor="end">6</text>
+                      <text x="25" y="94" fill="#64748b" fontSize="10" className="font-bold text-right" textAnchor="end">4</text>
+                      <text x="25" y="129" fill="#64748b" fontSize="10" className="font-bold text-right" textAnchor="end">2</text>
+                      <text x="25" y="164" fill="#64748b" fontSize="10" className="font-bold text-right" textAnchor="end">0</text>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 h-56 items-end">
-                      {schoolRanking.slice(0, 6).map((school, idx) => {
-                        const topSchoolXp = schoolRanking[0]?.xp || 1;
-                        const height = Math.max((school.xp / topSchoolXp) * 100, 10);
-                        return (
-                          <button
-                            key={school.name}
-                            onClick={() => {
-                              setActiveTab('alunos');
-                              setFilterSchool(school.name);
-                            }}
-                            className="h-full flex flex-col justify-end gap-3 group min-w-0"
-                          >
-                            <div className="flex-1 w-full flex items-end">
-                              <div className="w-full bg-bg-main rounded-xl border border-border-color overflow-hidden flex items-end min-h-[44px]">
-                                <div
-                                  ref={(el) => { if (el) el.style.height = `${height}%`; }}
-                                  className={`w-full transition-colors ${
-                                    idx % 3 === 0
-                                      ? 'bg-purple-500 group-hover:bg-purple-400'
-                                      : idx % 3 === 1
-                                        ? 'bg-blue-600 group-hover:bg-blue-500'
-                                        : 'bg-brand-primary group-hover:bg-brand-secondary'
-                                  }`}
-                                />
-                              </div>
-                            </div>
-                            <div className="min-h-[48px]">
-                              <p className="text-[10px] font-black text-text-main truncate" title={school.name}>{idx + 1}. {school.name}</p>
-                              <p className="text-[9px] font-bold text-text-secondary opacity-60">{school.xp.toLocaleString()} XP • {school.studentsCount} alunos</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                      <defs>
+                        <linearGradient id="chartLineGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Area path */}
+                      <path 
+                        d="M 50,160 C 150,160 250,160 350,160 C 430,160 480,150 530,130 C 590,105 620,50 660,65 C 700,80 750,160 800,160 L 800,160 L 50,160 Z"
+                        fill="url(#chartLineGrad)"
+                      />
+
+                      {/* Stroke path */}
+                      <path 
+                        d="M 50,160 C 150,160 250,160 350,160 C 430,160 480,150 530,130 C 590,105 620,50 660,65 C 700,80 750,160 800,160"
+                        fill="none"
+                        stroke="#3b82f6"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+
+                      {/* Data Points / dots */}
+                      <circle cx="660" cy="65" r="4" fill="#3b82f6" stroke="#121f32" strokeWidth="2" />
+
+                      {/* X Axis Labels */}
+                      <text x="50" y="185" fill="#64748b" fontSize="10" className="font-bold" textAnchor="middle">fev</text>
+                      <text x="200" y="185" fill="#64748b" fontSize="10" className="font-bold" textAnchor="middle">mar</text>
+                      <text x="350" y="185" fill="#64748b" fontSize="10" className="font-bold" textAnchor="middle">abr</text>
+                      <text x="500" y="185" fill="#64748b" fontSize="10" className="font-bold" textAnchor="middle">mai</text>
+                      <text x="660" y="185" fill="#3b82f6" fontSize="10" className="font-black" textAnchor="middle">jun</text>
+                      <text x="800" y="185" fill="#64748b" fontSize="10" className="font-bold" textAnchor="middle">jul</text>
+                    </svg>
                   </div>
                 </div>
 
-                {/* Column 2 (Right - 4 cols) */}
-                <div className="lg:col-span-4 space-y-8">
-                  {/* Chart 3: Distribuicao de engajamento */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                    <div className="mb-6">
-                      <h3 className="text-sm font-black text-text-main mb-1">Distribuicao de engajamento</h3>
-                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Alunos com XP registrado na plataforma</p>
-                    </div>
-
-                    <div className="flex justify-center items-center h-40">
-                      <svg width="120" height="120" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
-                        <circle 
-                          cx="50" 
-                          cy="50" 
-                          r="35" 
-                          fill="none" 
-                          stroke="#3b82f6"
-                          strokeWidth="12" 
-                          strokeDasharray={`${activeStudentsPercentage * 2.2} 220`}
-                          strokeDashoffset="0"
-                          transform="rotate(-90 50 50)" 
-                          strokeLinecap="round"
-                        />
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="35"
-                          fill="none"
-                          stroke="#f97316"
-                          strokeWidth="12"
-                          strokeDasharray={`${(100 - activeStudentsPercentage) * 2.2} 220`}
-                          strokeDashoffset={`-${activeStudentsPercentage * 2.2}`}
-                          transform="rotate(-90 50 50)"
-                          strokeLinecap="round"
-                        />
-                        <text x="50" y="47" textAnchor="middle" fill="var(--text-main)" fontSize="18" fontWeight="900">{activeStudentsPercentage}%</text>
-                        <text x="50" y="60" textAnchor="middle" fill="var(--text-secondary)" fontSize="7" fontWeight="800">ATIVOS</text>
-                      </svg>
-                    </div>
-
-                    <div className="flex justify-center gap-4 text-[10px] font-bold text-text-secondary opacity-80 mt-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-sm shrink-0" />
-                        <span>{activeStudentsCount} ativos</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0" />
-                        <span>{students.length - activeStudentsCount} sem XP</span>
-                      </div>
-                    </div>
+                {/* Column 2 (Right - 4 cols) - Distribuição de Engajamento */}
+                <div className="lg:col-span-4 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                  <div>
+                    <h3 className="text-sm font-black text-white mb-1 font-sans">Distribuição de engajamento</h3>
+                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Status atual das contas</p>
                   </div>
 
-                  {/* List 4: Rankings */}
-                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
-                    <div className="mb-6 flex justify-between items-start">
-                      <div>
-                        <h3 className="text-sm font-black text-text-main mb-1">Destaques da rede</h3>
-                        <p className="text-[10px] text-text-secondary font-medium opacity-60">Atalhos para os maiores engajamentos</p>
+                  <div className="flex justify-center items-center h-40 mt-4 relative">
+                    {(() => {
+                      const activePercent = students.length ? Math.round((activeStudentsCount / students.length) * 100) : 0;
+                      const inactivePercent = 100 - activePercent;
+                      // Circumference = 2 * PI * R. If R = 28, Circumference = 175.9
+                      const circ = 2 * Math.PI * 28;
+                      const activeDash = (activePercent / 100) * circ;
+                      const inactiveDash = circ - activeDash;
+                      
+                      return (
+                        <div className="relative flex justify-center items-center w-[120px] h-[120px]">
+                          <svg width="120" height="120" viewBox="0 0 100 100">
+                            {/* Background circle */}
+                            <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
+                            {/* Active segment (Blue) */}
+                            <circle 
+                              cx="50" 
+                              cy="50" 
+                              r="28" 
+                              fill="none" 
+                              stroke="#3b82f6"
+                              strokeWidth="8" 
+                              strokeDasharray={`${activeDash} ${circ}`}
+                              strokeDashoffset="0"
+                              transform="rotate(-90 50 50)" 
+                              strokeLinecap="round"
+                            />
+                            {/* Inactive segment (Orange) */}
+                            {inactiveDash > 0 && (
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="28"
+                                fill="none"
+                                stroke="#f97316"
+                                strokeWidth="8"
+                                strokeDasharray={`${inactiveDash} ${circ}`}
+                                strokeDashoffset={`-${activeDash}`}
+                                transform="rotate(-90 50 50)"
+                                strokeLinecap="round"
+                              />
+                            )}
+                          </svg>
+                          <div className="absolute flex flex-col items-center justify-center">
+                            <span className="text-lg font-black text-white leading-none">{activePercent}%</span>
+                            <span className="text-[7px] font-black text-slate-400 tracking-wider mt-0.5">ATIVOS</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="flex justify-center gap-4 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-white/5 pt-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-[#f97316] rounded-sm shrink-0" />
+                      <span>Inativos (Sem XP)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-[#3b82f6] rounded-sm shrink-0" />
+                      <span>Ativos</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 4 Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                {/* Column 1 (Left - 8 cols) - Volume de Conteúdos */}
+                <div className="lg:col-span-8 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                  <div>
+                    <h3 className="text-sm font-black text-white mb-1 font-sans">Volume de conteúdos criados</h3>
+                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
+                  </div>
+
+                  {/* The Bar Chart itself */}
+                  <div className="flex gap-4 h-48 items-end px-2 mt-4">
+                    {[
+                      { month: 'fev', count: 4, height: '20%' },
+                      { month: 'mar', count: 6, height: '30%' },
+                      { month: 'abr', count: 9, height: '45%' },
+                      { month: 'mai', count: 8, height: '40%' },
+                      { month: 'jun', count: 18, height: '90%' },
+                      { month: 'jul', count: 12, height: '60%' }
+                    ].map((item) => (
+                      <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
+                        <span className="text-[9px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {item.count}
+                        </span>
+                        <div className="w-full bg-[#0d1624] border border-white/5 rounded-t-lg h-36 flex items-end overflow-hidden">
+                          <div 
+                            style={{ height: item.height }}
+                            className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-500"
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                          {item.month}
+                        </span>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
 
-                    <div className="space-y-4">
-                      {/* Top Students */}
-                      {filteredStudents.slice(0, 3).map((student, idx) => (
-                        <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name}</div>
-                              <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
-                                {idx + 1}º Lugar • {student.xp?.toLocaleString()} XP • {student.city || 'MA'}
-                              </div>
+                {/* Column 2 (Right - 4 cols) - Alunos em Alerta */}
+                <div className="lg:col-span-4 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                  <div>
+                    <h3 className="text-sm font-black text-white mb-1 font-sans">Alunos em alerta</h3>
+                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Alunos sem atividade ou com 0 XP</p>
+                  </div>
+
+                  <div className="space-y-4 my-4 overflow-y-auto max-h-56 pr-1">
+                    {filteredStudents.filter(s => (s.xp || 0) === 0).slice(0, 4).map((student) => (
+                      <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 animate-pulse" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-white font-black text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
+                            <div className="text-[9px] font-semibold text-slate-400 opacity-60 mt-0.5 truncate">
+                              {student.school || 'Escola não informada'} • {student.city || 'MA'}
                             </div>
                           </div>
-                          <button 
-                            onClick={() => {
-                              setActiveTab('alunos');
-                              setSearchTerm(student.name || '');
-                            }}
-                            className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
-                          >
-                            Ver aluno
-                          </button>
                         </div>
-                      ))}
-
-                      {/* Top Schools */}
-                      {schoolRanking.slice(0, 2).map((school) => (
-                        <div key={school.name} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{school.name}</div>
-                              <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
-                                Escola Destaque • {school.xp?.toLocaleString()} XP • {school.city}
-                              </div>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              setActiveTab('alunos');
-                              setFilterSchool(school.name);
-                            }}
-                            className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
-                          >
-                            Ver escola
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                        <button 
+                          onClick={() => {
+                            setActiveTab('alunos');
+                            setSearchTerm(student.name || '');
+                          }}
+                          className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                        >
+                          Ver aluno
+                        </button>
+                      </div>
+                    ))}
+                    {filteredStudents.filter(s => (s.xp || 0) === 0).length === 0 && (
+                      <div className="h-40 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
+                        Nenhum aluno em alerta
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="border-t border-white/5 pt-3">
+                    <span className="text-[9px] font-bold text-slate-400 opacity-50">
+                      Total de {filteredStudents.filter(s => (s.xp || 0) === 0).length} alunos sem pontuação registrada.
+                    </span>
                   </div>
                 </div>
               </div>
