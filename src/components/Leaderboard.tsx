@@ -76,8 +76,8 @@ export default function Leaderboard({ user }: LeaderboardProps) {
               <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                 <div className="relative">
                   <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-slate-400 flex items-center justify-center font-black text-slate-500 text-sm md:text-lg shadow-lg overflow-hidden">
-                    {(displayRanking[1] as any)?.avatarUrl ? (
-                      <img src={(displayRanking[1] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    {(displayRanking[1] as any)?.avatarUrl || (displayRanking[1] as any)?.avatar ? (
+                      <img src={(displayRanking[1] as any).avatarUrl || (displayRanking[1] as any).avatar || ''} alt="" className="w-full h-full object-cover" />
                     ) : (
                       displayRanking[1]?.name?.charAt(0) || '?'
                     )}
@@ -119,8 +119,8 @@ export default function Leaderboard({ user }: LeaderboardProps) {
                     <Crown size={22} className="text-yellow-500 drop-shadow-[0_2px_4px_rgba(234,179,8,0.4)] md:w-7 md:h-7" />
                   </div>
                   <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-bg-card border-2 border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-base md:text-2xl shadow-xl overflow-hidden">
-                    {(displayRanking[0] as any)?.avatarUrl ? (
-                      <img src={(displayRanking[0] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    {(displayRanking[0] as any)?.avatarUrl || (displayRanking[0] as any)?.avatar ? (
+                      <img src={(displayRanking[0] as any).avatarUrl || (displayRanking[0] as any).avatar || ''} alt="" className="w-full h-full object-cover" />
                     ) : (
                       displayRanking[0]?.name?.charAt(0) || '?'
                     )}
@@ -160,8 +160,8 @@ export default function Leaderboard({ user }: LeaderboardProps) {
               <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                 <div className="relative">
                   <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-amber-700 flex items-center justify-center font-black text-amber-700 text-sm md:text-lg shadow-lg overflow-hidden">
-                    {(displayRanking[2] as any)?.avatarUrl ? (
-                      <img src={(displayRanking[2] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    {(displayRanking[2] as any)?.avatarUrl || (displayRanking[2] as any)?.avatar ? (
+                      <img src={(displayRanking[2] as any).avatarUrl || (displayRanking[2] as any).avatar || ''} alt="" className="w-full h-full object-cover" />
                     ) : (
                       displayRanking[2]?.name?.charAt(0) || '?'
                     )}
@@ -210,8 +210,8 @@ export default function Leaderboard({ user }: LeaderboardProps) {
                       {index + 1}
                     </span>
                     <div className="w-12 h-12 rounded-2xl bg-bg-sidebar border border-border-color flex items-center justify-center font-black text-text-secondary overflow-hidden Transition-colors">
-                      {(entry as any).avatarUrl ? (
-                        <img src={(entry as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                      {(entry as any).avatarUrl || (entry as any).avatar ? (
+                        <img src={(entry as any).avatarUrl || (entry as any).avatar || ''} alt="" className="w-full h-full object-cover" />
                       ) : (
                         entry.name?.charAt(0) || '?'
                       )}

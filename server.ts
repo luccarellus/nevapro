@@ -1107,12 +1107,12 @@ app.get('/api/leaderboard', async (req, res) => {
         if (u.show_in_leaderboard === false) return false;
         return true;
       })
-      .map(({ name, city, xp, level, avatar_url }) => ({
-        name,
-        city,
-        xp: xp || 0,
-        level: level || 1,
-        avatarUrl: avatar_url || ''
+      .map((u: any) => ({
+        name: u.name,
+        city: u.city,
+        xp: u.xp || 0,
+        level: u.level || 1,
+        avatarUrl: u.avatar_url || u.avatarUrl || u.avatar || ''
       }))
       .sort((a, b) => b.xp - a.xp)
       .slice(0, 20);
