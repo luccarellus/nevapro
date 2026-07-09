@@ -13,9 +13,15 @@ function getB2Client() {
   const accessKeyId = process.env.B2_KEY_ID;
   const secretAccessKey = process.env.B2_APPLICATION_KEY;
 
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error('Configurações do Backblaze B2 (B2_ENDPOINT, B2_KEY_ID, B2_APPLICATION_KEY) são obrigatórias.');
+  const missing = [];
+  if (!endpoint) missing.push('B2_ENDPOINT');
+  if (!accessKeyId) missing.push('B2_KEY_ID');
+  if (!secretAccessKey) missing.push('B2_APPLICATION_KEY');
+
+  if (missing.length > 0) {
+    throw new Error(`Configurações do Backblaze B2 ausentes no process.env: ${missing.join(', ')}`);
   }
+
 
   s3Client = new S3Client({
     endpoint: endpoint,
