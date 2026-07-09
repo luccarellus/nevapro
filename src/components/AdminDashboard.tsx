@@ -38,7 +38,6 @@ import { eventService } from '../services/eventService';
 import { adminService, AdminActivity, ProductionStat } from '../services/adminService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
-import Settings from './Settings';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import cidadesEscolasData from '../data/cidades_escolas.json';
 
@@ -152,7 +151,6 @@ interface AdminDashboardProps {
 export default function AdminDashboard({
   user,
   onLogout,
-  onUpdateUser,
   theme,
   onThemeChange,
   isDarkMode,
@@ -196,7 +194,7 @@ export default function AdminDashboard({
     return futureEvents[0]?.evt || null;
   }, [eventos]);
 
-  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos' | 'preferencias'>('panorama');
+  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos'>('panorama');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
@@ -354,6 +352,7 @@ export default function AdminDashboard({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showAdminPreferences, setShowAdminPreferences] = useState(false);
 
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -957,11 +956,11 @@ export default function AdminDashboard({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#070e17] text-text-secondary font-sans overflow-hidden">
+    <div className="flex flex-col h-screen bg-bg-main text-text-secondary font-sans overflow-hidden transition-colors duration-300">
       {/* Top Header Bar (Navy Blue) */}
-      <header className="h-16 md:h-20 bg-[#0b192c] border-b border-white/5 flex items-center justify-between px-6 md:px-12 shrink-0 z-50">
+      <header className="h-16 md:h-20 bg-bg-sidebar border-b border-border-color flex items-center justify-between px-6 md:px-12 shrink-0 z-50 transition-colors duration-300">
         <div className="flex items-center gap-6">
-          <div className="text-white flex items-center">
+          <div className="text-text-main flex items-center">
             <Logo className="h-8 md:h-10 justify-start" />
           </div>
           {/* Admin Mode Badge */}
@@ -977,8 +976,8 @@ export default function AdminDashboard({
             onClick={() => setActiveTab('panorama')} 
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'panorama' 
-                ? 'bg-white/10 text-white' 
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                ? 'bg-text-main/10 text-text-main' 
+                : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
             }`}
           >
             <LayoutGrid size={16} />
@@ -988,65 +987,54 @@ export default function AdminDashboard({
             onClick={() => setActiveTab('eventos')} 
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'eventos' 
-                ? 'bg-white/10 text-white' 
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                ? 'bg-text-main/10 text-text-main' 
+                : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
             }`}
           >
             <Calendar size={16} />
             Eventos
             {eventos.length > 0 && (
-              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{eventos.length}</span>
+              <span className="bg-text-main/10 text-text-main text-[9px] px-1.5 py-0.5 rounded-md">{eventos.length}</span>
             )}
           </button>
           <button 
             onClick={() => setActiveTab('materiais')} 
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'materiais' 
-                ? 'bg-white/10 text-white' 
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                ? 'bg-text-main/10 text-text-main' 
+                : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
             }`}
           >
             <Library size={16} />
             Materiais
             {materials.length > 0 && (
-              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{materials.length}</span>
+              <span className="bg-text-main/10 text-text-main text-[9px] px-1.5 py-0.5 rounded-md">{materials.length}</span>
             )}
           </button>
           <button 
             onClick={() => setActiveTab('mural')} 
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'mural' 
-                ? 'bg-white/10 text-white' 
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                ? 'bg-text-main/10 text-text-main' 
+                : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
             }`}
           >
             <Megaphone size={16} />
             Mural
             {recados.length > 0 && (
-              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{recados.length}</span>
+              <span className="bg-text-main/10 text-text-main text-[9px] px-1.5 py-0.5 rounded-md">{recados.length}</span>
             )}
           </button>
           <button 
             onClick={() => setActiveTab('alunos')} 
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'alunos' 
-                ? 'bg-white/10 text-white' 
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                ? 'bg-text-main/10 text-text-main' 
+                : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
             }`}
           >
             <Users size={16} />
             Alunos
-          </button>
-          <button
-            onClick={() => setActiveTab('preferencias')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'preferencias'
-                ? 'bg-white/10 text-white'
-                : 'text-slate-300 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <UserCircle size={16} />
-            Preferencias
           </button>
         </nav>
 
@@ -1061,17 +1049,157 @@ export default function AdminDashboard({
             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('preferencias')}
-            className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-2 text-white transition-all cursor-pointer"
-            title="Abrir preferencias"
-          >
-            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white">
-              {user.name?.charAt(0) || 'A'}
-            </div>
-            <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowAdminPreferences((current) => !current)}
+              className={`flex items-center gap-3 border rounded-xl px-4 py-2 text-text-main transition-all cursor-pointer ${
+                showAdminPreferences
+                  ? 'bg-blue-600/15 border-blue-500/30'
+                  : 'bg-text-main/5 hover:bg-text-main/10 border-border-color'
+              }`}
+              title="Abrir preferencias do admin"
+              aria-label="Abrir preferencias do admin"
+            >
+              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white">
+                {user.name?.charAt(0) || 'A'}
+              </div>
+              <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
+              <UserCircle size={15} className="text-slate-400" />
+            </button>
+
+            <AnimatePresence>
+              {showAdminPreferences && (
+                <>
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShowAdminPreferences(false)}
+                    className="fixed inset-0 z-[70] cursor-default"
+                    aria-label="Fechar preferencias do admin"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.18 }}
+                    className="absolute right-0 top-full mt-3 w-[min(340px,calc(100vw-2rem))] z-[80] rounded-2xl border border-border-color bg-bg-sidebar shadow-2xl shadow-black/20 overflow-hidden"
+                  >
+                    <div className="p-5 border-b border-border-color bg-text-main/[0.03]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm">
+                          {user.name?.charAt(0) || 'A'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-text-main font-black text-sm truncate">{user.name || 'Administrador'}</p>
+                          <p className="text-text-secondary font-bold text-[10px] truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl bg-text-main/5 border border-border-color px-3 py-2">
+                          <span className="block text-[9px] text-text-secondary font-black uppercase opacity-70">Acesso</span>
+                          <span className="block text-[11px] text-text-main font-black">BackOffice</span>
+                        </div>
+                        <div className="rounded-xl bg-text-main/5 border border-border-color px-3 py-2">
+                          <span className="block text-[9px] text-text-secondary font-black uppercase opacity-70">Status</span>
+                          <span className="block text-[11px] text-emerald-400 font-black">Admin ativo</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] text-text-secondary font-black uppercase tracking-wider">Aparencia do painel</span>
+                          <button
+                            type="button"
+                            onClick={onToggleDarkMode}
+                            className="text-[10px] font-black text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            {isDarkMode ? <Sun size={13} /> : <Moon size={13} />}
+                            {isDarkMode ? 'Modo claro' : 'Modo escuro'}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'default', label: 'Padrao', swatch: 'bg-[#00b094]' },
+                            { id: 'neva', label: 'Neva', swatch: 'bg-[#0dccd6]' },
+                            { id: 'minimalist', label: 'Minimal', swatch: 'bg-[#a1a1aa]' },
+                          ].map((item) => {
+                            const selected = theme === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => onThemeChange(item.id)}
+                                className={`h-10 rounded-xl border px-2 flex items-center justify-between gap-2 text-[10px] font-black transition-all cursor-pointer ${
+                                  selected
+                                    ? 'bg-blue-500/10 border-blue-500/40 text-text-main'
+                                    : 'bg-text-main/5 border-border-color text-text-secondary hover:text-text-main hover:bg-text-main/10'
+                                }`}
+                              >
+                                <span className={`w-3 h-3 rounded-full ${item.swatch}`} />
+                                <span className="truncate">{item.label}</span>
+                                {selected && <CheckCircle2 size={12} className="text-blue-400 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] text-text-secondary font-black uppercase tracking-wider block mb-2">Atalhos administrativos</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: 'Painel', icon: LayoutGrid, tab: 'panorama' as const },
+                            { label: 'Eventos', icon: Calendar, tab: 'eventos' as const },
+                            { label: 'Materiais', icon: Library, tab: 'materiais' as const },
+                            { label: 'Alunos', icon: Users, tab: 'alunos' as const },
+                          ].map((item) => {
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={item.tab}
+                                type="button"
+                                onClick={() => {
+                                  setActiveTab(item.tab);
+                                  setShowAdminPreferences(false);
+                                }}
+                                className="rounded-xl bg-text-main/5 hover:bg-text-main/10 border border-border-color px-3 py-2.5 text-left flex items-center gap-2 text-text-secondary hover:text-text-main transition-all cursor-pointer"
+                              >
+                                <Icon size={14} />
+                                <span className="text-[10px] font-black">{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border-t border-border-color bg-bg-main/30 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-text-secondary opacity-70">
+                        <ShieldCheck size={13} />
+                        Preferencias do admin
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.removeItem('neva_student_session');
+                          onLogout();
+                        }}
+                        className="text-[10px] font-black text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <LogOut size={13} />
+                        Sair
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
 
           <button 
             onClick={() => {
@@ -1086,7 +1214,7 @@ export default function AdminDashboard({
 
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="md:hidden p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer"
+            className="md:hidden p-2.5 bg-text-main/5 hover:bg-text-main/10 border border-border-color rounded-xl text-text-secondary hover:text-text-main cursor-pointer"
             title="Alternar menu"
             aria-label="Alternar menu"
           >
@@ -1111,51 +1239,45 @@ export default function AdminDashboard({
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'tween', duration: 0.3 }}
-              className="md:hidden fixed inset-y-0 left-0 w-72 bg-[#0b192c] border-r border-white/5 flex flex-col z-[60] mt-16 md:mt-20 p-6 space-y-4"
+              className="md:hidden fixed inset-y-0 left-0 w-72 bg-bg-sidebar border-r border-border-color flex flex-col z-[60] mt-16 md:mt-20 p-6 space-y-4"
             >
               <div className="text-[10px] font-black text-slate-400 opacity-50 tracking-wide uppercase mb-2">Navegação</div>
               <button 
                 onClick={() => { setActiveTab('panorama'); setIsSidebarOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'panorama' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'panorama' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
               >
                 <LayoutGrid size={18} /> Panorama
               </button>
               <button 
                 onClick={() => { setActiveTab('eventos'); setIsSidebarOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'eventos' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'eventos' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
               >
                 <Calendar size={18} /> Eventos
               </button>
               <button 
                 onClick={() => { setActiveTab('materiais'); setIsSidebarOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'materiais' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'materiais' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
               >
                 <Library size={18} /> Materiais
               </button>
               <button 
                 onClick={() => { setActiveTab('mural'); setIsSidebarOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'mural' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'mural' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
               >
                 <Megaphone size={18} /> Mural
               </button>
               <button 
                 onClick={() => { setActiveTab('alunos'); setIsSidebarOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'alunos' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'alunos' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
               >
                 <Users size={18} /> Alunos
-              </button>
-              <button
-                onClick={() => { setActiveTab('preferencias'); setIsSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'preferencias' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
-              >
-                <UserCircle size={18} /> Preferencias
               </button>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      <main className="flex-1 overflow-y-auto bg-[#070e17] relative">
+      <main className="flex-1 overflow-y-auto bg-bg-main relative transition-colors duration-300">
         <div className="p-6 md:p-12 max-w-7xl mx-auto">
           {activeTab === 'panorama' ? (
             <>
@@ -1181,16 +1303,16 @@ export default function AdminDashboard({
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
                 {/* Column 1 (Left - 40% width / lg:col-span-5) */}
-                <div className="lg:col-span-5 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
                   <div>
-                    <h3 className="text-base font-black text-white mb-1.5 font-sans">Configuração do Portal e Recompensas</h3>
+                    <h3 className="text-base font-black text-text-main mb-1.5 font-sans">Configuração do Portal e Recompensas</h3>
                     <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
                     
                     {/* Sub-selector pills mimicking photo */}
-                    <div className="flex gap-3 bg-[#0d1624] p-1.5 rounded-xl border border-white/5 mb-6">
+                    <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
                       <button 
                         onClick={() => setShowModal('material')}
-                        className="flex-1 bg-[#121f32] border border-white/5 py-2.5 rounded-lg text-xs font-black text-white shadow-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-all cursor-pointer"
+                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-bg-main transition-all cursor-pointer"
                       >
                         <Library size={14} className="text-blue-500" />
                         Material / Biblioteca
@@ -1204,15 +1326,15 @@ export default function AdminDashboard({
                       </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-white/5 bg-[#0d1624]/70 p-3">
+                      <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] font-black text-slate-400 uppercase">Materiais</span>
-                          <span className="text-lg font-black text-white">{materials.length}</span>
+                          <span className="text-lg font-black text-text-main">{materials.length}</span>
                         </div>
                         <div className="space-y-1.5">
                           {recentMaterials.length > 0 ? recentMaterials.map(item => (
                             <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
-                              <span className="text-slate-300 truncate">{item.title}</span>
+                              <span className="text-text-main truncate">{item.title}</span>
                               <span className="text-slate-500 shrink-0">{formatShortDate(item.uploadedAt)}</span>
                             </div>
                           )) : (
@@ -1220,15 +1342,15 @@ export default function AdminDashboard({
                           )}
                         </div>
                       </div>
-                      <div className="rounded-xl border border-white/5 bg-[#0d1624]/70 p-3">
+                      <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] font-black text-slate-400 uppercase">Recados</span>
-                          <span className="text-lg font-black text-white">{recados.length}</span>
+                          <span className="text-lg font-black text-text-main">{recados.length}</span>
                         </div>
                         <div className="space-y-1.5">
                           {recentRecados.length > 0 ? recentRecados.map(item => (
                             <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
-                              <span className="text-slate-300 truncate">{item.title}</span>
+                              <span className="text-text-main truncate">{item.title}</span>
                               <span className="text-slate-500 shrink-0">{formatShortDate(item.date)}</span>
                             </div>
                           )) : (
@@ -1245,14 +1367,14 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Column 2 (Right - 60% width / lg:col-span-7) */}
-                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px]">
+                <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px] transition-colors duration-300">
                   <div>
                     {/* Header with Golden Trophy Icon */}
                     <div className="flex flex-col items-center mb-6 text-center">
                       <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-yellow-500/5 shrink-0">
                         <Trophy size={24} className="text-yellow-500" />
                       </div>
-                      <h3 className="text-lg font-black text-white leading-none font-sans mb-1">Hall da Fama</h3>
+                      <h3 className="text-lg font-black text-text-main leading-none font-sans mb-1">Hall da Fama</h3>
                       <p className="text-[10px] text-slate-400 font-bold opacity-60">Os estudantes que mais se engajaram nessa jornada de estudos.</p>
                     </div>
 
@@ -1263,10 +1385,10 @@ export default function AdminDashboard({
                         <div className="w-full bg-gradient-to-t from-slate-200/5 to-slate-400/20 border border-slate-400/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[60%]">
                           <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                             <div className="relative">
-                              <div className="w-9 h-9 rounded-full bg-[#0d1624] border border-slate-400 flex items-center justify-center font-black text-slate-500 text-xs shadow-lg">
+                              <div className="w-9 h-9 rounded-full bg-bg-main border border-slate-400 flex items-center justify-center font-black text-slate-500 text-xs shadow-lg">
                                 {displayRanking[1]?.name?.charAt(0) || '?'}
                               </div>
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-400 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-400 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">
                                 2
                               </div>
                             </div>
@@ -1291,10 +1413,10 @@ export default function AdminDashboard({
                               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                                 <Crown size={16} className="text-yellow-500 drop-shadow-[0_2px_4px_rgba(234,179,8,0.3)]" />
                               </div>
-                              <div className="w-11 h-11 rounded-full bg-[#0d1624] border border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-sm shadow-xl">
+                              <div className="w-11 h-11 rounded-full bg-bg-main border border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-sm shadow-xl">
                                 {displayRanking[0]?.name?.charAt(0) || '?'}
                               </div>
-                              <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-yellow-500 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                              <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-yellow-500 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">
                                 1
                               </div>
                             </div>
@@ -1308,7 +1430,7 @@ export default function AdminDashboard({
                             </span>
                           </div>
                         </div>
-                        <p className="text-[10px] font-black mt-2 text-center text-white truncate w-full px-1">
+                        <p className="text-[10px] font-black mt-2 text-center text-text-main truncate w-full px-1">
                           {displayRanking[0]?.name || '---'}
                         </p>
                       </div>
@@ -1318,10 +1440,10 @@ export default function AdminDashboard({
                         <div className="w-full bg-gradient-to-t from-amber-600/5 to-amber-800/20 border border-amber-800/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[50%]">
                           <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                             <div className="relative">
-                              <div className="w-9 h-9 rounded-full bg-[#0d1624] border border-amber-700 flex items-center justify-center font-black text-amber-700 text-xs shadow-lg">
+                              <div className="w-9 h-9 rounded-full bg-bg-main border border-amber-700 flex items-center justify-center font-black text-amber-700 text-xs shadow-lg">
                                 {displayRanking[2]?.name?.charAt(0) || '?'}
                               </div>
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-700 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-700 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">
                                 3
                               </div>
                             </div>
@@ -1340,11 +1462,11 @@ export default function AdminDashboard({
                     </div>
 
                     {/* Ranking list under podium */}
-                    <div className="bg-[#0d1624]/40 border border-white/5 rounded-2xl overflow-hidden mt-4">
+                    <div className="bg-bg-main/40 border border-border-color rounded-2xl overflow-hidden mt-4">
                       {topStudents.map((entry, index) => (
                         <div
                           key={entry.id || index}
-                          className="flex items-center justify-between p-3 border-b border-white/5 last:border-0"
+                          className="flex items-center justify-between p-3 border-b border-border-color last:border-0"
                         >
                           <div className="flex items-center gap-3">
                             <span className={`w-4 font-black text-xs text-center ${
@@ -1355,16 +1477,16 @@ export default function AdminDashboard({
                             }`}>
                               {index + 1}
                             </span>
-                            <div className="w-8 h-8 rounded-xl bg-[#0d1624] border border-white/5 flex items-center justify-center font-black text-slate-400 text-xs">
+                            <div className="w-8 h-8 rounded-xl bg-bg-main border border-border-color flex items-center justify-center font-black text-slate-400 text-xs">
                               {entry.name?.charAt(0) || '?'}
                             </div>
                             <div className="min-w-0">
-                              <div className="text-xs font-bold text-white truncate">{entry.name}</div>
+                              <div className="text-xs font-bold text-text-main truncate">{entry.name}</div>
                               <div className="text-[9px] font-bold text-slate-400 opacity-50">Nível {calculateLevelAndProgression(entry.xp || 0).level}</div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className="text-[10px] font-black text-white">{entry.xp} XP</span>
+                            <span className="text-[10px] font-black text-text-main">{entry.xp} XP</span>
                           </div>
                         </div>
                       ))}
@@ -1381,33 +1503,33 @@ export default function AdminDashboard({
               {/* Stat Cards Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
                 {/* Card 1: Média de XP */}
-                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
-                      <span className="text-2xl font-black text-white leading-none block">{averageXp.toLocaleString()} XP</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{averageXp.toLocaleString()} XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
                       <Library size={18} />
                     </div>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-white/5">
+                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-border-color">
                     <span>Média de engajamento dos alunos</span>
                   </div>
                 </div>
 
                 {/* Card 2: Escolas */}
-                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
-                      <span className="text-2xl font-black text-white leading-none block">{schoolRanking.length}</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
                       <Users size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color">
                     <span className="text-[10px] font-bold text-slate-400 opacity-60">{schoolRanking.length} no total - 0 novas em 30d</span>
                     <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       + 100.0%
@@ -1416,17 +1538,17 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Card 3: XP Acumulado */}
-                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
-                      <span className="text-2xl font-black text-white leading-none block">{totalXp.toLocaleString()} XP</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()} XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
                       <Trophy size={18} />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color">
                     <span className="text-[10px] font-bold text-slate-400 opacity-60">{activeStudentsCount} alunos com XP - {xpGrantingEvents.length} eventos com XP</span>
                     <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       {xpConfiguredInEvents.toLocaleString()} XP eventos
@@ -1435,17 +1557,17 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Card 4: Avisos no Mural */}
-                <div className="bg-[#121f32] border border-white/5 rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
-                      <span className="text-2xl font-black text-white leading-none block">{recados.length}</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{recados.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
                       <Megaphone size={18} />
                     </div>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-white/5">
+                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-border-color">
                     <span>Ações acadêmicas pendentes</span>
                   </div>
                 </div>
@@ -1454,9 +1576,9 @@ export default function AdminDashboard({
               {/* Bottom Charts & Rankings Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
                 {/* Column 1 (Left - 8 cols) - Crescimento de Alunos */}
-                <div className="lg:col-span-8 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
-                    <h3 className="text-sm font-black text-white mb-1 font-sans">Evolução de alunos</h3>
+                    <h3 className="text-sm font-black text-text-main mb-1 font-sans">Evolução de alunos</h3>
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
                   </div>
 
@@ -1513,9 +1635,9 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Column 2 (Right - 4 cols) - Distribuição de Engajamento */}
-                <div className="lg:col-span-4 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
-                    <h3 className="text-sm font-black text-white mb-1 font-sans">Distribuição de engajamento</h3>
+                    <h3 className="text-sm font-black text-text-main mb-1 font-sans">Distribuição de engajamento</h3>
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Status atual das contas</p>
                   </div>
 
@@ -1557,7 +1679,7 @@ export default function AdminDashboard({
                     </svg>
                   </div>
 
-                  <div className="flex justify-center gap-6 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-white/5 pt-3">
+                  <div className="flex justify-center gap-6 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-border-color pt-3">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 bg-[#f97316] rounded-full shrink-0" />
                       <span>Aguardando atividade</span>
@@ -1573,9 +1695,9 @@ export default function AdminDashboard({
               {/* Row 4 Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
                 {/* Column 1 (Left - 8 cols) - Volume de Conteúdos */}
-                <div className="lg:col-span-8 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
-                    <h3 className="text-sm font-black text-white mb-1 font-sans">Volume de conteúdos criados</h3>
+                    <h3 className="text-sm font-black text-text-main mb-1 font-sans">Volume de conteúdos criados</h3>
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
                   </div>
 
@@ -1593,7 +1715,7 @@ export default function AdminDashboard({
                         <span className="text-[9px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
                           {item.count}
                         </span>
-                        <div className="w-full bg-[#0d1624] border border-white/5 rounded-t-lg h-36 flex items-end overflow-hidden">
+                        <div className="w-full bg-bg-main border border-border-color rounded-t-lg h-36 flex items-end overflow-hidden">
                           <div 
                             style={{ height: item.height }}
                             className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-500"
@@ -1608,19 +1730,19 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Column 2 (Right - 4 cols) - Alunos em Alerta */}
-                <div className="lg:col-span-4 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px]">
+                <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
-                    <h3 className="text-sm font-black text-white mb-1 font-sans">Alunos em alerta</h3>
+                    <h3 className="text-sm font-black text-text-main mb-1 font-sans">Alunos em alerta</h3>
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Sem interacao registrada ha mais de 30 dias</p>
                   </div>
 
                   <div className="space-y-4 my-4 overflow-y-auto max-h-56 pr-1">
                     {atRiskStudents.slice(0, 4).map((student) => (
-                      <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                      <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color last:border-0 last:pb-0">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 animate-pulse" />
                           <div className="min-w-0 flex-1">
-                            <div className="text-white font-black text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
+                            <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
                             <div className="text-[9px] font-semibold text-slate-400 opacity-60 mt-0.5 truncate">
                               {student.school || 'Escola não informada'} • {student.city || 'MA'}
                             </div>
@@ -1644,7 +1766,7 @@ export default function AdminDashboard({
                     )}
                   </div>
                   
-                  <div className="border-t border-white/5 pt-3">
+                  <div className="border-t border-border-color pt-3">
                     <span className="text-[9px] font-bold text-slate-400 opacity-50">
                       Total de {atRiskStudents.length} alunos sem interacao nos ultimos 30 dias.
                     </span>
@@ -1652,14 +1774,6 @@ export default function AdminDashboard({
                 </div>
               </div>
             </>
-          ) : activeTab === 'preferencias' ? (
-            <Settings
-              user={user}
-              onUpdateUser={onUpdateUser}
-              onClose={() => setActiveTab('panorama')}
-              theme={theme}
-              onThemeChange={onThemeChange}
-            />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {activeTab === 'eventos' ? (
@@ -1749,7 +1863,7 @@ export default function AdminDashboard({
                          <h4 className="text-text-main font-black text-base tracking-tight mb-2 leading-tight">{evt.title}</h4>
                          {evt.observation && <p className="text-text-secondary text-xs font-medium opacity-50 mb-4">{evt.observation}</p>}
                          
-                         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/5">
+                         <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-border-color">
                             <div>
                                <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1">Data</div>
                                <div className="text-text-main font-bold text-xs">{formatDateToBR(evt.date)}</div>
@@ -2127,11 +2241,11 @@ export default function AdminDashboard({
                            </div>
                          </div>
 
-                         <div className="flex items-end justify-between border-t border-white/5 pt-6">
+                         <div className="flex items-end justify-between border-t border-border-color pt-6">
                            <div className="flex-1 mr-4">
                               <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-2">Progresso</div>
                               <div className="flex items-center gap-3">
-                                 <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+                                 <div className="flex-1 h-1 bg-text-main/5 rounded-full overflow-hidden">
                                    {(() => {
                                      const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
                                      const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
@@ -2268,7 +2382,7 @@ export default function AdminDashboard({
                           <h4 className="text-text-main font-black text-base tracking-tight mb-2 leading-tight">{rec.title}</h4>
                           <p className="text-text-secondary text-xs font-medium opacity-50 mb-4">{rec.content}</p>
                           
-                          <div className="flex items-center justify-between border-t border-white/5 pt-4 mt-4">
+                          <div className="flex items-center justify-between border-t border-border-color pt-4 mt-4">
                             <span className="text-[9px] font-black text-text-secondary opacity-40 tracking-wider">{formatDateToBR(rec.date)}</span>
                             <div className="flex items-center gap-3">
                               <button 
@@ -2402,7 +2516,7 @@ function SidebarItem({
       className={`w-full flex items-center justify-between px-6 py-3.5 rounded-2xl transition-all duration-300 group relative ${
         active 
           ? `${activeColor} ${activeBgColor}` 
-          : 'text-text-secondary hover:bg-white/5 hover:text-text-main'
+          : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
       }`}
     >
       <div className="flex items-center gap-4 relative z-10">
@@ -2415,7 +2529,7 @@ function SidebarItem({
       </div>
       
       {count !== undefined && (
-        <span className={`relative z-10 text-[10px] font-black px-2.5 py-0.5 rounded-lg transition-colors duration-300 ${active ? `${activeBgColor} ${activeColor}` : 'bg-white/5 text-text-secondary opacity-50'}`}>
+        <span className={`relative z-10 text-[10px] font-black px-2.5 py-0.5 rounded-lg transition-colors duration-300 ${active ? `${activeBgColor} ${activeColor}` : 'bg-text-main/5 text-text-secondary opacity-50'}`}>
           {count}
         </span>
       )}
