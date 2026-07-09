@@ -26,6 +26,7 @@ import {
   Link as LinkIcon,
   BookOpen,
   Trophy,
+  Crown,
   LogOut,
   UserCircle,
   Sun,
@@ -38,6 +39,7 @@ import { adminService, AdminActivity, ProductionStat } from '../services/adminSe
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
 import Settings from './Settings';
+import Leaderboard from './Leaderboard';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import cidadesEscolasData from '../data/cidades_escolas.json';
 
@@ -183,7 +185,7 @@ export default function AdminDashboard({
     return futureEvents[0]?.evt || null;
   }, [eventos]);
 
-  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos' | 'preferencias'>('panorama');
+  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos' | 'preferencias' | 'ranking'>('panorama');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
@@ -300,6 +302,16 @@ export default function AdminDashboard({
     return [...students]
       .sort((a, b) => (b.xp || 0) - (a.xp || 0))
       .slice(0, 6);
+  }, [students]);
+
+  const displayRanking = useMemo(() => {
+    const sorted = [...students].sort((a, b) => (b.xp || 0) - (a.xp || 0));
+    const placeholders = [
+      { name: 'Em breve...', xp: 0, level: 0, id: 'p1' },
+      { name: 'Em breve...', xp: 0, level: 0, id: 'p2' },
+      { name: 'Em breve...', xp: 0, level: 0, id: 'p3' },
+    ];
+    return sorted.length >= 3 ? sorted : [...sorted, ...placeholders].slice(0, 3);
   }, [students]);
 
   const totalXp = useMemo(() => students.reduce((sum, student) => sum + (student.xp || 0), 0), [students]);
@@ -900,7 +912,15 @@ export default function AdminDashboard({
           <ShieldCheck size={64} className="mx-auto mb-6 text-red-500" />
           <h1 className="text-3xl font-black mb-2">Acesso Restrito</h1>
           <p className="text-text-secondary mb-8">Esta área é exclusiva para administradores.</p>
-          <button onClick={onLogout} className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white">Sair do sistema</button>
+          <button 
+            onClick={() => {
+              localStorage.removeItem('neva_student_session');
+              onLogout();
+            }} 
+            className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white"
+          >
+            Sair do sistema
+          </button>
         </div>
       </div>
     );
@@ -987,6 +1007,17 @@ export default function AdminDashboard({
             <Users size={16} />
             Alunos
           </button>
+          <button 
+            onClick={() => setActiveTab('ranking')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'ranking' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Trophy size={16} className="text-yellow-500" />
+            Ranking
+          </button>
           <button
             onClick={() => setActiveTab('preferencias')}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
@@ -1024,7 +1055,10 @@ export default function AdminDashboard({
           </button>
 
           <button 
-            onClick={onLogout}
+            onClick={() => {
+              localStorage.removeItem('neva_student_session');
+              onLogout();
+            }}
             className="p-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-500 transition-all cursor-pointer"
             title="Sair do sistema"
           >
@@ -1091,6 +1125,12 @@ export default function AdminDashboard({
               >
                 <Users size={18} /> Alunos
               </button>
+              <button 
+                onClick={() => { setActiveTab('ranking'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'ranking' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <Trophy size={18} className="text-yellow-500" /> Ranking
+              </button>
               <button
                 onClick={() => { setActiveTab('preferencias'); setIsSidebarOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'preferencias' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
@@ -1154,47 +1194,132 @@ export default function AdminDashboard({
                   
                   <p className="text-[11px] text-slate-400 leading-relaxed font-semibold opacity-70">
                     O XP automático é concedido por padrão. Alterar o canal de entrega revalida ações nas próximas atividades.
-                  </p>
-                </div>
-
-                {/* Column 2 (Right - 60% width / lg:col-span-7) */}
-                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                 {/* Column 2 (Right - 60% width / lg:col-span-7) */}
+                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px]">
                   <div>
-                    <h3 className="text-base font-black text-white mb-1.5 font-sans">Alunos mais engajados</h3>
-                    <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-6">Ranking por XP acumulado na plataforma</p>
+                    {/* Header with Golden Trophy Icon */}
+                    <div className="flex flex-col items-center mb-6 text-center">
+                      <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-yellow-500/5 shrink-0">
+                        <Trophy size={24} className="text-yellow-500" />
+                      </div>
+                      <h3 className="text-lg font-black text-white leading-none font-sans mb-1">Hall da Fama</h3>
+                      <p className="text-[10px] text-slate-400 font-bold opacity-60">Os estudantes que mais se engajaram nessa jornada de estudos.</p>
+                    </div>
 
-                    <div className="space-y-4 max-h-[220px] overflow-y-auto pr-1">
-                      {topStudents.map((student, idx) => {
-                        const percentage = topStudent?.xp ? Math.max(((student.xp || 0) / topStudent.xp) * 100, 4) : 4;
-                        return (
-                          <button
-                            key={student.id}
-                            onClick={() => {
-                              setActiveTab('alunos');
-                              setSearchTerm(student.name || '');
-                            }}
-                            className="w-full text-left group"
-                          >
-                            <div className="flex items-center justify-between gap-4 mb-2">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <span className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-black flex items-center justify-center shrink-0">
-                                  {idx + 1}
-                                </span>
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black text-white truncate">{student.name || 'Aluno sem nome'}</p>
-                                  <p className="text-[9px] font-bold text-slate-400 opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola não informada'}</p>
-                                </div>
+                    {/* Podium slots */}
+                    <div className="flex justify-center items-end gap-3 mb-6 px-4 h-48">
+                      {/* Rank 2 */}
+                      <div className="flex-1 flex flex-col items-center h-full justify-end">
+                        <div className="w-full bg-gradient-to-t from-slate-200/5 to-slate-400/20 border border-slate-400/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[60%]">
+                          <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
+                            <div className="relative">
+                              <div className="w-9 h-9 rounded-full bg-[#0d1624] border border-slate-400 flex items-center justify-center font-black text-slate-500 text-xs shadow-lg">
+                                {displayRanking[1]?.name?.charAt(0) || '?'}
                               </div>
-                              <span className="text-[10px] font-black text-blue-500 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-400 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                                2
+                              </div>
                             </div>
-                            <div className="h-2 bg-[#0d1624] rounded-full overflow-hidden border border-white/5">
-                              <div style={{ width: `${percentage}%` }} className="h-full bg-blue-600 rounded-full transition-all group-hover:bg-blue-500" />
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                            <span className="text-xl font-black text-slate-400/10">2º</span>
+                          </div>
+                          <div className="z-10 text-center px-1 mb-1">
+                            <span className="text-[9px] font-black text-slate-400">{(displayRanking[1]?.xp || 0).toLocaleString()} XP</span>
+                          </div>
+                        </div>
+                        <p className="text-[9px] font-black mt-2 text-center text-slate-400 truncate w-full px-1">
+                          {displayRanking[1]?.name || '---'}
+                        </p>
+                      </div>
+
+                      {/* Rank 1 */}
+                      <div className="flex-1 flex flex-col items-center h-full justify-end">
+                        <div className="w-full bg-gradient-to-t from-yellow-500/10 to-yellow-600/30 border border-yellow-500/40 rounded-t-[20px] relative flex flex-col items-center justify-end pb-4 pt-10 h-[80%] shadow-[0_0_20px_rgba(234,179,8,0.1)]">
+                          <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
+                            <div className="relative">
+                              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                                <Crown size={16} className="text-yellow-500 drop-shadow-[0_2px_4px_rgba(234,179,8,0.3)]" />
+                              </div>
+                              <div className="w-11 h-11 rounded-full bg-[#0d1624] border border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-sm shadow-xl">
+                                {displayRanking[0]?.name?.charAt(0) || '?'}
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-yellow-500 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                                1
+                              </div>
                             </div>
-                          </button>
-                        );
-                      })}
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                            <span className="text-2xl font-black text-yellow-500/10">1º</span>
+                          </div>
+                          <div className="z-10 text-center px-1 mb-1">
+                            <span className="text-[9px] font-black text-yellow-500">
+                              🏆 {(displayRanking[0]?.xp || 0).toLocaleString()} XP
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-black mt-2 text-center text-white truncate w-full px-1">
+                          {displayRanking[0]?.name || '---'}
+                        </p>
+                      </div>
+
+                      {/* Rank 3 */}
+                      <div className="flex-1 flex flex-col items-center h-full justify-end">
+                        <div className="w-full bg-gradient-to-t from-amber-600/5 to-amber-800/20 border border-amber-800/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[50%]">
+                          <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
+                            <div className="relative">
+                              <div className="w-9 h-9 rounded-full bg-[#0d1624] border border-amber-700 flex items-center justify-center font-black text-amber-700 text-xs shadow-lg">
+                                {displayRanking[2]?.name?.charAt(0) || '?'}
+                              </div>
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-700 text-white font-extrabold text-[9px] flex items-center justify-center border border-[#121f32]">
+                                3
+                              </div>
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                            <span className="text-lg font-black text-amber-600/10">3º</span>
+                          </div>
+                          <div className="z-10 text-center px-1 mb-1">
+                            <span className="text-[9px] font-black text-amber-600">{(displayRanking[2]?.xp || 0).toLocaleString()} XP</span>
+                          </div>
+                        </div>
+                        <p className="text-[9px] font-black mt-2 text-center text-slate-400 truncate w-full px-1">
+                          {displayRanking[2]?.name || '---'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Ranking list under podium */}
+                    <div className="bg-[#0d1624]/40 border border-white/5 rounded-2xl overflow-hidden mt-4">
+                      {topStudents.map((entry, index) => (
+                        <div
+                          key={entry.id || index}
+                          className="flex items-center justify-between p-3 border-b border-white/5 last:border-0"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-4 font-black text-xs text-center ${
+                              index === 0 ? 'text-yellow-500' : 
+                              index === 1 ? 'text-slate-400' : 
+                              index === 2 ? 'text-amber-750' : 
+                              'text-slate-400 opacity-50'
+                            }`}>
+                              {index + 1}
+                            </span>
+                            <div className="w-8 h-8 rounded-xl bg-[#0d1624] border border-white/5 flex items-center justify-center font-black text-slate-400 text-xs">
+                              {entry.name?.charAt(0) || '?'}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-white truncate">{entry.name}</div>
+                              <div className="text-[9px] font-bold text-slate-400 opacity-50">Nível {calculateLevelAndProgression(entry.xp || 0).level}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-black text-white">{entry.xp} XP</span>
+                          </div>
+                        </div>
+                      ))}
                       {topStudents.length === 0 && (
-                        <div className="h-48 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
+                        <div className="h-24 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
                           Nenhum aluno cadastrado
                         </div>
                       )}
@@ -1344,8 +1469,8 @@ export default function AdminDashboard({
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Status atual das contas</p>
                   </div>
 
-                  <div className="flex justify-center items-center h-44 mt-4">
-                    <svg width="120" height="120" viewBox="0 0 100 100">
+                  <div className="flex justify-center items-center h-52 mt-4">
+                    <svg width="160" height="160" viewBox="0 0 100 100">
                       {/* Background circle */}
                       <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
                       
@@ -1485,6 +1610,10 @@ export default function AdminDashboard({
               theme={theme}
               onThemeChange={onThemeChange}
             />
+          ) : activeTab === 'ranking' ? (
+            <div className="max-w-4xl mx-auto py-8">
+              <Leaderboard user={user} />
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {activeTab === 'eventos' ? (
