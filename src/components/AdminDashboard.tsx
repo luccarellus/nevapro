@@ -1194,7 +1194,10 @@ export default function AdminDashboard({
                   
                   <p className="text-[11px] text-slate-400 leading-relaxed font-semibold opacity-70">
                     O XP automático é concedido por padrão. Alterar o canal de entrega revalida ações nas próximas atividades.
-                 {/* Column 2 (Right - 60% width / lg:col-span-7) */}
+                  </p>
+                </div>
+
+                {/* Column 2 (Right - 60% width / lg:col-span-7) */}
                 <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px]">
                   <div>
                     {/* Header with Golden Trophy Icon */}
