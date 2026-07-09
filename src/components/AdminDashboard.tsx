@@ -258,6 +258,27 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     });
     return { name: bestSchool, xp: maxXp };
   }, [students, schoolMap]);
+
+  const schoolRanking = useMemo(() => {
+    const schoolData: Record<string, { name: string; xp: number; city: string; studentsCount: number }> = {};
+    students.forEach(s => {
+      if (s.school) {
+        const canonical = schoolMap[s.school] || s.school;
+        if (!schoolData[canonical]) {
+          schoolData[canonical] = {
+            name: canonical,
+            xp: 0,
+            city: s.city || '-',
+            studentsCount: 0
+          };
+        }
+        schoolData[canonical].xp += (s.xp || 0);
+        schoolData[canonical].studentsCount += 1;
+      }
+    });
+    return Object.values(schoolData).sort((a, b) => b.xp - a.xp);
+  }, [students, schoolMap]);
+
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -857,310 +878,612 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   }
 
   return (
-    <div className="flex h-screen bg-bg-main text-text-secondary font-sans overflow-hidden">
-      {/* Mobile Header Toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-[60]">
-        <button 
-          onClick={() => setIsSidebarOpen(true)}
-          className="p-3 bg-bg-card border border-border-color rounded-xl text-brand-primary"
-          title="Abrir menu"
-          aria-label="Abrir menu"
-        >
-          <PanelLeftClose size={24} />
-        </button>
-      </div>
+    <div className="flex flex-col h-screen bg-bg-main text-text-secondary font-sans overflow-hidden">
+      {/* Top Header Bar (Navy Blue) */}
+      <header className="h-16 md:h-20 bg-[#0b192c] border-b border-white/5 flex items-center justify-between px-6 md:px-12 shrink-0 z-50">
+        <div className="flex items-center gap-6">
+          <div className="text-white flex items-center">
+            <Logo className="h-8 md:h-10 justify-start" />
+          </div>
+          {/* Admin Mode Badge */}
+          <div className="hidden sm:flex bg-yellow-500/10 border border-yellow-500/20 px-3 py-1 rounded-lg items-center gap-1.5">
+            <ShieldCheck size={14} className="text-yellow-500" />
+            <span className="text-[10px] font-black tracking-wide text-yellow-500">Super-admin Neva Pro</span>
+          </div>
+        </div>
 
+        {/* Navigation Tabs (Horizontal Menu) */}
+        <nav className="hidden md:flex items-center gap-1.5 font-bold">
+          <button 
+            onClick={() => setActiveTab('panorama')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'panorama' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <LayoutGrid size={16} />
+            Painel
+          </button>
+          <button 
+            onClick={() => setActiveTab('eventos')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'eventos' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Calendar size={16} />
+            Eventos
+            {eventos.length > 0 && (
+              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{eventos.length}</span>
+            )}
+          </button>
+          <button 
+            onClick={() => setActiveTab('materiais')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'materiais' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Library size={16} />
+            Materiais
+            {materials.length > 0 && (
+              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{materials.length}</span>
+            )}
+          </button>
+          <button 
+            onClick={() => setActiveTab('mural')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'mural' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Megaphone size={16} />
+            Mural
+            {recados.length > 0 && (
+              <span className="bg-white/10 text-white text-[9px] px-1.5 py-0.5 rounded-md">{recados.length}</span>
+            )}
+          </button>
+          <button 
+            onClick={() => setActiveTab('alunos')} 
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'alunos' 
+                ? 'bg-white/10 text-white' 
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Users size={16} />
+            Alunos
+          </button>
+        </nav>
+
+        {/* User Info / Profile & Logout */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white">
+            <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white">
+              {user.name?.charAt(0) || 'A'}
+            </div>
+            <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
+          </div>
+
+          <button 
+            onClick={onLogout}
+            className="p-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-500 transition-all cursor-pointer"
+            title="Sair do sistema"
+          >
+            <LogOut size={16} />
+          </button>
+
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="md:hidden p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer"
+            title="Alternar menu"
+            aria-label="Alternar menu"
+          >
+            <PanelLeftClose size={18} className={isSidebarOpen ? "" : "rotate-180"} />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Drawer (Sidebar on mobile when clicked hamburger) */}
       <AnimatePresence>
         {isSidebarOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[55]"
-          />
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] mt-16 md:mt-20"
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="md:hidden fixed inset-y-0 left-0 w-72 bg-[#0b192c] border-r border-white/5 flex flex-col z-[60] mt-16 md:mt-20 p-6 space-y-4"
+            >
+              <div className="text-[10px] font-black text-slate-400 opacity-50 tracking-wide uppercase mb-2">Navegação</div>
+              <button 
+                onClick={() => { setActiveTab('panorama'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'panorama' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <LayoutGrid size={18} /> Panorama
+              </button>
+              <button 
+                onClick={() => { setActiveTab('eventos'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'eventos' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <Calendar size={18} /> Eventos
+              </button>
+              <button 
+                onClick={() => { setActiveTab('materiais'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'materiais' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <Library size={18} /> Materiais
+              </button>
+              <button 
+                onClick={() => { setActiveTab('mural'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'mural' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <Megaphone size={18} /> Mural
+              </button>
+              <button 
+                onClick={() => { setActiveTab('alunos'); setIsSidebarOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'alunos' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <Users size={18} /> Alunos
+              </button>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 w-72 md:w-80 bg-bg-sidebar border-r border-border-color flex flex-col z-[60] transition-transform duration-500 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="p-8 pt-10">
-          <div className="flex justify-between lg:justify-center items-center mb-10">
-             <div className="text-text-main flex lg:justify-center lg:w-full"><Logo className="h-10 md:h-12 lg:h-14 justify-center w-full" /></div>
-            <button 
-              className="lg:hidden text-text-secondary w-10 h-10 flex items-center justify-center bg-bg-main border border-border-color rounded-xl" 
-              onClick={() => setIsSidebarOpen(false)}
-              title="Fechar menu"
-              aria-label="Fechar menu"
-            >
-              <PanelLeftClose size={20} className="rotate-180" />
-            </button>
-          </div>
-          
-          <div className="mb-12">
-            <div className="bg-yellow-500/10 border border-yellow-500/20 px-4 py-2.5 rounded-xl flex items-center gap-2.5">
-              <ShieldCheck size={16} className="text-yellow-600 dark:text-yellow-400" />
-              <span className="text-[11px] font-black tracking-wide text-yellow-600 dark:text-yellow-400">Admin Mode</span>
-            </div>
-          </div>
-
-          <nav className="space-y-1.5 font-bold">
-            <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide mb-4 ml-4">Geral</div>
-            
-            <SidebarItem 
-              active={activeTab === 'panorama'} 
-              onClick={() => { setActiveTab('panorama'); setIsSidebarOpen(false); }} 
-              icon={<LayoutGrid size={20} />} 
-              label="Panorama" 
-              activeColor="text-brand-primary"
-              activeBgColor="bg-brand-primary/10"
-            />
-            
-            <SidebarItem 
-              active={activeTab === 'eventos'} 
-              onClick={() => { setActiveTab('eventos'); setIsSidebarOpen(false); }} 
-              icon={<Calendar size={20} />} 
-              label="Eventos" 
-              count={eventos.length}
-              activeColor="text-purple-500"
-              activeBgColor="bg-purple-500/10"
-            />
-            
-            <SidebarItem 
-              active={activeTab === 'materiais'} 
-              onClick={() => { setActiveTab('materiais'); setIsSidebarOpen(false); }} 
-              icon={<Library size={20} />} 
-              label="Materiais" 
-              count={materials.length}
-              activeColor="text-blue-500"
-              activeBgColor="bg-blue-500/10"
-            />
-            
-            <SidebarItem 
-              active={activeTab === 'mural'} 
-              onClick={() => { setActiveTab('mural'); setIsSidebarOpen(false); }} 
-              icon={<Megaphone size={20} />} 
-              label="Mural" 
-              count={recados.length}
-              activeColor="text-orange-500"
-              activeBgColor="bg-orange-500/10"
-            />
-            
-            <SidebarItem 
-              active={activeTab === 'alunos'} 
-              onClick={() => { setActiveTab('alunos'); setIsSidebarOpen(false); }} 
-              icon={<Users size={20} />} 
-              label="Alunos" 
-              activeColor="text-slate-400"
-              activeBgColor="bg-slate-400/10"
-            />
-          </nav>
-        </div>
-
-        <div className="mt-auto p-8">
-          <button 
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-6 py-4 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-2xl text-red-500 font-bold text-sm transition-all shadow-sm"
-          >
-            <LogOut size={18} />
-            Sair do sistema
-          </button>
-        </div>
-      </aside>
-
       <main className="flex-1 overflow-y-auto bg-bg-main relative">
         <div className="p-6 md:p-12 max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-12 gap-8 lg:gap-12">
-            <div className="pt-10 lg:pt-0">
-              <div className="flex flex-wrap items-center gap-3 mb-6">
-                <div className="flex items-center gap-2 bg-brand-primary/10 px-3 py-1.5 rounded-full">
-                  <div className="w-2 h-2 rounded-full bg-brand-primary animate-pulse" />
-                  <span className="text-[10px] font-black text-brand-primary tracking-wide leading-none">Live</span>
-                  <span className="text-[10px] font-bold text-text-secondary tracking-wide leading-none">Admin</span>
+          {activeTab === 'panorama' ? (
+            <>
+              {/* Header Title Section */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-600 shrink-0 shadow-sm">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-black text-text-main tracking-tight leading-none mb-1.5 flex items-center gap-2">Painel Neva Pro</h1>
+                    <p className="text-xs text-text-secondary font-medium">Visão geral do Neva Pro — KPIs, crescimento e alertas em tempo real.</p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-text-secondary opacity-50 tracking-wide whitespace-nowrap">Painel Operacional</span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-black text-text-main tracking-tight leading-none mb-4">Backoffice</h1>
-              <p className="text-text-secondary font-medium max-w-xl text-sm leading-relaxed opacity-80">
-                Coordene estrategicamente o projeto, centralizando eventos, conteúdos e avisos para toda a comunidade estudantil do Neva Pro.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 w-full lg:w-auto">
-              <button 
-                onClick={() => setShowModal('recado')}
-                className="bg-brand-primary hover:bg-brand-secondary text-white px-8 py-4 rounded-2xl font-black text-xs tracking-wide shadow-lg shadow-brand-primary/20 transition-all flex items-center justify-center gap-3 flex-1 sm:flex-none lg:min-w-[220px]"
-              >
-                <Megaphone size={18} />
-                Novo Recado
-              </button>
-              <div className="flex gap-3 flex-1 sm:flex-none">
                 <button 
-                  onClick={() => setShowModal('material')}
-                  className="flex-1 px-6 py-4 bg-bg-card border border-border-color hover:bg-text-main/5 rounded-2xl text-text-secondary font-bold text-xs flex items-center justify-center gap-3 transition-all"
+                  onClick={() => setActiveTab('alunos')}
+                  className="bg-bg-card border border-border-color hover:bg-slate-50 dark:hover:bg-slate-800 text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
-                  <Plus size={18} />
-                  Material
-                </button>
-                <button 
-                  onClick={() => setShowModal('evento')}
-                  className="flex-1 px-6 py-4 bg-bg-card border border-border-color hover:bg-text-main/5 rounded-2xl text-text-secondary font-bold text-xs flex items-center justify-center gap-3 transition-all"
-                >
-                  <Calendar size={18} />
-                  Evento
+                  <Users size={15} />
+                  Ver alunos
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 md:gap-8 mb-12">
-            <StatCard 
-              label="Eventos organizados" 
-              value={eventos.length} 
-              icon={<Calendar className="text-purple-500" size={20} />} 
-              tag="Agenda ativa"
-            />
-            <StatCard 
-              label="Materiais disponíveis" 
-              value={materials.length} 
-              icon={<Library className="text-blue-500" size={20} />} 
-              tag="Biblioteca"
-            />
-            <StatCard 
-              label="Recados publicados" 
-              value={recados.length} 
-              icon={<Megaphone className="text-orange-500" size={20} />} 
-              tag="Mural ativo"
-            />
-            <StatCard 
-              label="Próxima ação" 
-              value={nextEvent ? nextEvent.title : "--"} 
-              icon={<Clock className={nextEvent ? "text-pink-500" : "text-text-secondary opacity-40"} size={20} />} 
-              tag={nextEvent ? `Ação: ${formatDateToBR(nextEvent.date)} às ${nextEvent.time}` : "Sem agendamento"}
-            />
-          </div>
+              {/* Two Large Configuration Cards (Top Grid) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                {/* Column 1 (Left - 40% width / lg:col-span-5) */}
+                <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-text-main mb-1.5">Cobrança de assinaturas</h3>
+                    <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Provedor das NOVAS assinaturas — não afeta as já criadas</p>
+                    
+                    {/* Sub-selector pills mimicking photo */}
+                    <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
+                      <button 
+                        onClick={() => setShowModal('material')}
+                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                      >
+                        <Library size={14} className="text-blue-500" />
+                        Material / Biblioteca
+                      </button>
+                      <button 
+                        onClick={() => setShowModal('recado')}
+                        className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer"
+                      >
+                        <Megaphone size={14} />
+                        Mural / Avisos
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
+                    PIX Automático (Pluggy) é o padrão. Trocar para Pagar.me reativa cartão/boleto nas próximas assinaturas.
+                  </p>
+                </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {activeTab === 'panorama' ? (
-              <>
+                {/* Column 2 (Right - 60% width / lg:col-span-7) */}
+                <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <h3 className="text-base font-black text-text-main mb-1.5">Recebedor master (assinatura via PIX)</h3>
+                  <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-4">Conta da Mytia que recebe as mensalidades dos clientes</p>
+
+                  {/* Warning Box */}
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-lg flex items-center gap-2 mb-4 w-fit">
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-yellow-600 dark:text-yellow-400">Recebedor não configurado</span>
+                  </div>
+
+                  {/* Form Fields styled like the photo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-1">
+                      <label htmlFor="master-cnpj" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">CNPJ</label>
+                      <input 
+                        id="master-cnpj"
+                        type="text" 
+                        readOnly 
+                        value="00.000.000/0001-00" 
+                        placeholder="CNPJ"
+                        title="CNPJ do Recebedor"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="master-titular" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Titular</label>
+                      <input 
+                        id="master-titular"
+                        type="text" 
+                        readOnly 
+                        value="Razão social" 
+                        placeholder="Titular"
+                        title="Titular da Conta"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-secondary font-bold focus:outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 space-y-1">
+                      <label htmlFor="master-banco" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Banco (instituição)</label>
+                      <select 
+                        id="master-banco"
+                        disabled 
+                        title="Banco da Conta"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-secondary font-bold focus:outline-none appearance-none"
+                      >
+                        <option>Selecione o banco...</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="master-agencia" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Agência</label>
+                      <input 
+                        id="master-agencia"
+                        type="text" 
+                        readOnly 
+                        value="0001" 
+                        placeholder="Agência"
+                        title="Agência do Banco"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="master-conta" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Conta</label>
+                      <input 
+                        id="master-conta"
+                        type="text" 
+                        readOnly 
+                        value="12345-6" 
+                        placeholder="Número da conta"
+                        title="Número da Conta Bancária"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                      />
+                    </div>
+                    <div className="sm:col-span-2 space-y-1">
+                      <label htmlFor="master-tipo" className="text-[10px] font-black text-text-secondary uppercase opacity-70 tracking-wider">Tipo de conta</label>
+                      <input 
+                        id="master-tipo"
+                        type="text" 
+                        readOnly 
+                        value="Conta corrente" 
+                        placeholder="Tipo de conta"
+                        title="Tipo de Conta Bancária"
+                        className="w-full bg-bg-main border border-border-color rounded-xl px-4 py-2.5 text-xs text-text-main font-bold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3">
+                    <button className="bg-bg-main border border-border-color hover:bg-slate-100 dark:hover:bg-slate-800 text-text-main font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed opacity-50">
+                      Salvar dados
+                    </button>
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed shadow-sm">
+                      Criar/validar recebedor
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stat Cards Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+                {/* KPI 1: MRR */}
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MRR</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">R$ 0,00</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                      <Library size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
+                    <span>0 Assinaturas ativas</span>
+                  </div>
+                </div>
+
+                {/* KPI 2: Empresas */}
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">EMPRESAS</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">{students.length}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
+                      <Users size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{students.length} no total - 4 novas em 30d</span>
+                    <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      ↗ 100.0%
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI 3: Volume Processado */}
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">VOLUME PROCESSADO</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">R$ 478k</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
+                      <Calendar size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">138 créditos - 48 ativos</span>
+                    <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      ↘ 59.0%
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI 4: Alertas */}
+                <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALERTAS</span>
+                      <span className="text-2xl font-black text-text-main leading-none block">4</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
+                      <Megaphone size={18} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color/30">
+                    <span>Ações pendentes</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Charts & Rankings Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+                {/* Column 1 (Left - 8 cols) */}
                 <div className="lg:col-span-8 space-y-8">
-                  <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-6 md:p-10 relative overflow-hidden">
-                    <div className="flex flex-col sm:flex-row justify-between items-start mb-12 gap-4">
-                      <div>
-                        <h3 className="text-xl font-black text-text-main mb-2">Produção dos últimos 7 dias</h3>
-                        <p className="text-sm text-text-secondary font-medium">Atividade do time editorial.</p>
-                      </div>
-                      <div className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary px-4 py-1.5 rounded-full text-[10px] font-black tracking-wider leading-none">Análise</div>
+                  {/* Chart 1: Crescimento de empresas */}
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-black text-text-main mb-1">Crescimento de empresas</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Novas empresas por mês (últimos 6)</p>
                     </div>
 
-                    <div className="flex items-end justify-between h-48 gap-2 md:gap-4 px-2 overflow-hidden pt-4">
-                      {productionStats.length > 0 ? productionStats.map((stat) => {
-                        const maxValue = Math.max(...productionStats.map(s => s.value), 1);
-                        const today = new Date().getDay();
-                        const dayNames = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-                        const isToday = stat.day === dayNames[today];
-                        
-                        return (
-                          <Bar 
-                            key={stat.day} 
-                            day={stat.day} 
-                            value={Math.max(0.1, stat.value / maxValue)} 
-                            label={stat.value.toString()} 
-                            active={isToday}
-                          />
-                        );
-                      }) : (
-                        ['TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM', 'SEG'].map(day => (
-                          <Bar key={day} day={day} value={0.1} label="0" />
-                        ))
-                      )}
+                    <div className="relative h-48 w-full mt-4">
+                      <svg className="w-full h-full" viewBox="0 0 600 180" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+                            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Grid lines */}
+                        <line x1="40" y1="26" x2="580" y2="26" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="40" y1="54.5" x2="580" y2="54.5" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="40" y1="83" x2="580" y2="83" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="40" y1="111.5" x2="580" y2="111.5" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="40" y1="140" x2="580" y2="140" stroke="rgba(255,255,255,0.05)" />
+
+                        {/* Y Axis Text */}
+                        <text x="25" y="30" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">8</text>
+                        <text x="25" y="58.5" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">6</text>
+                        <text x="25" y="87" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">4</text>
+                        <text x="25" y="115.5" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">2</text>
+                        <text x="25" y="144" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">0</text>
+
+                        {/* Area */}
+                        <path d="M 50,140 C 150,140 250,140 310,135 C 370,120 410,52.5 450,52.5 C 490,52.5 510,125 550,140 L 550,140 L 50,140 Z" fill="url(#areaGradient)" />
+
+                        {/* Curve */}
+                        <path d="M 50,140 C 150,140 250,140 310,135 C 370,120 410,52.5 450,52.5 C 490,52.5 510,125 550,140" fill="none" stroke="#2563eb" strokeWidth="2" />
+
+                        {/* X Axis Labels */}
+                        <text x="50" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">fev</text>
+                        <text x="150" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mar</text>
+                        <text x="250" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">abr</text>
+                        <text x="350" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mai</text>
+                        <text x="450" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jun</text>
+                        <text x="550" y="165" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jul</text>
+                      </svg>
                     </div>
                   </div>
 
-                  <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-6 md:p-10">
-                    <div className="flex justify-between items-start mb-10">
-                      <div>
-                        <h3 className="text-xl font-black text-text-main mb-2">Distribuição editorial</h3>
-                        <p className="text-sm text-text-secondary font-medium">Balanço das ações publicadas.</p>
-                      </div>
-                      <div className="bg-text-main/5 border border-border-color text-text-secondary px-4 py-1.5 rounded-full text-[10px] font-black tracking-wider leading-none">Stats</div>
+                  {/* Chart 2: Volume de créditos emitidos */}
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-black text-text-main mb-1">Volume de créditos emitidos</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Por mês — valor total e quantidade</p>
                     </div>
 
-                    <div className="space-y-4 md:space-y-6">
-                      <DistributionRow label="Eventos" info={`${eventos.length} itens no momento`} percent={eventos.length > 0 ? 100 : 0} color={eventos.length > 0 ? "bg-brand-primary" : "bg-text-secondary/20"} />
-                      <DistributionRow label="Materiais" info={`${materials.length} itens no momento`} percent={materials.length > 0 ? 100 : 0} color="bg-brand-primary" />
-                      <DistributionRow label="Recados" info={`${recados.length} itens no momento`} percent={recados.length > 0 ? 100 : 0} color="bg-brand-primary" />
+                    <div className="relative h-48 w-full mt-4">
+                      <svg className="w-full h-full" viewBox="0 0 600 180" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#a855f7" />
+                            <stop offset="100%" stopColor="#7c3aed" />
+                          </linearGradient>
+                        </defs>
+
+                        {/* Grid lines */}
+                        <line x1="50" y1="30" x2="580" y2="30" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="50" y1="70" x2="580" y2="70" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="50" y1="110" x2="580" y2="110" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                        <line x1="50" y1="150" x2="580" y2="150" stroke="rgba(255,255,255,0.05)" />
+
+                        {/* Y Axis Text */}
+                        <text x="35" y="34" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 100k</text>
+                        <text x="35" y="74" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 75k</text>
+                        <text x="35" y="114" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="end">R$ 50k</text>
+
+                        {/* Bars */}
+                        <rect x="75" y="100" width="30" height="50" rx="3" fill="url(#barGradient)" />
+                        <rect x="155" y="80" width="30" height="70" rx="3" fill="url(#barGradient)" />
+                        <rect x="235" y="50" width="30" height="100" rx="3" fill="url(#barGradient)" />
+                        <rect x="315" y="35" width="30" height="115" rx="3" fill="url(#barGradient)" />
+                        <rect x="395" y="60" width="30" height="90" rx="3" fill="url(#barGradient)" />
+                        <rect x="475" y="45" width="30" height="105" rx="3" fill="url(#barGradient)" />
+
+                        {/* X Axis Labels */}
+                        <text x="90" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">fev</text>
+                        <text x="170" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mar</text>
+                        <text x="250" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">abr</text>
+                        <text x="330" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">mai</text>
+                        <text x="410" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jun</text>
+                        <text x="490" y="168" fill="rgba(255,255,255,0.4)" fontSize="9" fontWeight="bold" textAnchor="middle">jul</text>
+                      </svg>
                     </div>
                   </div>
                 </div>
 
-                <div className="lg:col-span-4 space-y-8 pb-10">
-                  <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-6 md:p-10">
-                    <div className="flex justify-between items-start mb-8">
-                      <h3 className="text-xl font-black text-text-main tracking-tight">Recente</h3>
-                      <span className="text-[10px] font-black text-brand-primary tracking-wider">Log</span>
+                {/* Column 2 (Right - 4 cols) */}
+                <div className="lg:col-span-4 space-y-8">
+                  {/* Chart 3: Distribuição de assinaturas */}
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                    <div className="mb-6">
+                      <h3 className="text-sm font-black text-text-main mb-1">Distribuição de assinaturas</h3>
+                      <p className="text-[10px] text-text-secondary font-medium opacity-60">Status atual das contas</p>
                     </div>
-                    <p className="text-text-secondary text-[10px] font-bold tracking-[0.1em] mb-8 leading-none opacity-50">Fluxo de edições.</p>
+
+                    <div className="flex justify-center items-center h-40">
+                      <svg width="120" height="120" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
+                        <circle 
+                          cx="50" 
+                          cy="50" 
+                          r="35" 
+                          fill="none" 
+                          stroke="#3b82f6" 
+                          strokeWidth="12" 
+                          strokeDasharray="140 220" 
+                          strokeDashoffset="0"
+                          transform="rotate(-90 50 50)" 
+                          strokeLinecap="round"
+                        />
+                        <circle 
+                          cx="50" 
+                          cy="50" 
+                          r="35" 
+                          fill="none" 
+                          stroke="#f97316" 
+                          strokeWidth="12" 
+                          strokeDasharray="75 220" 
+                          strokeDashoffset="-142"
+                          transform="rotate(-90 50 50)" 
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </div>
+
+                    <div className="flex justify-center gap-4 text-[10px] font-bold text-text-secondary opacity-80 mt-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 bg-orange-500 rounded-sm shrink-0" />
+                        <span>Aguardando pagamento</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 bg-blue-500 rounded-sm shrink-0" />
+                        <span>Avaliação</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* List 4: Rankings (Empresas em alerta layout) */}
+                  <div className="bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm">
+                    <div className="mb-6 flex justify-between items-start">
+                      <div>
+                        <h3 className="text-sm font-black text-text-main mb-1">Empresas em alerta</h3>
+                        <p className="text-[10px] text-text-secondary font-medium opacity-60">Ações que precisam de atenção</p>
+                      </div>
+                    </div>
 
                     <div className="space-y-4">
-                      {recados.slice(0, 2).map((rec) => (
-                        <ActivityItem key={rec.id} type="Recado" title={rec.title} info={rec.sender} date={rec.date} />
-                      ))}
-                      {materials.slice(0, 1).map((mat) => (
-                        <ActivityItem key={mat.id} type="Material" title={mat.title} info={`${mat.type.toUpperCase()} • ENEM`} date={mat.uploadedAt} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-6 md:p-10">
-                    <div className="flex justify-between items-start mb-8">
-                      <h3 className="text-xl font-black text-text-main tracking-tight">Agendados</h3>
-                      <span className="text-[10px] font-black text-orange-500 tracking-wider">Fila</span>
-                    </div>
-                    <p className="text-text-secondary text-[10px] font-bold tracking-[0.1em] mb-10 leading-none opacity-50">Ações futuras.</p>
-
-                    {eventos.length === 0 ? (
-                      <div className="text-text-secondary font-bold text-sm py-8 opacity-40">Nenhum evento agendado.</div>
-                    ) : (
-                      <div className="space-y-6">
-                        {eventos.map((evt) => (
-                          <div key={evt.id} className="flex items-center justify-between group gap-4 w-full min-w-0">
-                            <div className="flex items-center gap-4 cursor-pointer flex-1 min-w-0">
-                              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-bg-sidebar border border-border-color flex items-center justify-center text-text-secondary group-hover:bg-brand-primary group-hover:text-white transition-all shrink-0">
-                                <Clock size={18} />
+                      {/* Top Students */}
+                      {filteredStudents.slice(0, 3).map((student, idx) => (
+                        <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name}</div>
+                              <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
+                                {idx + 1}º Lugar • {student.xp?.toLocaleString()} XP • {student.city || 'MA'}
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="text-text-main font-bold text-sm mb-1 truncate group-hover:text-brand-primary transition-colors" title={evt.title}>{evt.title}</div>
-                                <div className="text-text-secondary font-bold text-[9px] md:text-[10px] tracking-wider opacity-60 truncate">{formatDateToBR(evt.date)} às {evt.time}</div>
-                              </div>
-                            </div>
-                            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all relative z-[70]">
-                              <button 
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEditEvent(evt); }}
-                                className="p-2 text-text-secondary hover:text-brand-primary transition-colors cursor-pointer"
-                                title="Editar Evento"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              <button 
-                                onClick={(e) => handleDeleteEvent(evt.id, e)}
-                                className="p-2 text-text-secondary hover:text-red-500 transition-colors cursor-pointer"
-                                title="Excluir Evento"
-                              >
-                                <Trash2 size={15} />
-                              </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                          <button 
+                            onClick={() => {
+                              setActiveTab('alunos');
+                              setSearchTerm(student.name || '');
+                            }}
+                            className="text-blue-500 hover:text-blue-600 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                          >
+                            Atuar ↗
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Top Schools */}
+                      {schoolRanking.slice(0, 2).map((school) => (
+                        <div key={school.name} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{school.name}</div>
+                              <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
+                                Escola Destaque • {school.xp?.toLocaleString()} XP • {school.city}
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setActiveTab('alunos');
+                              setFilterSchool(school.name);
+                            }}
+                            className="text-blue-500 hover:text-blue-600 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                          >
+                            Atuar ↗
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </>
-            ) : activeTab === 'eventos' ? (
-              <div className="lg:col-span-12">
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {activeTab === 'eventos' ? (
+                <div className="lg:col-span-12">
                 <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-8 md:p-12">
                    <div className="flex justify-between items-center mb-10">
                       <div>
@@ -1795,7 +2118,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
               </div>
             ) : null}
-          </div>
+            </div>
+          )}
         </div>
       </main>
 
