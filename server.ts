@@ -1417,7 +1417,7 @@ app.get('/api/materials', requireAuth, async (req, res) => {
       subject: mat.subject,
       foco: mat.subject,
       description: mat.description,
-      url: mat.url,
+      url: mat.content_url || mat.url,
       type: mat.type,
       uploadedAt: mat.created_at ? mat.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
     }));
