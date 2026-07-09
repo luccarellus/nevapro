@@ -1,9 +1,3 @@
-﻿<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
----
-
 ## 📖 Sobre o Projeto
 
 A **Neva Pro** é uma plataforma web full-stack voltada para a preparação de estudantes para o **ENEM**, com foco especial no estado do **Maranhão**. Combinando gamificação, inteligência artificial e uma experiência de usuário moderna, a Neva Pro transforma os estudos em uma jornada engajante e eficiente.
