@@ -32,7 +32,7 @@ import { calculateLevelAndProgression } from './utils/xpUtils';
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('neva_dark_mode') !== 'false');
   const [customTheme, setCustomTheme] = useState<string>(() => localStorage.getItem('neva_custom_theme') || 'default');
   const [user, setUser] = useState<UserProfile>({
     id: 'loading',
@@ -129,7 +129,13 @@ export default function App() {
     localStorage.setItem('neva_custom_theme', newTheme);
   };
 
-  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const next = !prev;
+      localStorage.setItem('neva_dark_mode', String(next));
+      return next;
+    });
+  };
   
   const handleLogin = async (loggedUser: UserProfile) => {
     setIsLoggedIn(true);
@@ -275,7 +281,17 @@ export default function App() {
           />
         );
       case 'admin':
-        return user.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Dashboard user={user} onEarnXp={handleEarnXp} />;
+        return user.role === 'admin' ? (
+          <AdminDashboard
+            user={user}
+            onLogout={handleLogout}
+            onUpdateUser={setUser}
+            theme={customTheme}
+            onThemeChange={handleCustomThemeChange}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={toggleDarkMode}
+          />
+        ) : <Dashboard user={user} onEarnXp={handleEarnXp} />;
       case 'profile':
         return (
           <Settings 

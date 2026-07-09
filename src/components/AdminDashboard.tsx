@@ -26,7 +26,10 @@ import {
   Link as LinkIcon,
   BookOpen,
   Trophy,
-  LogOut
+  LogOut,
+  UserCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
@@ -34,6 +37,7 @@ import { eventService } from '../services/eventService';
 import { adminService, AdminActivity, ProductionStat } from '../services/adminService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
+import Settings from './Settings';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import cidadesEscolasData from '../data/cidades_escolas.json';
 
@@ -125,9 +129,22 @@ const getCanonicalSchoolMap = (rawSchools: (string | null | undefined)[]): Recor
 interface AdminDashboardProps {
   user: UserProfile;
   onLogout: () => void;
+  onUpdateUser: (user: UserProfile) => void;
+  theme: string;
+  onThemeChange: (theme: string) => void;
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
 }
 
-export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
+export default function AdminDashboard({
+  user,
+  onLogout,
+  onUpdateUser,
+  theme,
+  onThemeChange,
+  isDarkMode,
+  onToggleDarkMode
+}: AdminDashboardProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [recados, setRecados] = useState<Notice[]>([]);
   const [eventos, setEventos] = useState<StudyEvent[]>([]);
@@ -166,7 +183,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return futureEvents[0]?.evt || null;
   }, [eventos]);
 
-  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos'>('panorama');
+  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos' | 'preferencias'>('panorama');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
@@ -970,16 +987,41 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
             <Users size={16} />
             Alunos
           </button>
+          <button
+            onClick={() => setActiveTab('preferencias')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'preferencias'
+                ? 'bg-white/10 text-white'
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <UserCircle size={16} />
+            Preferencias
+          </button>
         </nav>
 
         {/* User Info / Profile & Logout */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white">
+          <button
+            onClick={onToggleDarkMode}
+            className="p-2.5 bg-bg-card/50 rounded-xl text-text-secondary hover:text-text-main transition-all cursor-pointer"
+            title={isDarkMode ? "Modo Claro" : "Modo Escuro"}
+            aria-label={isDarkMode ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('preferencias')}
+            className="flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-4 py-2 text-white transition-all cursor-pointer"
+            title="Abrir preferencias"
+          >
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white">
               {user.name?.charAt(0) || 'A'}
             </div>
             <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
-          </div>
+          </button>
 
           <button 
             onClick={onLogout}
@@ -1049,6 +1091,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               >
                 <Users size={18} /> Alunos
               </button>
+              <button
+                onClick={() => { setActiveTab('preferencias'); setIsSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'preferencias' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5'}`}
+              >
+                <UserCircle size={18} /> Preferencias
+              </button>
             </motion.aside>
           </>
         )}
@@ -1061,7 +1109,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               {/* Header Title Section */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-text-main/[0.03] border border-text-main/[0.06] flex items-center justify-center text-brand-primary/80 shrink-0 shadow-sm">
                     <ShieldCheck size={22} />
                   </div>
                   <div>
@@ -1071,7 +1119,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
                 <button 
                   onClick={() => setActiveTab('alunos')}
-                  className="bg-bg-card border border-border-color hover:bg-slate-50 dark:hover:bg-slate-800 text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  className="bg-bg-card/60 border border-text-main/[0.06] hover:bg-text-main/[0.04] text-text-main/90 px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <Users size={15} />
                   Ver alunos
@@ -1079,21 +1127,21 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-                <div className="lg:col-span-5 bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                <div className="lg:col-span-5 bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
                   <div>
                     <h3 className="text-base font-black text-text-main mb-1.5">Publicacao para alunos</h3>
                     <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Atalhos para atualizar biblioteca, mural e agenda.</p>
-                    <div className="flex gap-3 bg-bg-main/60 p-1.5 rounded-xl border border-border-color mb-6">
+                    <div className="flex gap-3 bg-bg-main/50 p-1.5 rounded-xl border border-text-main/[0.04] mb-6">
                       <button
                         onClick={() => setShowModal('material')}
-                        className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-bg-sidebar transition-all cursor-pointer"
+                        className="flex-1 bg-text-main/[0.03] border border-text-main/[0.05] py-2.5 rounded-lg text-xs font-black text-text-main/85 shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/[0.06] transition-all cursor-pointer"
                       >
-                        <Library size={14} className="text-brand-primary" />
+                        <Library size={14} className="text-brand-primary/80" />
                         Material
                       </button>
                       <button
                         onClick={() => setShowModal('recado')}
-                        className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer"
+                        className="flex-1 bg-brand-primary/[0.07] border border-brand-primary/15 py-2.5 rounded-lg text-xs font-black text-brand-primary/85 flex items-center justify-center gap-2 hover:bg-brand-primary/12 transition-all cursor-pointer"
                       >
                         <Megaphone size={14} />
                         Mural
@@ -1105,7 +1153,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </p>
                 </div>
 
-                <div className="lg:col-span-7 bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                <div className="lg:col-span-7 bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
                   <div className="flex flex-col sm:flex-row justify-between gap-6 mb-6">
                     <div>
                       <h3 className="text-base font-black text-text-main mb-1.5">Resumo academico</h3>
@@ -1113,7 +1161,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     </div>
                     <button
                       onClick={() => setShowModal('evento')}
-                      className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider hover:bg-brand-primary hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      className="bg-brand-primary/[0.07] text-brand-primary/85 border border-brand-primary/15 px-4 py-2.5 rounded-xl font-black text-[10px] tracking-wider hover:bg-brand-primary/15 hover:text-brand-primary transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Calendar size={14} />
                       Novo evento
@@ -1121,15 +1169,15 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Materiais</p>
                       <p className="text-2xl font-black text-text-main">{materials.length}</p>
                     </div>
-                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Avisos</p>
                       <p className="text-2xl font-black text-text-main">{recados.length}</p>
                     </div>
-                    <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                    <div className="bg-bg-main/35 border border-text-main/[0.04] rounded-2xl p-4">
                       <p className="text-[10px] font-black text-text-secondary uppercase opacity-60 mb-2">Eventos</p>
                       <p className="text-2xl font-black text-text-main">{eventos.length}</p>
                     </div>
@@ -1269,13 +1317,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               {/* Stat Cards Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
                 {/* KPI 1: Alunos ativos */}
-                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ALUNOS ATIVOS</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{activeStudentsCount}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
                       <Users size={18} />
                     </div>
                   </div>
@@ -1285,32 +1333,32 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
 
                 {/* KPI 2: XP total */}
-                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP TOTAL</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
                       <Trophy size={18} />
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border-color/30">
                     <span className="text-[10px] font-bold text-text-secondary opacity-60">{averageXp.toLocaleString()} XP de media</span>
-                    <span className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                    <span className="bg-brand-primary/[0.06] border border-brand-primary/15 text-brand-primary/85 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       REDE
                     </span>
                   </div>
                 </div>
 
                 {/* KPI 3: Top aluno */}
-                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">TOP ALUNO</span>
                       <span className="text-2xl font-black text-text-main leading-none block truncate max-w-[170px]" title={topStudent?.name || '-'}>{topStudent?.name || '-'}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand-primary/[0.06] border border-brand-primary/15 flex items-center justify-center text-brand-primary/80 shrink-0">
                       <Activity size={18} />
                     </div>
                   </div>
@@ -1320,13 +1368,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
 
                 {/* KPI 4: Escolas */}
-                <div className="bg-bg-card/70 border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
+                <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px]">
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
                     </div>
-                    <div className="w-9 h-9 rounded-xl bg-bg-sidebar border border-border-color flex items-center justify-center text-brand-primary shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-bg-sidebar/60 border border-text-main/[0.05] flex items-center justify-center text-brand-primary/80 shrink-0">
                       <Library size={18} />
                     </div>
                   </div>
@@ -1341,7 +1389,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 {/* Column 1 (Left - 8 cols) */}
                 <div className="lg:col-span-8 space-y-8">
                   {/* Chart 1: Alunos mais engajados */}
-                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Alunos mais engajados</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Ranking por XP acumulado</p>
@@ -1361,7 +1409,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                           >
                             <div className="flex items-center justify-between gap-4 mb-2">
                               <div className="flex items-center gap-3 min-w-0">
-                                <span className="w-7 h-7 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black flex items-center justify-center shrink-0">
+                                <span className="w-7 h-7 rounded-lg bg-brand-primary/[0.06] border border-brand-primary/15 text-brand-primary/80 text-[10px] font-black flex items-center justify-center shrink-0">
                                   {idx + 1}
                                 </span>
                                 <div className="min-w-0">
@@ -1369,10 +1417,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                                   <p className="text-[9px] font-bold text-text-secondary opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola nao informada'}</p>
                                 </div>
                               </div>
-                              <span className="text-[10px] font-black text-brand-primary shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
+                              <span className="text-[10px] font-black text-brand-primary/85 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
                             </div>
-                            <div className="h-2 bg-bg-sidebar rounded-full overflow-hidden border border-border-color/40">
-                              <div className="h-full bg-brand-primary rounded-full transition-all group-hover:bg-brand-secondary" style={{ width: `${percentage}%` }} />
+                            <div className="h-2 bg-bg-sidebar/70 rounded-full overflow-hidden border border-text-main/[0.04]">
+                              <div className="h-full bg-brand-primary/70 rounded-full transition-all group-hover:bg-brand-primary/90" style={{ width: `${percentage}%` }} />
                             </div>
                           </button>
                         );
@@ -1386,7 +1434,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </div>
 
                   {/* Chart 2: Escolas mais engajadas */}
-                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Escolas mais engajadas</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Soma de XP dos alunos por escola</p>
@@ -1406,8 +1454,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                             className="h-full flex flex-col justify-end gap-3 group min-w-0"
                           >
                             <div className="flex-1 w-full flex items-end">
-                              <div className="w-full bg-bg-sidebar rounded-xl border border-border-color overflow-hidden flex items-end min-h-[44px]">
-                                <div className="w-full bg-brand-primary/80 group-hover:bg-brand-primary transition-colors" style={{ height: `${height}%` }} />
+                              <div className="w-full bg-bg-sidebar/70 rounded-xl border border-text-main/[0.04] overflow-hidden flex items-end min-h-[44px]">
+                                <div className="w-full bg-brand-primary/55 group-hover:bg-brand-primary/75 transition-colors" style={{ height: `${height}%` }} />
                               </div>
                             </div>
                             <div className="min-h-[48px]">
@@ -1424,7 +1472,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 {/* Column 2 (Right - 4 cols) */}
                 <div className="lg:col-span-4 space-y-8">
                   {/* Chart 3: Distribuicao de engajamento */}
-                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6">
                       <h3 className="text-sm font-black text-text-main mb-1">Distribuicao de engajamento</h3>
                       <p className="text-[10px] text-text-secondary font-medium opacity-60">Alunos com XP registrado na plataforma</p>
@@ -1452,7 +1500,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                     <div className="flex justify-center gap-4 text-[10px] font-bold text-text-secondary opacity-80 mt-4">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-brand-primary rounded-sm shrink-0" />
+                        <span className="w-2.5 h-2.5 bg-brand-primary/70 rounded-sm shrink-0" />
                         <span>{activeStudentsCount} ativos</span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -1463,7 +1511,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </div>
 
                   {/* List 4: Rankings */}
-                  <div className="bg-bg-card/70 border border-border-color rounded-[24px] p-6 shadow-sm">
+                  <div className="bg-bg-card/45 border border-text-main/[0.05] rounded-[24px] p-6 shadow-sm">
                     <div className="mb-6 flex justify-between items-start">
                       <div>
                         <h3 className="text-sm font-black text-text-main mb-1">Destaques da rede</h3>
@@ -1476,7 +1524,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       {filteredStudents.slice(0, 3).map((student, idx) => (
                         <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color/30 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />
+                            <span className="w-2 h-2 rounded-full bg-brand-primary/70 shrink-0" />
                             <div className="min-w-0 flex-1">
                               <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name}</div>
                               <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5">
@@ -1489,7 +1537,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                               setActiveTab('alunos');
                               setSearchTerm(student.name || '');
                             }}
-                            className="text-brand-primary hover:text-brand-secondary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-brand-primary/80 hover:text-brand-primary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
                             Ver aluno
                           </button>
@@ -1513,7 +1561,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                               setActiveTab('alunos');
                               setFilterSchool(school.name);
                             }}
-                            className="text-brand-primary hover:text-brand-secondary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
+                            className="text-brand-primary/80 hover:text-brand-primary transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer"
                           >
                             Ver escola
                           </button>
@@ -1524,6 +1572,14 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
               </div>
             </>
+          ) : activeTab === 'preferencias' ? (
+            <Settings
+              user={user}
+              onUpdateUser={onUpdateUser}
+              onClose={() => setActiveTab('panorama')}
+              theme={theme}
+              onThemeChange={onThemeChange}
+            />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {activeTab === 'eventos' ? (
