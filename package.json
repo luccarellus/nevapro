@@ -18,6 +18,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1083.0",
     "@google/genai": "^1.29.0",
     "@nestjs/common": "^11.1.21",
     "@nestjs/core": "^11.1.21",

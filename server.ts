@@ -1381,8 +1381,10 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const filename = `${baseName}-${uniqueSuffix}${fileExt}`;
 
+    const bucketName = process.env.B2_BUCKET_NAME || 'materials';
+
     const { data, error } = await dbAdmin.storage
-      .from('materials')
+      .from(bucketName)
       .upload(filename, file.buffer, {
         contentType: file.mimetype,
         cacheControl: '3600',
@@ -1394,11 +1396,9 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
       return res.status(500).json({ error: 'Erro ao fazer upload no Storage: ' + error.message });
     }
 
-    const { data: { publicUrl } } = dbAdmin.storage
-      .from('materials')
-      .getPublicUrl(filename);
+    const proxyUrl = `/api/storage/object?file=${encodeURIComponent(filename)}`;
 
-    res.json({ url: publicUrl });
+    res.json({ url: proxyUrl });
   } catch (error: any) {
     console.error('[POST /api/upload] Error:', error);
     res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + error.message });
@@ -2103,6 +2103,47 @@ app.post('/api/lgpd/consent-log', (req, res) => {
   // Retorna 200 OK para evitar erro de 404 no console do navegador
   console.log('[LGPD] Consent preferences received:', req.body);
   res.json({ success: true });
+});
+
+// STORAGE PROXY (Private Bucket Access via Backblaze B2)
+app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
+  const filePath = req.query.file as string;
+  if (!filePath) {
+    return res.status(400).json({ error: 'Parâmetro file é obrigatório.' });
+  }
+
+  // Proteção contra path traversal
+  if (filePath.includes('..') || filePath.includes('\\') || filePath.startsWith('/')) {
+    return res.status(400).json({ error: 'Caminho de arquivo inválido.' });
+  }
+
+  try {
+    const bucketName = process.env.B2_BUCKET_NAME || 'materials';
+    const { data, error } = await dbAdmin.storage
+      .from(bucketName)
+      .getObject(filePath);
+
+    if (error || !data) {
+      console.error('[Storage] GetObject error:', error);
+      return res.status(500).json({ error: 'Erro ao buscar arquivo no Storage.' });
+    }
+
+    const { stream, contentType } = data;
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+
+    // O stream do S3 pode ser um ReadableStream ou Buffer - converte para buffer
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error('[GET /api/storage/object] Error:', error);
+    res.status(500).json({ error: 'Erro ao servir arquivo.' });
+  }
 });
 
 // Rota de Health Check para o Docker Compose

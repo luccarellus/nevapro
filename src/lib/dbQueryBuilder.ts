@@ -1,8 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { query } from './db.js';
 
 let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
 let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
+let s3Client: S3Client | null = null;
+
+function getB2Client() {
+  if (s3Client) return s3Client;
+
+  const endpoint = process.env.B2_ENDPOINT;
+  const accessKeyId = process.env.B2_KEY_ID;
+  const secretAccessKey = process.env.B2_APPLICATION_KEY;
+
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    throw new Error('Configurações do Backblaze B2 (B2_ENDPOINT, B2_KEY_ID, B2_APPLICATION_KEY) são obrigatórias.');
+  }
+
+  s3Client = new S3Client({
+    endpoint: endpoint,
+    region: endpoint.split('.')[1] || 'us-east-005',
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
+
+  return s3Client;
+}
+
 
 export function getSupabaseAdminClient() {
   if (supabaseAdminClient) return supabaseAdminClient;
@@ -265,14 +292,43 @@ export const dbAdmin = {
   },
   storage: {
     from(bucket: string) {
-      const storageBucket = getSupabaseAdminClient().storage.from(bucket);
       return {
         async upload(path: string, file: any, options?: any) {
-          const { data, error } = await storageBucket.upload(path, file, options);
-          return { data, error };
+          try {
+            const client = getB2Client();
+            const command = new PutObjectCommand({
+              Bucket: bucket,
+              Key: path,
+              Body: file,
+              ContentType: options?.contentType || 'application/octet-stream',
+            });
+            await client.send(command);
+            return { data: { path }, error: null };
+          } catch (error: any) {
+            console.error('[B2 Storage] Upload error:', error);
+            return { data: null, error };
+          }
         },
         getPublicUrl(path: string, options?: any) {
-          return storageBucket.getPublicUrl(path, options);
+          const endpointHost = process.env.B2_ENDPOINT?.replace(/^https?:\/\//, '');
+          const publicUrl = `https://${bucket}.${endpointHost}/${path}`;
+          return { data: { publicUrl } };
+        },
+        async getObject(path: string) {
+          try {
+            const client = getB2Client();
+            const command = new GetObjectCommand({
+              Bucket: bucket,
+              Key: path,
+            });
+            const response = await client.send(command);
+            const stream = response.Body;
+            const contentType = response.ContentType || 'application/octet-stream';
+            return { data: { stream, contentType }, error: null };
+          } catch (error: any) {
+            console.error('[B2 Storage] GetObject error:', error);
+            return { data: null, error };
+          }
         }
       };
     }

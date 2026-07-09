@@ -16,17 +16,17 @@
 :root {
   --brand-primary: #00b094;
   --brand-secondary: #00d1b0;
-  --bg-main: #0a0f1a;
-  --bg-card: #1e293b;
-  --bg-card-rgb: 30 41 59;
-  --bg-sidebar: #0f172a;
+  --bg-main: #060a12;
+  --bg-card: #0f1725;
+  --bg-card-rgb: 15 23 37;
+  --bg-sidebar: #080c18;
   --text-main: #ffffff;
   --text-main-rgb: 255 255 255;
-  --text-secondary: #71717a;
+  --text-secondary: #6b7280;
   --border-color: transparent;
   
-  --input-bg: #1e293b;
-  --card-shadow: rgba(0, 0, 0, 0.2);
+  --input-bg: #0f1725;
+  --card-shadow: rgba(0, 0, 0, 0.3);
 }
 
 [data-theme='light'] {

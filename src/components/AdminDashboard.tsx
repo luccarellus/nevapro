@@ -1115,8 +1115,8 @@ export default function AdminDashboard({
                   user.name?.charAt(0) || 'A'
                 )}
               </div>
-              <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
-              <UserCircle size={15} className="text-slate-400" />
+              <span className="hidden sm:inline text-xs font-bold text-text-main">{user.name}</span>
+              <UserCircle size={15} className="text-text-secondary" />
             </button>
 
             <AnimatePresence>
@@ -1326,7 +1326,7 @@ export default function AdminDashboard({
               transition={{ type: 'tween', duration: 0.3 }}
               className="md:hidden fixed inset-y-0 left-0 w-72 bg-bg-sidebar border-r border-border-color flex flex-col z-[60] mt-16 md:mt-20 p-6 space-y-4"
             >
-              <div className="text-[10px] font-black text-slate-400 opacity-50 tracking-wide uppercase mb-2">Navegação</div>
+              <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide uppercase mb-2">Navegação</div>
               <button 
                 onClick={() => { setActiveTab('panorama'); setIsSidebarOpen(false); }} 
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-sm cursor-pointer ${activeTab === 'panorama' ? 'bg-text-main/10 text-text-main' : 'text-text-secondary hover:bg-text-main/5'}`}
@@ -1379,7 +1379,7 @@ export default function AdminDashboard({
                 </div>
                 <button 
                   onClick={() => setActiveTab('alunos')}
-                  className="bg-bg-card border border-border-color hover:bg-slate-800 text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  className="bg-bg-card border border-border-color hover:bg-bg-sidebar text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <Users size={15} />
                   Ver alunos
@@ -1391,7 +1391,7 @@ export default function AdminDashboard({
                 <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
                   <div>
                     <h3 className="text-base font-black text-text-main mb-1.5 font-sans">Configuração do Portal e Recompensas</h3>
-                    <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
+                    <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
                     
                     {/* Sub-selector pills mimicking photo */}
                     <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
@@ -1413,40 +1413,40 @@ export default function AdminDashboard({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black text-slate-400 uppercase">Materiais</span>
+                          <span className="text-[10px] font-black text-text-secondary uppercase">Materiais</span>
                           <span className="text-lg font-black text-text-main">{materials.length}</span>
                         </div>
                         <div className="space-y-1.5">
                           {recentMaterials.length > 0 ? recentMaterials.map(item => (
                             <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
                               <span className="text-text-main truncate">{item.title}</span>
-                              <span className="text-slate-500 shrink-0">{formatShortDate(item.uploadedAt)}</span>
+                              <span className="text-text-secondary shrink-0">{formatShortDate(item.uploadedAt)}</span>
                             </div>
                           )) : (
-                            <span className="text-[10px] font-bold text-slate-500">Nenhum material cadastrado</span>
+                            <span className="text-[10px] font-bold text-text-secondary">Nenhum material cadastrado</span>
                           )}
                         </div>
                       </div>
                       <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-black text-slate-400 uppercase">Recados</span>
+                          <span className="text-[10px] font-black text-text-secondary uppercase">Recados</span>
                           <span className="text-lg font-black text-text-main">{recados.length}</span>
                         </div>
                         <div className="space-y-1.5">
                           {recentRecados.length > 0 ? recentRecados.map(item => (
                             <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
                               <span className="text-text-main truncate">{item.title}</span>
-                              <span className="text-slate-500 shrink-0">{formatShortDate(item.date)}</span>
+                              <span className="text-text-secondary shrink-0">{formatShortDate(item.date)}</span>
                             </div>
                           )) : (
-                            <span className="text-[10px] font-bold text-slate-500">Nenhum recado cadastrado</span>
+                            <span className="text-[10px] font-bold text-text-secondary">Nenhum recado cadastrado</span>
                           )}
                         </div>
                       </div>
                     </div>
                   </div>
                   
-                  <p className="text-[11px] text-slate-400 leading-relaxed font-semibold opacity-70">
+                  <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
                     Conteudos mais recentes do portal e recompensas ficam refletidos aqui automaticamente.
                   </p>
                 </div>
@@ -1460,32 +1460,32 @@ export default function AdminDashboard({
                         <Trophy size={24} className="text-yellow-500" />
                       </div>
                       <h3 className="text-lg font-black text-text-main leading-none font-sans mb-1">Hall da Fama</h3>
-                      <p className="text-[10px] text-slate-400 font-bold opacity-60">Os estudantes que mais se engajaram nessa jornada de estudos.</p>
+                      <p className="text-[10px] text-text-secondary font-bold opacity-60">Os estudantes que mais se engajaram nessa jornada de estudos.</p>
                     </div>
 
                     {/* Podium slots */}
                     <div className="flex justify-center items-end gap-3 mb-6 px-4 h-48">
                       {/* Rank 2 */}
                       <div className="flex-1 flex flex-col items-center h-full justify-end">
-                        <div className="w-full bg-gradient-to-t from-slate-200/5 to-slate-400/20 border border-slate-400/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[60%]">
+                        <div className="w-full bg-gradient-to-t from-text-secondary/5 to-text-secondary/20 border border-border-color rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[60%]">
                           <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                             <div className="relative">
-                              <div className="w-9 h-9 rounded-full bg-bg-main border border-slate-400 flex items-center justify-center font-black text-slate-500 text-xs shadow-lg">
+                              <div className="w-9 h-9 rounded-full bg-bg-main border border-border-color flex items-center justify-center font-black text-text-secondary text-xs shadow-lg">
                                 {displayRanking[1]?.name?.charAt(0) || '?'}
                               </div>
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-400 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-text-secondary text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">
                                 2
                               </div>
                             </div>
                           </div>
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                            <span className="text-xl font-black text-slate-400/10">2º</span>
+                            <span className="text-xl font-black text-text-secondary/10">2º</span>
                           </div>
                           <div className="z-10 text-center px-1 mb-1">
-                            <span className="text-[9px] font-black text-slate-400">{(displayRanking[1]?.xp || 0).toLocaleString()} XP</span>
+                            <span className="text-[9px] font-black text-text-secondary">{(displayRanking[1]?.xp || 0).toLocaleString()} XP</span>
                           </div>
                         </div>
-                        <p className="text-[9px] font-black mt-2 text-center text-slate-400 truncate w-full px-1">
+                        <p className="text-[9px] font-black mt-2 text-center text-text-secondary truncate w-full px-1">
                           {displayRanking[1]?.name || '---'}
                         </p>
                       </div>
@@ -1540,7 +1540,7 @@ export default function AdminDashboard({
                             <span className="text-[9px] font-black text-amber-600">{(displayRanking[2]?.xp || 0).toLocaleString()} XP</span>
                           </div>
                         </div>
-                        <p className="text-[9px] font-black mt-2 text-center text-slate-400 truncate w-full px-1">
+                        <p className="text-[9px] font-black mt-2 text-center text-text-secondary truncate w-full px-1">
                           {displayRanking[2]?.name || '---'}
                         </p>
                       </div>
@@ -1556,18 +1556,18 @@ export default function AdminDashboard({
                           <div className="flex items-center gap-3">
                             <span className={`w-4 font-black text-xs text-center ${
                               index === 0 ? 'text-yellow-500' : 
-                              index === 1 ? 'text-slate-400' : 
+                              index === 1 ? 'text-text-secondary' : 
                               index === 2 ? 'text-amber-750' : 
-                              'text-slate-400 opacity-50'
+                              'text-text-secondary opacity-50'
                             }`}>
                               {index + 1}
                             </span>
-                            <div className="w-8 h-8 rounded-xl bg-bg-main border border-border-color flex items-center justify-center font-black text-slate-400 text-xs">
+                            <div className="w-8 h-8 rounded-xl bg-bg-main border border-border-color flex items-center justify-center font-black text-text-secondary text-xs">
                               {entry.name?.charAt(0) || '?'}
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-bold text-text-main truncate">{entry.name}</div>
-                              <div className="text-[9px] font-bold text-slate-400 opacity-50">Nível {calculateLevelAndProgression(entry.xp || 0).level}</div>
+                              <div className="text-[9px] font-bold text-text-secondary opacity-50">Nível {calculateLevelAndProgression(entry.xp || 0).level}</div>
                             </div>
                           </div>
                           <div className="text-right">
@@ -1576,7 +1576,7 @@ export default function AdminDashboard({
                         </div>
                       ))}
                       {topStudents.length === 0 && (
-                        <div className="h-24 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
+                        <div className="h-24 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">
                           Nenhum aluno cadastrado
                         </div>
                       )}
@@ -1591,14 +1591,14 @@ export default function AdminDashboard({
                 <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{averageXp.toLocaleString()} XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
                       <Library size={18} />
                     </div>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-border-color">
+                  <div className="text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color">
                     <span>Média de engajamento dos alunos</span>
                   </div>
                 </div>
@@ -1607,7 +1607,7 @@ export default function AdminDashboard({
                 <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
@@ -1615,7 +1615,7 @@ export default function AdminDashboard({
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border-color">
-                    <span className="text-[10px] font-bold text-slate-400 opacity-60">{schoolRanking.length} no total - 0 novas em 30d</span>
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{schoolRanking.length} no total - 0 novas em 30d</span>
                     <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       + 100.0%
                     </span>
@@ -1626,7 +1626,7 @@ export default function AdminDashboard({
                 <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()} XP</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
@@ -1634,7 +1634,7 @@ export default function AdminDashboard({
                     </div>
                   </div>
                   <div className="flex justify-between items-center pt-4 border-t border-border-color">
-                    <span className="text-[10px] font-bold text-slate-400 opacity-60">{activeStudentsCount} alunos com XP - {xpGrantingEvents.length} eventos com XP</span>
+                    <span className="text-[10px] font-bold text-text-secondary opacity-60">{activeStudentsCount} alunos com XP - {xpGrantingEvents.length} eventos com XP</span>
                     <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">
                       {xpConfiguredInEvents.toLocaleString()} XP eventos
                     </span>
@@ -1645,14 +1645,14 @@ export default function AdminDashboard({
                 <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
                       <span className="text-2xl font-black text-text-main leading-none block">{recados.length}</span>
                     </div>
                     <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
                       <Megaphone size={18} />
                     </div>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-400 opacity-60 pt-4 border-t border-border-color">
+                  <div className="text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color">
                     <span>Ações acadêmicas pendentes</span>
                   </div>
                 </div>
@@ -1664,11 +1664,11 @@ export default function AdminDashboard({
                 <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
                     <h3 className="text-sm font-black text-text-main mb-1 font-sans">Evolução de alunos</h3>
-                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
+                    <p className="text-[10px] text-text-secondary font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
                   </div>
 
                   <div className="flex-1 w-full relative min-h-[200px] mt-4 flex items-center">
-                    <svg viewBox="0 0 800 200" className="w-full h-full text-slate-500">
+                    <svg viewBox="0 0 800 200" className="w-full h-full text-text-secondary">
                       {/* Grid lines */}
                       <line x1="50" y1="20" x2="800" y2="20" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
                       <line x1="50" y1="55" x2="800" y2="55" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
@@ -1723,7 +1723,7 @@ export default function AdminDashboard({
                 <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
                     <h3 className="text-sm font-black text-text-main mb-1 font-sans">Distribuição de engajamento</h3>
-                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Status atual das contas</p>
+                    <p className="text-[10px] text-text-secondary font-medium opacity-60">Status atual das contas</p>
                   </div>
 
                   <div className="flex justify-center items-center h-52 mt-4">
@@ -1764,7 +1764,7 @@ export default function AdminDashboard({
                     </svg>
                   </div>
 
-                  <div className="flex justify-center gap-6 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-border-color pt-3">
+                  <div className="flex justify-center gap-6 text-[10px] font-bold text-text-secondary opacity-80 mt-4 border-t border-border-color pt-3">
                     <div className="flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 bg-[#f97316] rounded-full shrink-0" />
                       <span>Aguardando atividade</span>
@@ -1783,7 +1783,7 @@ export default function AdminDashboard({
                 <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
                     <h3 className="text-sm font-black text-text-main mb-1 font-sans">Volume de conteúdos criados</h3>
-                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
+                    <p className="text-[10px] text-text-secondary font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
                   </div>
 
                   {/* The Bar Chart itself */}
@@ -1797,7 +1797,7 @@ export default function AdminDashboard({
                       { month: 'jul', count: 12, height: '60%' }
                     ].map((item) => (
                       <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
-                        <span className="text-[9px] font-black text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[9px] font-black text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
                           {item.count}
                         </span>
                         <div className="w-full bg-bg-main border border-border-color rounded-t-lg h-36 flex items-end overflow-hidden">
@@ -1806,7 +1806,7 @@ export default function AdminDashboard({
                             className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-500"
                           />
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mt-1">
                           {item.month}
                         </span>
                       </div>
@@ -1818,7 +1818,7 @@ export default function AdminDashboard({
                 <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
                   <div>
                     <h3 className="text-sm font-black text-text-main mb-1 font-sans">Alunos em alerta</h3>
-                    <p className="text-[10px] text-slate-400 font-medium opacity-60">Sem interacao registrada ha mais de 30 dias</p>
+                    <p className="text-[10px] text-text-secondary font-medium opacity-60">Sem interacao registrada ha mais de 30 dias</p>
                   </div>
 
                   <div className="space-y-4 my-4 overflow-y-auto max-h-56 pr-1">
@@ -1828,7 +1828,7 @@ export default function AdminDashboard({
                           <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 animate-pulse" />
                           <div className="min-w-0 flex-1">
                             <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
-                            <div className="text-[9px] font-semibold text-slate-400 opacity-60 mt-0.5 truncate">
+                            <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5 truncate">
                               {student.school || 'Escola não informada'} • {student.city || 'MA'}
                             </div>
                           </div>
@@ -1845,14 +1845,14 @@ export default function AdminDashboard({
                       </div>
                     ))}
                     {atRiskStudents.length === 0 && (
-                      <div className="h-40 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
+                      <div className="h-40 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">
                         Nenhum aluno em alerta
                       </div>
                     )}
                   </div>
                   
                   <div className="border-t border-border-color pt-3">
-                    <span className="text-[9px] font-bold text-slate-400 opacity-50">
+                    <span className="text-[9px] font-bold text-text-secondary opacity-50">
                       Total de {atRiskStudents.length} alunos sem interacao nos ultimos 30 dias.
                     </span>
                   </div>
