@@ -326,12 +326,14 @@ export default function App() {
             isAdmin={user.role === 'admin'} 
             onTabChange={handleTabChange}
             userEmail={user.email}
+            user={user}
           />
           <Navigation 
             activeTab={activeTab} 
             setActiveTab={handleTabChange} 
             isAdmin={user.role === 'admin'} 
             onLogout={handleLogout}
+            user={user}
           />
         </>
       )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -10,7 +10,9 @@ import {
   CheckCircle2,
   Loader2,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  Camera
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
@@ -41,6 +43,55 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadError, setAvatarUploadError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const userAvatarUrl = user.avatarUrl || user.avatar || '';
+
+  const handleAvatarUpload = async (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setAvatarUploadError('Envie uma imagem PNG, JPG ou GIF.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => null);
+        throw new Error(errorData?.error || 'Falha ao enviar foto.');
+      }
+
+      const uploadData = await uploadRes.json();
+      const avatarUrl = uploadData.url;
+
+      const response = await userService.updateProfile({
+        email: user.email,
+        name: user.name,
+        avatarUrl
+      });
+
+      const updatedUser = { ...user, ...(response.user || {}), avatarUrl };
+      onUpdateUser(updatedUser);
+      localStorage.setItem('neva_student_session', JSON.stringify(updatedUser));
+    } catch (error: any) {
+      setAvatarUploadError(error?.message || 'Não foi possível salvar a foto.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -218,6 +269,68 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
               <h3 className="text-2xl font-black text-text-main mb-10">Seu Perfil</h3>
 
               <div className="space-y-8">
+                {/* Profile Photo */}
+                <div className="flex items-center gap-6">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-white font-black text-2xl overflow-hidden shadow-lg shadow-brand-primary/20">
+                      {userAvatarUrl ? (
+                        <img src={userAvatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        user.name?.charAt(0)?.toUpperCase() || '?'
+                      )}
+                    </div>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-brand-primary text-white flex items-center justify-center shadow-lg shadow-brand-primary/30 hover:bg-brand-primary/80 transition-all disabled:opacity-50"
+                      title="Alterar foto de perfil"
+                    >
+                      {isUploadingAvatar ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Camera size={14} />
+                      )}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/gif"
+                      className="hidden"
+                      onChange={(event) => {
+                        handleAvatarUpload(event.target.files?.[0]);
+                        event.target.value = '';
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-text-main font-black text-sm">Foto de perfil</p>
+                    <p className="text-text-secondary text-[10px] font-bold mt-1">
+                      PNG, JPG ou GIF. Tamanho máximo de 10MB.
+                    </p>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingAvatar}
+                      className={`mt-3 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-wider transition-all ${
+                        isUploadingAvatar
+                          ? 'text-text-secondary opacity-60'
+                          : 'text-brand-primary hover:text-brand-primary/80'
+                      }`}
+                    >
+                      {isUploadingAvatar ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Upload size={12} />
+                      )}
+                      {isUploadingAvatar ? 'Enviando...' : userAvatarUrl ? 'Trocar foto' : 'Enviar foto'}
+                    </button>
+                    {avatarUploadError && (
+                      <p className="mt-2 text-[10px] font-bold text-red-400">{avatarUploadError}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-px bg-border-color/50" />
+
                 {/* Display Name */}
                 <div className="space-y-3">
                   <label htmlFor="settings-display-name" className="text-[12px] font-bold text-text-main ml-1 opacity-70">

@@ -3,14 +3,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon } from 'lucide-react';
 import Logo from './Logo';
 
+import { UserProfile } from '../types';
+
 interface NavigationProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isAdmin?: boolean;
   onLogout?: () => void;
+  user?: UserProfile;
 }
 
-export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout }: NavigationProps) {
+export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout, user }: NavigationProps) {
   const [showMore, setShowMore] = useState(false);
 
   const tabs = [
@@ -92,7 +95,24 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout 
           })}
         </div>
 
-        <div className="mt-auto mb-8 space-y-2">
+        {/* User Info */}
+        <div className="mt-auto mb-4 flex items-center gap-3 px-4 py-3 rounded-2xl bg-text-main/[0.03] border border-border-color/30">
+          <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 bg-brand-primary">
+            {user?.avatarUrl || user?.avatar ? (
+              <img src={user?.avatarUrl || user?.avatar || ''} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white font-black text-xs">
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-text-main font-bold text-xs truncate">{user?.name || 'Usuário'}</p>
+            <p className="text-text-secondary font-bold text-[10px] truncate opacity-60">Nível {user?.level || 0}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
           <button
             onClick={() => setActiveTab('profile')}
             className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all ${

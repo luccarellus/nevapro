@@ -35,6 +35,8 @@ export interface UserProfile {
   isFlashQuizUpdate?: boolean;
   flashQuizCompleted?: boolean;
   xpReason?: string;
+  avatarUrl?: string;
+  avatar?: string;
   created_at?: string;
   updated_at?: string;
 }

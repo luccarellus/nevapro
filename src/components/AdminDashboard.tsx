@@ -36,6 +36,7 @@ import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
 import { eventService } from '../services/eventService';
 import { adminService, AdminActivity, ProductionStat } from '../services/adminService';
+import { userService } from '../services/userService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import Logo from './Logo';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
@@ -151,6 +152,7 @@ interface AdminDashboardProps {
 export default function AdminDashboard({
   user,
   onLogout,
+  onUpdateUser,
   theme,
   onThemeChange,
   isDarkMode,
@@ -347,12 +349,15 @@ export default function AdminDashboard({
       return !lastInteraction || lastInteraction < thirtyDaysAgo;
     });
   }, [filteredStudents]);
+  const adminAvatarUrl = user.avatarUrl || user.avatar || '';
 
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAdminPreferences, setShowAdminPreferences] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUploadError, setAvatarUploadError] = useState('');
 
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -386,6 +391,48 @@ export default function AdminDashboard({
     setMaterialForm({ title: '', type: 'pdf', foco: 'ENEM geral', url: '', description: '' });
     setSelectedFile(null);
     setMuralForm({ title: '', category: 'importante', tag: '', content: '' });
+  };
+
+  const handleAdminAvatarUpload = async (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setAvatarUploadError('Envie uma imagem PNG, JPG ou GIF.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => null);
+        throw new Error(errorData?.error || 'Falha ao enviar foto.');
+      }
+
+      const uploadData = await uploadRes.json();
+      const avatarUrl = uploadData.url;
+      const response = await userService.updateProfile({
+        email: user.email,
+        name: user.name,
+        avatarUrl
+      });
+      const updatedUser = { ...user, ...(response.user || {}), avatarUrl };
+
+      onUpdateUser(updatedUser);
+      localStorage.setItem('neva_student_session', JSON.stringify(updatedUser));
+    } catch (error: any) {
+      setAvatarUploadError(error?.message || 'Nao foi possivel salvar a foto.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleEditEvent = (evt: StudyEvent) => {
@@ -1061,8 +1108,12 @@ export default function AdminDashboard({
               title="Abrir preferencias do admin"
               aria-label="Abrir preferencias do admin"
             >
-              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white">
-                {user.name?.charAt(0) || 'A'}
+              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white overflow-hidden">
+                {adminAvatarUrl ? (
+                  <img src={adminAvatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user.name?.charAt(0) || 'A'
+                )}
               </div>
               <span className="hidden sm:inline text-xs font-bold text-slate-200">{user.name}</span>
               <UserCircle size={15} className="text-slate-400" />
@@ -1089,13 +1140,47 @@ export default function AdminDashboard({
                   >
                     <div className="p-5 border-b border-border-color bg-text-main/[0.03]">
                       <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm">
-                          {user.name?.charAt(0) || 'A'}
+                        <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm overflow-hidden">
+                          {adminAvatarUrl ? (
+                            <img src={adminAvatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            user.name?.charAt(0) || 'A'
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-text-main font-black text-sm truncate">{user.name || 'Administrador'}</p>
                           <p className="text-text-secondary font-bold text-[10px] truncate">{user.email}</p>
                         </div>
+                      </div>
+                      <div className="mt-4">
+                        <input
+                          id="admin-profile-photo"
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/gif"
+                          className="hidden"
+                          onChange={(event) => {
+                            handleAdminAvatarUpload(event.target.files?.[0]);
+                            event.target.value = '';
+                          }}
+                        />
+                        <label
+                          htmlFor="admin-profile-photo"
+                          className={`w-full rounded-xl border border-border-color bg-text-main/5 px-3 py-2.5 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-wider transition-all ${
+                            isUploadingAvatar
+                              ? 'text-text-secondary opacity-60 pointer-events-none'
+                              : 'text-text-main hover:bg-text-main/10 cursor-pointer'
+                          }`}
+                        >
+                          {isUploadingAvatar ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Upload size={13} />
+                          )}
+                          {isUploadingAvatar ? 'Enviando foto' : adminAvatarUrl ? 'Trocar foto de perfil' : 'Enviar foto de perfil'}
+                        </label>
+                        {avatarUploadError && (
+                          <p className="mt-2 text-[10px] font-bold text-red-400">{avatarUploadError}</p>
+                        )}
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <div className="rounded-xl bg-text-main/5 border border-border-color px-3 py-2">

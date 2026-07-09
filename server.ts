@@ -39,7 +39,7 @@ app.use((req, res, next) => {
 });
 
 
-// Evita 304 em rotas dinâmicas da API, garantindo respostas sempre frescas.
+// Evita 304 em rotas dinï¿½micas da API, garantindo respostas sempre frescas.
 app.use('/api', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -233,6 +233,7 @@ const getUserWithRole = (user: any) => {
     role: isAdmin ? 'admin' : 'student',
     showInLeaderboard: user.show_in_leaderboard !== false, // default true
     languagePreference: user.language_preference || 'ingles',
+    avatarUrl: user.avatar_url || user.avatarUrl || user.avatar || '',
     flashQuizCompleted: !!user.flash_quiz_completed
   };
 };
@@ -800,7 +801,8 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
     school: 'school',
     gremio: 'gremio',
     showInLeaderboard: 'show_in_leaderboard',
-    languagePreference: 'language_preference'
+    languagePreference: 'language_preference',
+    avatarUrl: 'avatar_url'
   };
 
   if (req.user.role === 'admin') {
@@ -854,7 +856,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
 
   try {
     const updatePayload = isAdmin
-      ? { name: dbUpdate.name, email: dbUpdate.email, xp: dbUpdate.xp, level: dbUpdate.level, answered_questions: dbUpdate.answered_questions, correct_answers: dbUpdate.correct_answers, streak: dbUpdate.streak }
+      ? { name: dbUpdate.name, email: dbUpdate.email, xp: dbUpdate.xp, level: dbUpdate.level, answered_questions: dbUpdate.answered_questions, correct_answers: dbUpdate.correct_answers, streak: dbUpdate.streak, avatar_url: dbUpdate.avatar_url }
       : dbUpdate;
 
     const { data, error } = await dbAdmin.from(targetTable).update(updatePayload).eq('email', email).select().single();
@@ -877,6 +879,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
           email,
           name: updateData.name || email.split('@')[0],
           role: 'admin',
+          avatar_url: updateData.avatarUrl || '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -1092,7 +1095,7 @@ app.get('/api/leaderboard', async (req, res) => {
   try {
     const { data, error } = await dbAdmin
       .from('users')
-      .select('name, email, city, xp, level, role, show_in_leaderboard');
+      .select('name, email, city, xp, level, role, show_in_leaderboard, avatar_url');
 
     if (error) throw error;
 
@@ -1104,11 +1107,12 @@ app.get('/api/leaderboard', async (req, res) => {
         if (u.show_in_leaderboard === false) return false;
         return true;
       })
-      .map(({ name, city, xp, level }) => ({
+      .map(({ name, city, xp, level, avatar_url }) => ({
         name,
         city,
         xp: xp || 0,
-        level: level || 1
+        level: level || 1,
+        avatarUrl: avatar_url || ''
       }))
       .sort((a, b) => b.xp - a.xp)
       .slice(0, 20);
@@ -1357,7 +1361,7 @@ const upload = multer({
   }
 });
 
-app.post('/api/upload', requireAdmin, (req: any, res: any, next: any) => {
+app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
   upload.single('file')(req, res, (err: any) => {
     if (err) {
       return res.status(400).json({ error: err.message });
@@ -2246,6 +2250,7 @@ if (!process.env.VERCEL) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
+
 
 
 

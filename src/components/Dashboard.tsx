@@ -202,16 +202,32 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
       >
         <header className="mb-10 md:mb-16 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
           <motion.div variants={itemVariants}>
-            <p className="text-brand-primary font-bold mb-2 text-[10px]">Portal de Alta Performance</p>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter text-text-main leading-none">
-              Olá, <span className="text-brand-primary">{userName}</span>
-            </h1>
-            {(user.city || user.school) && (
-              <p className="text-text-secondary text-[10px] font-bold mt-4 opacity-50 flex items-center gap-2">
-                <MapPin size={10} className="text-brand-primary" />
-                {user.city}{user.city && user.school ? ' • ' : ''}{user.school}
-              </p>
-            )}
+            <div className="flex items-center gap-4">
+              {(() => {
+                const avatarUrl = user.avatarUrl || user.avatar || '';
+                return avatarUrl ? (
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl overflow-hidden flex-shrink-0 ring-2 ring-brand-primary/20 shadow-lg shadow-brand-primary/10">
+                    <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-white font-black text-xl md:text-2xl flex-shrink-0 shadow-lg shadow-brand-primary/10">
+                    {user.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                );
+              })()}
+              <div>
+                <p className="text-brand-primary font-bold mb-2 text-[10px]">Portal de Alta Performance</p>
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter text-text-main leading-none">
+                  Olá, <span className="text-brand-primary">{userName}</span>
+                </h1>
+                {(user.city || user.school) && (
+                  <p className="text-text-secondary text-[10px] font-bold mt-4 opacity-50 flex items-center gap-2">
+                    <MapPin size={10} className="text-brand-primary" />
+                    {user.city}{user.city && user.school ? ' • ' : ''}{user.school}
+                  </p>
+                )}
+              </div>
+            </div>
           </motion.div>
           <motion.button 
             variants={itemVariants}

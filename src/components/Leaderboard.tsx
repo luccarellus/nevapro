@@ -75,8 +75,12 @@ export default function Leaderboard({ user }: LeaderboardProps) {
               {/* Floating Avatar with Rank Badge */}
               <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                 <div className="relative">
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-slate-400 flex items-center justify-center font-black text-slate-500 text-sm md:text-lg shadow-lg">
-                    {displayRanking[1]?.name?.charAt(0) || '?'}
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-slate-400 flex items-center justify-center font-black text-slate-500 text-sm md:text-lg shadow-lg overflow-hidden">
+                    {(displayRanking[1] as any)?.avatarUrl ? (
+                      <img src={(displayRanking[1] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      displayRanking[1]?.name?.charAt(0) || '?'
+                    )}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-slate-400 text-white font-extrabold text-[10px] md:text-xs flex items-center justify-center border border-white dark:border-slate-800">
                     2
@@ -114,8 +118,12 @@ export default function Leaderboard({ user }: LeaderboardProps) {
                   <div className="absolute -top-5 md:-top-7 left-1/2 -translate-x-1/2">
                     <Crown size={22} className="text-yellow-500 drop-shadow-[0_2px_4px_rgba(234,179,8,0.4)] md:w-7 md:h-7" />
                   </div>
-                  <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-bg-card border-2 border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-base md:text-2xl shadow-xl">
-                    {displayRanking[0]?.name?.charAt(0) || '?'}
+                  <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-bg-card border-2 border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-base md:text-2xl shadow-xl overflow-hidden">
+                    {(displayRanking[0] as any)?.avatarUrl ? (
+                      <img src={(displayRanking[0] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      displayRanking[0]?.name?.charAt(0) || '?'
+                    )}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 md:w-7 md:h-7 rounded-full bg-yellow-500 text-white font-extrabold text-xs flex items-center justify-center border border-white dark:border-yellow-950">
                     1
@@ -151,8 +159,12 @@ export default function Leaderboard({ user }: LeaderboardProps) {
               {/* Floating Avatar with Rank Badge */}
               <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
                 <div className="relative">
-                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-amber-700 flex items-center justify-center font-black text-amber-700 text-sm md:text-lg shadow-lg">
-                    {displayRanking[2]?.name?.charAt(0) || '?'}
+                  <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-bg-card border-2 border-amber-700 flex items-center justify-center font-black text-amber-700 text-sm md:text-lg shadow-lg overflow-hidden">
+                    {(displayRanking[2] as any)?.avatarUrl ? (
+                      <img src={(displayRanking[2] as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      displayRanking[2]?.name?.charAt(0) || '?'
+                    )}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 md:w-6 md:h-6 rounded-full bg-amber-700 text-white font-extrabold text-[10px] md:text-xs flex items-center justify-center border border-white dark:border-amber-950">
                     3
@@ -197,8 +209,12 @@ export default function Leaderboard({ user }: LeaderboardProps) {
                     }`}>
                       {index + 1}
                     </span>
-                    <div className="w-12 h-12 rounded-2xl bg-bg-sidebar border border-border-color flex items-center justify-center font-black text-text-secondary Transition-colors">
-                      {entry.name?.charAt(0) || '?'}
+                    <div className="w-12 h-12 rounded-2xl bg-bg-sidebar border border-border-color flex items-center justify-center font-black text-text-secondary overflow-hidden Transition-colors">
+                      {(entry as any).avatarUrl ? (
+                        <img src={(entry as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        entry.name?.charAt(0) || '?'
+                      )}
                     </div>
                     <div>
                       <p className={`font-bold tracking-tight ${isMe ? 'text-brand-primary' : 'text-text-main'}`}>{entry.name || 'Estudante'} {isMe && '(Você)'}</p>

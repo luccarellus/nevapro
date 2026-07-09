@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     show_in_leaderboard BOOLEAN DEFAULT true,
     email_notifications BOOLEAN DEFAULT true,
     browser_notifications BOOLEAN DEFAULT true,
+    avatar_url TEXT,
     points INTEGER DEFAULT 0,
     answered_questions INTEGER DEFAULT 0,
     correct_answers INTEGER DEFAULT 0,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
     name VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'admin',
     password_hash VARCHAR(255),
+    avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
