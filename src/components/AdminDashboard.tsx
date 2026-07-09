@@ -1420,7 +1420,7 @@ export default function AdminDashboard({
                               <span className="text-[10px] font-black text-brand-primary/85 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
                             </div>
                             <div className="h-2 bg-bg-sidebar/70 rounded-full overflow-hidden border border-text-main/[0.04]">
-                              <div className="h-full bg-brand-primary/70 rounded-full transition-all group-hover:bg-brand-primary/90" style={{ width: `${percentage}%` }} />
+                              <div ref={(el) => { if (el) el.style.width = `${percentage}%`; }} className="h-full bg-brand-primary/70 rounded-full transition-all group-hover:bg-brand-primary/90" />
                             </div>
                           </button>
                         );
@@ -1455,7 +1455,7 @@ export default function AdminDashboard({
                           >
                             <div className="flex-1 w-full flex items-end">
                               <div className="w-full bg-bg-sidebar/70 rounded-xl border border-text-main/[0.04] overflow-hidden flex items-end min-h-[44px]">
-                                <div className="w-full bg-brand-primary/55 group-hover:bg-brand-primary/75 transition-colors" style={{ height: `${height}%` }} />
+                                <div ref={(el) => { if (el) el.style.height = `${height}%`; }} className="w-full bg-brand-primary/55 group-hover:bg-brand-primary/75 transition-colors" />
                               </div>
                             </div>
                             <div className="min-h-[48px]">
