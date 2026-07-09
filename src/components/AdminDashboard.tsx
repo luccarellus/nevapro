@@ -1158,99 +1158,47 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Column 2 (Right - 60% width / lg:col-span-7) */}
-                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm">
-                  <h3 className="text-base font-black text-white mb-1.5 font-sans">Servidor de Administração (Master API)</h3>
-                  <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-4">Instância de banco de dados que sincroniza os dados escolares</p>
+                <div className="lg:col-span-7 bg-[#121f32] border border-white/5 rounded-[24px] p-6 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-white mb-1.5 font-sans">Alunos mais engajados</h3>
+                    <p className="text-[11px] text-slate-400 font-medium opacity-80 mb-6">Ranking por XP acumulado na plataforma</p>
 
-                  {/* Warning Box */}
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-lg flex items-center gap-2 mb-4 w-fit">
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-yellow-600 dark:text-yellow-400">Servidor principal ativo</span>
-                  </div>
-
-                  {/* Form Fields styled like the photo */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-1">
-                      <label htmlFor="master-cnpj" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">ID DO SERVIDOR</label>
-                      <input 
-                        id="master-cnpj"
-                        type="text" 
-                        readOnly 
-                        value="00.000.000/0001-00" 
-                        placeholder="ID DO SERVIDOR"
-                        title="ID do Servidor"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
-                      />
+                    <div className="space-y-4 max-h-[220px] overflow-y-auto pr-1">
+                      {topStudents.map((student, idx) => {
+                        const percentage = topStudent?.xp ? Math.max(((student.xp || 0) / topStudent.xp) * 100, 4) : 4;
+                        return (
+                          <button
+                            key={student.id}
+                            onClick={() => {
+                              setActiveTab('alunos');
+                              setSearchTerm(student.name || '');
+                            }}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500 text-[10px] font-black flex items-center justify-center shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black text-white truncate">{student.name || 'Aluno sem nome'}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 opacity-60 truncate">{student.city || 'MA'} • {student.school || 'Escola não informada'}</p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black text-blue-500 shrink-0">{(student.xp || 0).toLocaleString()} XP</span>
+                            </div>
+                            <div className="h-2 bg-[#0d1624] rounded-full overflow-hidden border border-white/5">
+                              <div style={{ width: `${percentage}%` }} className="h-full bg-blue-600 rounded-full transition-all group-hover:bg-blue-500" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {topStudents.length === 0 && (
+                        <div className="h-48 flex items-center justify-center text-[10px] font-black text-slate-400 opacity-50">
+                          Nenhum aluno cadastrado
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <label htmlFor="master-titular" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">RESPONSÁVEL / INSTITUIÇÃO</label>
-                      <input 
-                        id="master-titular"
-                        type="text" 
-                        readOnly 
-                        value="Diretoria de Tecnologia" 
-                        placeholder="Titular"
-                        title="Responsável pela Conta"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-bold focus:outline-none"
-                      />
-                    </div>
-                    <div className="sm:col-span-2 space-y-1">
-                      <label htmlFor="master-banco" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">PROTOCOLO DE REDE</label>
-                      <select 
-                        id="master-banco"
-                        disabled 
-                        title="Protocolo de Rede"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-slate-400 font-bold focus:outline-none appearance-none"
-                      >
-                        <option>Selecione o protocolo (HTTPS)...</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="master-agencia" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">PORTA</label>
-                      <input 
-                        id="master-agencia"
-                        type="text" 
-                        readOnly 
-                        value="0001" 
-                        placeholder="Porta"
-                        title="Porta de Rede"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="master-conta" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">IP DO SERVIDOR</label>
-                      <input 
-                        id="master-conta"
-                        type="text" 
-                        readOnly 
-                        value="12345-6" 
-                        placeholder="IP do servidor"
-                        title="IP do Servidor"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
-                      />
-                    </div>
-                    <div className="sm:col-span-2 space-y-1">
-                      <label htmlFor="master-tipo" className="text-[10px] font-black text-slate-400 uppercase opacity-70 tracking-wider">AMBIENTE DE EXECUÇÃO</label>
-                      <input 
-                        id="master-tipo"
-                        type="text" 
-                        readOnly 
-                        value="Produção / Admin" 
-                        placeholder="Ambiente de execução"
-                        title="Ambiente de Execução"
-                        className="w-full bg-[#0d1624] border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white font-bold focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Buttons */}
-                  <div className="flex gap-3">
-                    <button className="bg-[#0d1624] border border-white/5 hover:bg-slate-800 text-slate-400 font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed opacity-50">
-                      Salvar dados
-                    </button>
-                    <button className="bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] tracking-wide uppercase px-6 py-3 rounded-xl transition-all cursor-not-allowed shadow-sm">
-                      Validar credenciais / conexão
-                    </button>
                   </div>
                 </div>
               </div>
@@ -1396,66 +1344,52 @@ export default function AdminDashboard({
                     <p className="text-[10px] text-slate-400 font-medium opacity-60">Status atual das contas</p>
                   </div>
 
-                  <div className="flex justify-center items-center h-40 mt-4 relative">
-                    {(() => {
-                      const activePercent = students.length ? Math.round((activeStudentsCount / students.length) * 100) : 0;
-                      const inactivePercent = 100 - activePercent;
-                      // Circumference = 2 * PI * R. If R = 28, Circumference = 175.9
-                      const circ = 2 * Math.PI * 28;
-                      const activeDash = (activePercent / 100) * circ;
-                      const inactiveDash = circ - activeDash;
+                  <div className="flex justify-center items-center h-44 mt-4">
+                    <svg width="120" height="120" viewBox="0 0 100 100">
+                      {/* Background circle */}
+                      <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
                       
-                      return (
-                        <div className="relative flex justify-center items-center w-[120px] h-[120px]">
-                          <svg width="120" height="120" viewBox="0 0 100 100">
-                            {/* Background circle */}
-                            <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="8" />
-                            {/* Active segment (Blue) */}
-                            <circle 
-                              cx="50" 
-                              cy="50" 
-                              r="28" 
-                              fill="none" 
-                              stroke="#3b82f6"
-                              strokeWidth="8" 
-                              strokeDasharray={`${activeDash} ${circ}`}
-                              strokeDashoffset="0"
-                              transform="rotate(-90 50 50)" 
-                              strokeLinecap="round"
-                            />
-                            {/* Inactive segment (Orange) */}
-                            {inactiveDash > 0 && (
-                              <circle
-                                cx="50"
-                                cy="50"
-                                r="28"
-                                fill="none"
-                                stroke="#f97316"
-                                strokeWidth="8"
-                                strokeDasharray={`${inactiveDash} ${circ}`}
-                                strokeDashoffset={`-${activeDash}`}
-                                transform="rotate(-90 50 50)"
-                                strokeLinecap="round"
-                              />
-                            )}
-                          </svg>
-                          <div className="absolute flex flex-col items-center justify-center">
-                            <span className="text-lg font-black text-white leading-none">{activePercent}%</span>
-                            <span className="text-[7px] font-black text-slate-400 tracking-wider mt-0.5">ATIVOS</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                      {/* Orange segment (Aguardando atividade) - 28% of circle */}
+                      {/* Circumference = 2 * PI * 30 = 188.49 */}
+                      {/* 28% of 188.49 = 52.78 */}
+                      <circle 
+                        cx="50" 
+                        cy="50" 
+                        r="30" 
+                        fill="none" 
+                        stroke="#f97316"
+                        strokeWidth="12" 
+                        strokeDasharray="52.78 188.49"
+                        strokeDashoffset="-135.71"
+                        transform="rotate(-90 50 50)" 
+                        strokeLinecap="round"
+                      />
+
+                      {/* Blue segment (Avaliação) - 72% of circle */}
+                      {/* 72% of 188.49 = 135.71 */}
+                      <circle 
+                        cx="50" 
+                        cy="50" 
+                        r="30" 
+                        fill="none" 
+                        stroke="#3b82f6"
+                        strokeWidth="12" 
+                        strokeDasharray="135.71 188.49"
+                        strokeDashoffset="0"
+                        transform="rotate(-90 50 50)" 
+                        strokeLinecap="round"
+                      />
+                    </svg>
                   </div>
 
-                  <div className="flex justify-center gap-4 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-white/5 pt-3">
+                  <div className="flex justify-center gap-6 text-[10px] font-bold text-slate-400 opacity-80 mt-4 border-t border-white/5 pt-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 bg-[#f97316] rounded-sm shrink-0" />
-                      <span>Inativos (Sem XP)</span>
+                      <span className="w-2.5 h-2.5 bg-[#f97316] rounded-full shrink-0" />
+                      <span>Aguardando atividade</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 bg-[#3b82f6] rounded-sm shrink-0" />
-                      <span>Ativos</span>
+                      <span className="w-2.5 h-2.5 bg-[#3b82f6] rounded-full shrink-0" />
+                      <span>Avaliação</span>
                     </div>
                   </div>
                 </div>
