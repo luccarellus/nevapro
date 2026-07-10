@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     points INTEGER DEFAULT 0,
     answered_questions INTEGER DEFAULT 0,
     correct_answers INTEGER DEFAULT 0,
+    answered_questions INTEGER DEFAULT 0,
+    correct_answers INTEGER DEFAULT 0,
     streak INTEGER DEFAULT 0,
     flash_quiz_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
@@ -37,6 +39,13 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
     role VARCHAR(50) DEFAULT 'admin',
     password_hash VARCHAR(255),
     avatar_url TEXT,
+    auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
+    xp INTEGER DEFAULT 0,
+    level INTEGER DEFAULT 1,
+    answered_questions INTEGER DEFAULT 0,
+    correct_answers INTEGER DEFAULT 0,
+    streak INTEGER DEFAULT 0,
+    flash_quiz_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -85,13 +94,12 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     priority VARCHAR(50),
     type VARCHAR(50),
     is_read BOOLEAN DEFAULT false,
-    read BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- 6. QUESTIONS
 CREATE TABLE IF NOT EXISTS public.questions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(255) PRIMARY KEY,
     subject VARCHAR(255),
     text TEXT NOT NULL,
     image_url TEXT,
@@ -107,7 +115,7 @@ CREATE TABLE IF NOT EXISTS public.questions (
 -- 7. QUESTION_OPTIONS
 CREATE TABLE IF NOT EXISTS public.question_options (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE,
+    question_id VARCHAR(255) REFERENCES public.questions(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
     image_url TEXT,
     letter VARCHAR(10),
@@ -131,7 +139,7 @@ CREATE TABLE IF NOT EXISTS public.simulados (
 CREATE TABLE IF NOT EXISTS public.simulado_questions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     simulado_id UUID REFERENCES public.simulados(id) ON DELETE CASCADE,
-    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE,
+    question_id VARCHAR(255) REFERENCES public.questions(id) ON DELETE CASCADE,
     order_index INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -140,7 +148,7 @@ CREATE TABLE IF NOT EXISTS public.simulado_questions (
 CREATE TABLE IF NOT EXISTS public.answers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
-    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE,
+    question_id VARCHAR(255) REFERENCES public.questions(id) ON DELETE CASCADE,
     selected_option_index INTEGER,
     is_correct BOOLEAN,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
@@ -244,3 +252,41 @@ CREATE TABLE IF NOT EXISTS public.mural (
 -- VALUES ('lucassantos.-@outlook.com', 'Lucas Santos', 'admin', crypt('sua_senha_aqui', gen_salt('bf', 10)))
 -- ON CONFLICT (email) DO NOTHING;
 
+
+-- ============================================================
+-- ÍNDICES PARA CONSULTAS FREQUENTES E PERFORMANCE
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_answers_user_id ON public.answers(user_id);
+CREATE INDEX IF NOT EXISTS idx_answers_question_id ON public.answers(question_id);
+CREATE INDEX IF NOT EXISTS idx_answers_user_created ON public.answers(user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_xp_logs_user_id ON public.xp_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_xp_logs_user_created ON public.xp_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_xp_logs_reason ON public.xp_logs(reason);
+
+CREATE INDEX IF NOT EXISTS idx_questions_year ON public.questions(year);
+CREATE INDEX IF NOT EXISTS idx_questions_subject ON public.questions(subject);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
+CREATE INDEX IF NOT EXISTS idx_users_school ON public.users(school);
+CREATE INDEX IF NOT EXISTS idx_users_city ON public.users(city);
+CREATE INDEX IF NOT EXISTS idx_users_xp ON public.users(xp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON public.notifications(user_id, is_read);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON public.login_attempts(email);
+
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON public.revoked_tokens(expires_at);
+
+CREATE INDEX IF NOT EXISTS idx_materials_created ON public.materials(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_materials_subject ON public.materials(subject);
+
+CREATE INDEX IF NOT EXISTS idx_events_date ON public.events(date);
+
+CREATE INDEX IF NOT EXISTS idx_mural_created ON public.mural(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_question_options_question_id ON public.question_options(question_id);
+
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
+CREATE INDEX IF NOT EXISTS idx_admin_users_auth_user_id ON public.admin_users(auth_user_id);

@@ -7,7 +7,7 @@ import multer from 'multer';
 import cookieParser from 'cookie-parser';
 import fs from 'fs';
 import { dbAdmin, getSupabaseAnonClient } from './src/lib/dbQueryBuilder.js';
-import pool, { query } from './src/lib/db.js';
+import pool, { query, runMigrationQuery } from './src/lib/db.js';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -504,37 +504,40 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
           }
 
           if (!studentRow) {
-            // Todo auth user que não é estudante vira admin automaticamente
-            const adminName = authData.user.user_metadata?.name
-              || authData.user.user_metadata?.full_name
-              || authData.user.email?.split('@')[0]
-              || cleanEmail.split('@')[0];
+            // Apenas promove o usuário do Supabase Auth para admin se ele tiver a role de admin explicitly set
+            const isAuthAdmin = authData.user.app_metadata?.role === 'admin' || authData.user.user_metadata?.role === 'admin';
+            if (isAuthAdmin) {
+              const adminName = authData.user.user_metadata?.name
+                || authData.user.user_metadata?.full_name
+                || authData.user.email?.split('@')[0]
+                || cleanEmail.split('@')[0];
 
-            await dbAdmin.from('admin_users').insert([{
-              id: crypto.randomUUID(),
-              email: cleanEmail,
-              name: adminName,
-              role: 'admin',
-              auth_user_id: authData.user.id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }]);
+              await dbAdmin.from('admin_users').insert([{
+                id: crypto.randomUUID(),
+                email: cleanEmail,
+                name: adminName,
+                role: 'admin',
+                auth_user_id: authData.user.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }]);
 
-            const userObj = getUserWithRole({
-              id: authData.user.id,
-              email: cleanEmail,
-              name: adminName,
-              role: 'admin',
-            });
-            const token = generateToken(userObj.id, userObj.email, userObj.role);
-            res.cookie('session_token', token, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'strict',
-              maxAge: 24 * 60 * 60 * 1000
-            });
-            await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
-            return res.json({ success: true, user: userObj });
+              const userObj = getUserWithRole({
+                id: authData.user.id,
+                email: cleanEmail,
+                name: adminName,
+                role: 'admin',
+              });
+              const token = generateToken(userObj.id, userObj.email, userObj.role);
+              res.cookie('session_token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 24 * 60 * 60 * 1000
+              });
+              await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
+              return res.json({ success: true, user: userObj });
+            }
           }
           // Se é estudante registrado, cai fora do bloco Supabase e segue para autenticação de estudante
         }
@@ -2256,9 +2259,9 @@ async function applyDbMigration() {
       
       if (resolvedPath) {
         const sql = fs.readFileSync(resolvedPath, 'utf8');
-        await query(sql);
+        await runMigrationQuery(sql);
         // Marca a migration como aplicada (usa revoked_tokens como flag store)
-        await query(
+        await runMigrationQuery(
           'INSERT INTO public.revoked_tokens (token, expires_at) VALUES ($1, NOW() + INTERVAL \'100 years\') ON CONFLICT DO NOTHING',
           [migrationFlag]
         ).catch(() => {});
