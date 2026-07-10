@@ -236,8 +236,8 @@ export default function AdminHeader({
   return (
     <>
       <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-72 bg-bg-sidebar border-r border-border-color flex-col p-5 transition-colors duration-300">
-        <div className="flex items-center gap-3 mb-6">
-          <Logo className="h-10 justify-start" />
+        <div className="flex items-center justify-center mb-7">
+          <Logo className="h-12 justify-center" />
         </div>
 
         <div className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 rounded-xl flex items-center gap-2 mb-8">
@@ -273,7 +273,7 @@ export default function AdminHeader({
       </aside>
 
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-bg-sidebar border-b border-border-color flex items-center justify-between px-4 shrink-0 z-50 transition-colors duration-300">
-        <Logo className="h-9 justify-start" />
+        <Logo className="h-10 justify-start" />
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleDarkMode}
