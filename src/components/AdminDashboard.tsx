@@ -249,7 +249,7 @@ export default function AdminDashboard({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg-main text-text-secondary font-sans overflow-hidden transition-colors duration-300">
+    <div className="h-screen bg-bg-main text-text-secondary font-sans overflow-hidden transition-colors duration-300">
       <AdminHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -263,7 +263,7 @@ export default function AdminDashboard({
         eventosCount={eventos.length}
       />
 
-      <main className="flex-1 overflow-y-auto bg-bg-main relative transition-colors duration-300">
+      <main className="h-full overflow-y-auto bg-bg-main relative transition-colors duration-300 pt-16 md:pt-0 md:pl-72">
         <div className="p-6 md:p-12 max-w-7xl mx-auto">
           {activeTab === 'panorama' ? (
             <AdminPanorama
