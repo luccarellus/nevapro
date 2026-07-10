@@ -1,13 +1,12 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, Users, X, Loader2, CheckCircle2, Trash2, ChevronRight, TrendingUp,
-  ShieldAlert, Crown, UserCircle, Send, Clock
+  Users, X, Loader2, CheckCircle2, Trash2, ChevronRight, TrendingUp,
+  ShieldAlert, Crown, UserCircle, Send, Clock, Trophy, Building2
 } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { calculateLevelAndProgression } from '../../utils/xpUtils';
-import { normalizeString, getStudentRankInfo } from './AdminUtils';
-import cidadesEscolasData from '../../data/cidades_escolas.json';
+import { getStudentRankInfo } from './AdminUtils';
 
 interface AdminAlunosProps {
   students: UserProfile[];
@@ -60,6 +59,30 @@ export default function AdminAlunos({
     if (!selectedStudent) return null;
     return students.find(s => s.id === selectedStudent.id) || selectedStudent;
   }, [students, selectedStudent]);
+
+  const studentStats = useMemo(() => {
+    const totalXp = students.reduce((sum, student) => sum + (student.xp || 0), 0);
+    const averageXp = students.length ? Math.round(totalXp / students.length) : 0;
+
+    const getLeader = (field: 'city' | 'school') => {
+      const map = new Map<string, { name: string; xp: number }>();
+      students.forEach((student) => {
+        const name = student[field]?.trim();
+        if (!name) return;
+        const current = map.get(name) || { name, xp: 0 };
+        current.xp += student.xp || 0;
+        map.set(name, current);
+      });
+      return [...map.values()].sort((a, b) => b.xp - a.xp)[0] || { name: '-', xp: 0 };
+    };
+
+    return {
+      activeStudents: students.length,
+      averageXp,
+      cityLeader: getLeader('city'),
+      schoolLeader: getLeader('school')
+    };
+  }, [students]);
 
   const handleGiveXp = async (amount: number) => {
     if (!currentSelectedStudent) return;
@@ -136,45 +159,95 @@ export default function AdminAlunos({
             </div>
           </div>
 
+          {/* Stats Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
+            {[
+              {
+                label: 'ALUNOS ATIVOS',
+                value: studentStats.activeStudents.toLocaleString('pt-BR'),
+                detail: 'Total cadastrados',
+                icon: Users,
+                tone: 'text-brand-primary bg-brand-primary/10 border-brand-primary/25'
+              },
+              {
+                label: 'MEDIA DE XP',
+                value: `${studentStats.averageXp.toLocaleString('pt-BR')} XP`,
+                detail: 'Por estudante',
+                icon: Trophy,
+                tone: 'text-amber-500 bg-amber-500/10 border-amber-500/25'
+              },
+              {
+                label: 'CIDADE LIDER',
+                value: studentStats.cityLeader.name,
+                detail: `${studentStats.cityLeader.xp.toLocaleString('pt-BR')} XP`,
+                icon: TrendingUp,
+                tone: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/25'
+              },
+              {
+                label: 'ESCOLA CAMPEA',
+                value: studentStats.schoolLeader.name,
+                detail: `${studentStats.schoolLeader.xp.toLocaleString('pt-BR')} XP`,
+                icon: Building2,
+                tone: 'text-purple-500 bg-purple-500/10 border-purple-500/25'
+              }
+            ].map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="flex items-center gap-4 min-w-0">
+                  <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${stat.tone}`}>
+                    <Icon size={19} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-black text-text-secondary tracking-wider opacity-50">{stat.label}</div>
+                    <div className="text-base font-black text-text-main truncate">{stat.value}</div>
+                    <div className="text-[9px] font-black text-brand-primary">{stat.detail}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           {/* Filters Row */}
-          <div className="flex flex-wrap items-center gap-3 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
             <div className="relative">
+              <label className="block text-[10px] font-black text-text-secondary tracking-wider opacity-40 mb-3">Cidades</label>
               <select
                 title="Filtrar por cidade"
                 value={filterCity}
                 onChange={(e) => { onFilterCityChange(e.target.value); onFilterSchoolChange(''); }}
-                className="bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-[10px] font-black text-text-secondary tracking-wider focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
               >
                 <option value="">Todas as cidades</option>
                 {cidadeOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none opacity-30" />
+              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
             </div>
             <div className="relative">
+              <label className="block text-[10px] font-black text-text-secondary tracking-wider opacity-40 mb-3">Escolas</label>
               <select
                 title="Filtrar por escola"
                 value={filterSchool}
                 onChange={(e) => onFilterSchoolChange(e.target.value)}
-                className="bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-[10px] font-black text-text-secondary tracking-wider focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
               >
                 <option value="">Todas as escolas</option>
                 {escolaOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none opacity-30" />
+              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
             </div>
             <div className="relative">
+              <label className="block text-[10px] font-black text-text-secondary tracking-wider opacity-40 mb-3">Gremios</label>
               <select
                 title="Filtrar por grêmio"
                 value={filterGremio}
                 onChange={(e) => onFilterGremioChange(e.target.value)}
-                className="bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-[10px] font-black text-text-secondary tracking-wider focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
               >
                 <option value="">Todos os grêmios</option>
                 {gremioOptions.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-3 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none opacity-30" />
+              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
             </div>
-            <span className="text-[10px] font-bold text-text-secondary opacity-40 ml-auto">{filteredStudents.length} alunos</span>
           </div>
 
           {/* Desktop Table */}
@@ -194,6 +267,7 @@ export default function AdminAlunos({
                 {filteredStudents.map((student) => {
                   const rankInfo = getStudentRankInfo(student.level || calculateLevelAndProgression(student.xp || 0).level);
                   const levelInfo = calculateLevelAndProgression(student.xp || 0);
+                  const progress = Math.max(0, Math.min(100, Math.round(((student.xp || 0) - levelInfo.currentLevelMinXp) / (levelInfo.nextLevelXp - levelInfo.currentLevelMinXp) * 100)));
                   return (
                     <tr
                       key={student.id}
@@ -218,26 +292,24 @@ export default function AdminAlunos({
                         </div>
                       </td>
                       <td className="py-6">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-text-main font-black text-sm">{student.xp || 0} XP</span>
-                          <span className={`inline-block w-fit px-2 py-0.5 text-[8px] font-black rounded uppercase tracking-wider ${rankInfo.classes}`}>
-                            {rankInfo.label}
-                          </span>
-                        </div>
+                        <span className={`inline-block w-fit px-2 py-0.5 text-[8px] font-black rounded uppercase tracking-wider ${rankInfo.classes}`}>
+                          {rankInfo.label}
+                        </span>
                       </td>
                       <td className="py-6">
-                        <div className="text-text-secondary text-xs font-bold">{student.city || '-'}</div>
+                        <div className="text-text-main text-xs font-black">{student.city || '-'}</div>
+                        <div className="text-text-secondary text-[9px] font-bold opacity-50">MA</div>
                       </td>
                       <td className="py-6">
-                        <div className="text-text-secondary text-xs font-bold truncate max-w-[200px]">{student.school || '-'}</div>
-                        <div className="text-text-secondary text-[10px] font-medium opacity-50">{student.gremio || ''}</div>
+                        <div className="text-text-main text-xs font-black truncate max-w-[200px]">{student.school || '-'}</div>
+                        <div className="text-brand-primary text-[10px] font-black truncate max-w-[200px]">{student.gremio || 'Sem gremio'}</div>
                       </td>
                       <td className="py-6">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-bg-main rounded-full overflow-hidden max-w-[100px]">
-                            <div className="h-full bg-brand-primary rounded-full transition-all" style={{ width: `${Math.round(((student.xp || 0) - levelInfo.currentLevelMinXp) / (levelInfo.nextLevelXp - levelInfo.currentLevelMinXp) * 100)}%` }} />
+                            <div className="h-full bg-brand-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
                           </div>
-                          <span className="text-[9px] font-black text-text-secondary opacity-50">{Math.round(((student.xp || 0) - levelInfo.currentLevelMinXp) / (levelInfo.nextLevelXp - levelInfo.currentLevelMinXp) * 100)}%</span>
+                          <span className="text-[9px] font-black text-text-secondary opacity-50">{(student.xp || 0).toLocaleString('pt-BR')} XP</span>
                         </div>
                       </td>
                       <td className="py-6 text-right pr-4">

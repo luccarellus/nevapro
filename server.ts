@@ -293,45 +293,38 @@ const requireAdmin = (req: any, res: any, next: any) => {
   });
 };
 
-// Rate Limiter: Redis (Upstash)
-// Usa janela fixa por IP+rota com TTL automático via Redis
-// Se Redis não estiver configurado ou falhar, permite a requisição (fail-open)
+// Rate limiter local. Upstash Redis is used only as application cache.
+const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
+
 const rateLimiter = (limit: number, windowMs: number) => {
-  return async (req: any, res: any, next: any) => {
+  return (req: any, res: any, next: any) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     const path = req.path || req.url;
-
-    if (isUpstashRedisConfigured()) {
-      try {
-        const windowKey = Math.floor(Date.now() / windowMs);
-        const key = `rl:${ip}:${path}:${windowKey}`;
-        const ttlSeconds = Math.ceil(windowMs / 1000);
-
-        const results = await runUpstashRedisPipeline([
-          ['INCR', key],
-          ['EXPIRE', key, String(ttlSeconds)]
-        ]);
-
-        if (results && results.length >= 2) {
-          const count = Number(results[0]?.result ?? 0);
-
-          if (count > limit) {
-            const ttlResult = await runUpstashRedisCommand(['TTL', key]);
-            const waitTime = typeof ttlResult === 'number' ? ttlResult : ttlSeconds;
-            return res.status(429).json({
-              error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.`
-            });
-          }
-
-          return next();
-        }
-      } catch (err) {
-        log.warn('[RateLimiter] Redis error, allowing request:', err);
+    const now = Date.now();
+    for (const [entryKey, entry] of inMemoryRateLimit) {
+      if (entry.resetAt <= now) {
+        inMemoryRateLimit.delete(entryKey);
       }
     }
 
-    // Redis não configurado ou falhou — permite a requisição
-    next();
+    const windowKey = Math.floor(now / windowMs);
+    const key = `${ip}:${path}:${windowKey}`;
+    const resetAt = (windowKey + 1) * windowMs;
+    const current = inMemoryRateLimit.get(key) || { count: 0, resetAt };
+
+    current.count += 1;
+    current.resetAt = resetAt;
+    inMemoryRateLimit.set(key, current);
+
+    if (current.count > limit) {
+      const waitTime = Math.max(1, Math.ceil((resetAt - now) / 1000));
+      return res.status(429).json({
+        error: `Muitas requisicoes. Por favor, aguarde ${waitTime} segundos.`
+      });
+    }
+
+    return next();
+
   };
 };
 
