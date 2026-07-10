@@ -62,7 +62,9 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
     try {
       if (isResettingPassword) {
-        throw new Error("Recuperação desativada. Por favor, contate a administração.");
+        setSuccessMessage("Funcionalidade em desenvolvimento! Em breve você poderá redefinir sua senha. Por enquanto, contate a administração pelo suporte.");
+        setIsLoading(false);
+        return;
       } else if (isRegistering) {
         // Register Common User in DB table
         const res = await userService.register({

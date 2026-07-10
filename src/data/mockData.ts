@@ -1,14 +1,4 @@
-import { Question, RankingEntry, StudyEvent, Material, Notice, Simulado } from '../types';
-
-export const MOCK_QUESTIONS: Question[] = [];
-
-export const MOCK_RANKING: RankingEntry[] = [];
-
-export const MOCK_EVENTS: StudyEvent[] = [];
-
-export const MOCK_MATERIALS: Material[] = [];
-
-export const MOCK_NOTICES: Notice[] = [];
+import { Simulado } from '../types';
 
 export const MOCK_SIMULADOS: Simulado[] = [
   {

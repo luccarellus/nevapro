@@ -68,10 +68,33 @@ app.use(helmet({
 }));
 app.use(express.json());
 
+// --- SISTEMA DE LOG E VALIDAÇÃO ---
+// Logger condicional: em produção só loga se DEBUG=true
+const isDev = process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true';
+const log = {
+  info: (...args: any[]) => { if (isDev) console.log(...args); },
+  warn: (...args: any[]) => { if (isDev) console.warn(...args); },
+  error: (...args: any[]) => { console.error(...args); } // Erros sempre logados
+};
+
+// Validação simples de corpo de requisição
+const validateBody = (requiredFields: string[]) => {
+  return (req: any, res: any, next: any) => {
+    const missing = requiredFields.filter(f => req.body[f] === undefined || req.body[f] === null || req.body[f] === '');
+    if (missing.length > 0) {
+      return res.status(400).json({ 
+        error: `Campos obrigatórios ausentes: ${missing.join(', ')}`,
+        missing
+      });
+    }
+    next();
+  };
+};
+
 // --- SISTEMA DE AUTENTICAÇÃO E SESSÕES CRIPTOGRAFADAS ---
 const SESSION_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
-  console.error('[Erro Fatal] Variáveis de ambiente JWT_SECRET ou SESSION_SECRET ausentes.');
+  log.error('[Erro Fatal] Variáveis de ambiente JWT_SECRET ou SESSION_SECRET ausentes.');
   process.exit(1);
 }
 
@@ -88,7 +111,7 @@ setInterval(async () => {
   try {
     await query('DELETE FROM public.revoked_tokens WHERE expires_at < NOW()');
   } catch (err) {
-    console.error('[Cleanup] Erro ao limpar tokens revogados expirados do banco:', err);
+    log.error('[Cleanup] Erro ao limpar tokens revogados expirados do banco:', err);
   }
 }, 60 * 60 * 1000);
 
@@ -144,41 +167,59 @@ const requireAdmin = (req: any, res: any, next: any) => {
   });
 };
 
-// Middleware: Rate Limiter simples em memória
-const rateLimiterAttempts = new Map<string, { count: number, lastAttempt: number }>();
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, attempt] of rateLimiterAttempts.entries()) {
-    if (now - attempt.lastAttempt > 60000) {
-      rateLimiterAttempts.delete(ip);
-    }
-  }
-}, 60000);
-
+// Rate Limiter DB-backed (funciona em serverless/multi-instância)
 const rateLimiter = (limit: number, windowMs: number) => {
-  return (req: any, res: any, next: any) => {
+  return async (req: any, res: any, next: any) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const now = Date.now();
-    const attempt = rateLimiterAttempts.get(ip);
+    const key = `rl:${ip}:${req.path || req.url}`;
+    const now = new Date();
     
-    if (!attempt) {
-      rateLimiterAttempts.set(ip, { count: 1, lastAttempt: now });
-      return next();
+    try {
+      // Tenta limpar entradas expiradas (sem阻塞 a requisição)
+      await query('DELETE FROM public.rate_limits WHERE expires_at < NOW()').catch(() => {});
+      
+      const { rows } = await query(
+        'SELECT count, expires_at FROM public.rate_limits WHERE key = $1',
+        [key]
+      );
+      
+      if (rows.length === 0) {
+        const expiresAt = new Date(Date.now() + windowMs);
+        await query(
+          'INSERT INTO public.rate_limits (key, count, expires_at) VALUES ($1, 1, $2) ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = $2',
+          [key, expiresAt.toISOString()]
+        );
+        return next();
+      }
+      
+      const row = rows[0];
+      const expiresAt = new Date(row.expires_at);
+      
+      if (now > expiresAt) {
+        // Janela expirou, resetar
+        const newExpiresAt = new Date(Date.now() + windowMs);
+        await query(
+          'INSERT INTO public.rate_limits (key, count, expires_at) VALUES ($1, 1, $2) ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = $2',
+          [key, newExpiresAt.toISOString()]
+        );
+        return next();
+      }
+      
+      if (row.count >= limit) {
+        const waitTime = Math.ceil((expiresAt.getTime() - now.getTime()) / 1000);
+        return res.status(429).json({ error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.` });
+      }
+      
+      await query(
+        'UPDATE public.rate_limits SET count = count + 1 WHERE key = $1',
+        [key]
+      );
+      next();
+    } catch (err) {
+      // Fallback: se o DB falhar, permite a requisição
+      log.error('[RateLimiter] DB error, allowing request:', err);
+      next();
     }
-    
-    if (now - attempt.lastAttempt > windowMs) {
-      attempt.count = 1;
-      attempt.lastAttempt = now;
-      return next();
-    }
-    
-    if (attempt.count >= limit) {
-      const waitTime = Math.ceil((windowMs - (now - attempt.lastAttempt)) / 1000);
-      return res.status(429).json({ error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.` });
-    }
-    
-    attempt.count++;
-    next();
   };
 };
 
@@ -191,7 +232,7 @@ setInterval(async () => {
   try {
     await query('DELETE FROM public.login_attempts WHERE lock_until < NOW()');
   } catch (err) {
-    console.error('[Cleanup] Erro ao limpar tentativas de login expiradas do banco:', err);
+    log.error('[Cleanup] Erro ao limpar tentativas de login expiradas do banco:', err);
   }
 }, 5 * 60 * 1000);
 
@@ -216,7 +257,7 @@ const isFlashQuizCompleted = async (email: string, userId: string): Promise<bool
         }
       }
     } catch (e) {
-      console.error('Error checking last quiz log:', e);
+      log.error('Error checking last quiz log:', e);
     }
   }
   return false;
@@ -267,21 +308,21 @@ const addNotification = async (title: string, message: string, type: string, met
       }));
       const { error } = await dbAdmin.from('notifications').insert(notifRecords);
       if (error) {
-        console.error('Failed to save notification: ', error);
+        log.error('Failed to save notification: ', error);
         throw error;
       }
     } else {
-      console.log('[addNotification] No users found in database to notify.');
+      log.info('[addNotification] No users found in database to notify.');
     }
   } catch (e) {
-    console.error('Failed to save notification:', e);
+    log.error('Failed to save notification:', e);
   }
   return newNotif;
 };
 
-// Logging middleware
+// Logging middleware (condicional - só em dev)
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  log.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
@@ -305,7 +346,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
       }
     }
   } catch (err) {
-    console.error('[Auth Lock Check] Erro ao verificar bloqueio:', err);
+    log.error('[Auth Lock Check] Erro ao verificar bloqueio:', err);
   }
 
   if (isLocked) {
@@ -394,7 +435,7 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
         }
       }
     } catch (authErr) {
-      console.error('[Auth Admin] Erro ao autenticar via Supabase:', authErr);
+      log.error('[Auth Admin] Erro ao autenticar via Supabase:', authErr);
     }
 
     // 2. Tabela de Alunos
@@ -425,9 +466,9 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(password, salt);
             await dbAdmin.from('users').update({ password_hash: hashedPassword }).eq('id', student.id);
-            console.log(`[Security] Senha legada do usuário ${student.email} convertida para BCrypt com sucesso.`);
+            log.info(`[Security] Senha legada do usuário ${student.email} convertida para BCrypt com sucesso.`);
           } catch (e) {
-            console.error('[Security] Erro ao converter senha legada:', e);
+            log.error('[Security] Erro ao converter senha legada:', e);
           }
         }
         const userObj = getUserWithRole(student);
@@ -461,13 +502,13 @@ app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
         await query('INSERT INTO public.login_attempts (email, attempts, lock_until) VALUES ($1, 1, NULL)', [cleanEmail]);
       }
     } catch (dbErr) {
-      console.error('[Auth Increment] Erro ao registrar tentativa falha:', dbErr);
+      log.error('[Auth Increment] Erro ao registrar tentativa falha:', dbErr);
     }
 
     return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
 
   } catch (err: any) {
-    console.error('[Auth] Login error:', err.message);
+    log.error('[Auth] Login error:', err.message);
     res.status(500).json({ error: 'Falha na autenticação.' });
   }
 });
@@ -543,7 +584,7 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
 
     res.status(201).json({ success: true, user: userObj });
   } catch (err: any) {
-    console.error('[Auth] Register error:', err.message);
+    log.error('[Auth] Register error:', err.message);
     res.status(500).json({ error: 'Erro ao criar conta.' });
   }
 });
@@ -582,7 +623,7 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    console.error('[POST /api/auth/delete-user] Error:', err);
+    log.error('[POST /api/auth/delete-user] Error:', err);
     res.status(500).json({ error: 'Erro ao remover.' });
   }
 });
@@ -658,7 +699,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
         return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
       } catch (authErr) {
-        console.error('[Change Password] Erro ao atualizar senha no Supabase Auth:', authErr);
+        log.error('[Change Password] Erro ao atualizar senha no Supabase Auth:', authErr);
         return res.status(500).json({ error: 'Erro ao alterar senha via Supabase Auth.' });
       }
     }
@@ -703,7 +744,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
     return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
   } catch (err: any) {
-    console.error('[Change Password] Error:', err.message);
+    log.error('[Change Password] Error:', err.message);
     res.status(500).json({ error: 'Erro interno ao alterar a senha.', details: err?.message });
   }
 });
@@ -720,7 +761,7 @@ app.post('/api/auth/logout', async (req, res) => {
         await query('INSERT INTO public.revoked_tokens (token, expires_at) VALUES ($1, $2) ON CONFLICT DO NOTHING', [token, expiresAtDate]);
       }
     } catch (err) {
-      console.error('[Logout] Erro ao registrar token revogado no banco:', err);
+      log.error('[Logout] Erro ao registrar token revogado no banco:', err);
     }
   }
   
@@ -837,14 +878,14 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
         }
       }
     } catch (e) {
-      console.error('[Profile Update] Error fetching old user:', e);
+      log.error('[Profile Update] Error fetching old user:', e);
     }
 
   // Check flash quiz protection on server side
   if (isFlashQuizUpdate) {
     const alreadyCompleted = await isFlashQuizCompleted(email, userId);
     if (alreadyCompleted) {
-      console.log(`[Flash Quiz Secure Block] Email ${email} blocked from gaining duplicate quiz XP.`);
+      log.info(`[Flash Quiz Secure Block] Email ${email} blocked from gaining duplicate quiz XP.`);
       // Reset XP back to old rate
       dbUpdate.xp = oldXp;
       xpDiff = 0;
@@ -942,7 +983,7 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    console.error('[DELETE /api/user/profile] Error:', err);
+    log.error('[DELETE /api/user/profile] Error:', err);
     res.status(500).json({ error: 'Erro ao remover perfil.' });
   }
 });
@@ -997,7 +1038,7 @@ app.get('/api/notifications', requireAuth, async (req, res) => {
 
     res.json(uniqueMapped);
   } catch (err) {
-    console.error('[GET /api/notifications] Error:', err);
+    log.error('[GET /api/notifications] Error:', err);
     res.json([]);
   }
 });
@@ -1119,7 +1160,7 @@ app.get('/api/leaderboard', async (req, res) => {
 
     res.json(filteredLeaderboard);
   } catch (err) {
-    console.error('Erro ao buscar ranking:', err);
+    log.error('Erro ao buscar ranking:', err);
     res.status(500).json({ error: 'Erro ao buscar ranking' });
   }
 });
@@ -1216,7 +1257,7 @@ app.post('/api/admin/sync-auth-users', requireAdmin, async (req, res) => {
       stats: { created, updated, skipped, total: authUsers.length }
     });
   } catch (err: any) {
-    console.error('[POST /api/admin/sync-auth-users] Error:', err);
+    log.error('[POST /api/admin/sync-auth-users] Error:', err);
     res.status(500).json({ error: 'Erro ao sincronizar usuários do Auth.', details: err?.message });
   }
 });
@@ -1315,7 +1356,7 @@ app.post('/api/notifications/read-all', requireAuth, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
-    console.error('[POST /api/notifications/read-all] Error:', err);
+    log.error('[POST /api/notifications/read-all] Error:', err);
     res.json({ success: false });
   }
 });
@@ -1337,7 +1378,7 @@ app.post('/api/notifications/:id/read', requireAuth, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (err) {
-    console.error('[POST /api/notifications/:id/read] Error:', err);
+    log.error('[POST /api/notifications/:id/read] Error:', err);
     res.json({ success: false });
   }
 });
@@ -1395,7 +1436,7 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
       });
 
     if (error) {
-      console.error('[Storage] Upload error:', error);
+      log.error('[Storage] Upload error:', error);
       return res.status(500).json({ error: 'Erro ao fazer upload no Storage: ' + error.message });
     }
 
@@ -1403,7 +1444,7 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
 
     res.json({ url: proxyUrl });
   } catch (error: any) {
-    console.error('[POST /api/upload] Error:', error);
+    log.error('[POST /api/upload] Error:', error);
     res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + error.message });
   }
 });
@@ -1468,7 +1509,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
     await addNotification('Novo Material', `"${req.body.title}" em ${dbRecord.subject}.`, 'material', { id: data?.id });
     res.status(201).json(mappedResult);
   } catch (error) {
-    console.error('[POST /api/materials] Error inserting:', error);
+    log.error('[POST /api/materials] Error inserting:', error);
     res.status(500).json({ error: 'Failed to insert material' });
   }
 });
@@ -1504,7 +1545,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
     };
     res.json(mappedResult);
   } catch (error) {
-    console.error('[PUT /api/materials/:id] Error updating:', error);
+    log.error('[PUT /api/materials/:id] Error updating:', error);
     res.status(500).json({ error: 'Failed to update material' });
   }
 });
@@ -1541,7 +1582,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
 
     const { data, error } = await dbAdmin.from('mural').insert([dbBody]).select().single();
     if (error) {
-      console.error('[POST /api/recados] Database insertion error:', error);
+      log.error('[POST /api/recados] Database insertion error:', error);
       throw error;
     }
 
@@ -1558,7 +1599,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
     await addNotification('Novo Recado', `${req.body.title}`, 'mural', { id: data?.id });
     res.status(201).json(mappedResult);
   } catch (err: any) {
-    console.error('[POST /api/recados] Failed to insert recado:', err);
+    log.error('[POST /api/recados] Failed to insert recado:', err);
     res.status(500).json({ error: 'Failed to insert recado', details: err?.message || err });
   }
 });
@@ -1594,7 +1635,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
     };
     res.json(mappedResult);
   } catch (err: any) {
-    console.error('[PUT /api/recados/:id] Failed to update recado:', err);
+    log.error('[PUT /api/recados/:id] Failed to update recado:', err);
     res.status(500).json({ error: 'Failed to update recado', details: err?.message || err });
   }
 });
@@ -1622,7 +1663,7 @@ app.get('/api/eventos', requireAuth, async (req, res) => {
     }));
     res.json(mapped);
   } catch (err) {
-    console.error('[GET /api/eventos] Error:', err);
+    log.error('[GET /api/eventos] Error:', err);
     res.json([]);
   }
 });
@@ -1665,7 +1706,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
     await addNotification('Novo Evento', `${req.body.title}`, 'evento', { id: data.id });
     res.status(201).json(mapped);
   } catch (err: any) {
-    console.error('[POST /api/eventos] Failed to insert event:', err);
+    log.error('[POST /api/eventos] Failed to insert event:', err);
     res.status(500).json({ error: 'Failed to insert evento', details: err?.message || err });
   }
 });
@@ -1679,7 +1720,7 @@ app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
     if (error) throw error;
     res.status(204).end();
   } catch (err) {
-    console.error('[DELETE /api/eventos/:id] Error:', err);
+    log.error('[DELETE /api/eventos/:id] Error:', err);
     res.status(500).json({ error: 'Failed to delete event' });
   }
 });
@@ -1722,7 +1763,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
 
     res.json(mapped);
   } catch (err: any) {
-    console.error('[PUT /api/eventos/:id] Failed to update event:', err);
+    log.error('[PUT /api/eventos/:id] Failed to update event:', err);
     res.status(500).json({ error: 'Failed to update event', details: err?.message });
   }
 });
@@ -1747,7 +1788,7 @@ app.post('/api/answers', requireAuth, async (req, res) => {
     const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
     
     if (qCheck.rows.length === 0 && questionData) {
-      console.log(`[POST /api/answers] Caching question ${questionId}...`);
+      log.info(`[POST /api/answers] Caching question ${questionId}...`);
       // Inserir a questão
       await query(
         `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
@@ -1793,7 +1834,7 @@ app.post('/api/answers', requireAuth, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error('[POST /api/answers] Error logging answer:', err);
+    log.error('[POST /api/answers] Error logging answer:', err);
     res.status(500).json({ error: 'Erro ao registrar resposta.' });
   }
 });
@@ -1874,7 +1915,7 @@ app.get('/api/user/errors', requireAuth, async (req, res) => {
 
     res.json(result);
   } catch (err: any) {
-    console.error('[GET /api/user/errors] Error:', err);
+    log.error('[GET /api/user/errors] Error:', err);
     res.status(500).json({ error: 'Erro ao buscar caderno de erros.' });
   }
 });
@@ -1919,203 +1960,7 @@ app.get('/api/imagem', async (req, res) => {
 // LGPD Consent log endpoint
 app.post('/api/lgpd/consent-log', (req, res) => {
   // Retorna 200 OK para evitar erro de 404 no console do navegador
-  console.log('[LGPD] Consent preferences received:', req.body);
-  res.json({ success: true });
-});
-
-// QUESTOES
-app.get('/api/questoes', requireAuth, async (req, res) => {
-  const { year, limit = 50, offset = 0 } = req.query;
-  if (!year) return res.status(400).json({ error: 'Ano necessário' });
-  try {
-    const { data: dbData } = await dbAdmin.from('questions').select('*, question_options(*)').eq('year', year).order('index', { ascending: true }).range(Number(offset), Number(offset) + Number(limit) - 1);
-    if (dbData?.length) return res.json({ questions: dbData.map(q => ({ ...q, alternatives: q.question_options?.sort((a: any, b: any) => a.letter.localeCompare(b.letter)) || [] })) });
-    const response = await fetch(`https://api.enem.dev/v1/exams/${year}/questions?limit=${limit}&offset=${offset}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) { res.status(500).json({ error: 'Erro ao buscar questões' }); }
-});
-
-app.post('/api/answers', requireAuth, async (req, res) => {
-  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
-  try {
-    // 1. Verificar se a questão já existe no banco
-    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
-    
-    if (qCheck.rows.length === 0 && questionData) {
-      console.log(`[POST /api/answers] Caching question ${questionId}...`);
-      // Inserir a questão
-      await query(
-        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         ON CONFLICT (id) DO NOTHING`,
-        [
-          questionId,
-          questionData.subject || 'Geral',
-          questionData.text,
-          questionData.imageUrl || null,
-          questionData.correctOptionIndex,
-          questionData.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
-          questionData.difficulty || 'médio',
-          questionData.xpReward || 50,
-          questionData.year || 2023,
-          questionData.index || 0
-        ]
-      );
-
-      // Inserir as alternativas
-      if (Array.isArray(questionData.options)) {
-        for (let idx = 0; idx < questionData.options.length; idx++) {
-          const optText = questionData.options[idx];
-          const optImg = questionData.optionImages?.[idx] || null;
-          const letter = String.fromCharCode(65 + idx); // A, B, C, D, E...
-          const isCorrectOption = idx === questionData.correctOptionIndex;
-
-          await query(
-            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
-             VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5)`,
-            [questionId, optText, optImg, letter, isCorrectOption]
-          );
-        }
-      }
-    }
-
-    // 2. Inserir a resposta do aluno
-    await query(
-      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
-       VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW())`,
-      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect]
-    );
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('[POST /api/answers] Error logging answer:', err);
-    res.status(500).json({ error: 'Erro ao registrar resposta.' });
-  }
-});
-
-app.get('/api/user/errors', requireAuth, async (req, res) => {
-  let email = req.query.email as string;
-  if (!email) {
-    email = req.user.email;
-  }
-  const cleanEmail = email.toLowerCase().trim();
-
-  if (req.user.role !== 'admin' && req.user.email !== cleanEmail) {
-    return res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
-  }
-
-  try {
-    // 1. Obter o ID do usuário pelo e-mail
-    const userRes = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [cleanEmail]);
-    if (userRes.rows.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-    const userId = userRes.rows[0].id;
-
-    // 2. Buscar as últimas respostas incorretas (rn = 1 e is_correct = false)
-    const errorsQuery = `
-      WITH latest_answers AS (
-        SELECT *,
-               ROW_NUMBER() OVER(PARTITION BY question_id ORDER BY created_at DESC) as rn
-        FROM public.answers
-        WHERE user_id = $1
-      )
-      SELECT 
-        la.id as answer_id,
-        la.selected_option_index,
-        la.created_at as answered_at,
-        q.id as question_id,
-        q.subject,
-        q.text as question_text,
-        q.image_url,
-        q.correct_option_index,
-        q.explanation,
-        q.difficulty,
-        q.year,
-        q.index
-      FROM latest_answers la
-      JOIN public.questions q ON la.question_id = q.id
-      WHERE la.rn = 1 AND la.is_correct = false
-      ORDER BY la.created_at DESC;
-    `;
-
-    const errorsRes = await query(errorsQuery, [userId]);
-    const errorsList = errorsRes.rows;
-
-    // 3. Para cada erro, carregar suas alternativas
-    const result = [];
-    for (const errRow of errorsList) {
-      const optsRes = await query(
-        'SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC',
-        [errRow.question_id]
-      );
-      
-      result.push({
-        id: errRow.question_id,
-        subject: errRow.subject,
-        text: errRow.question_text,
-        imageUrl: errRow.image_url,
-        correctOptionIndex: errRow.correct_option_index,
-        explanation: errRow.explanation,
-        difficulty: errRow.difficulty,
-        year: errRow.year,
-        index: errRow.index,
-        selectedOptionIndex: errRow.selected_option_index,
-        answeredAt: errRow.answered_at,
-        options: optsRes.rows.map(opt => opt.text),
-        optionImages: optsRes.rows.map(opt => opt.image_url),
-      });
-    }
-
-    res.json(result);
-  } catch (err: any) {
-    console.error('[GET /api/user/errors] Error:', err);
-    res.status(500).json({ error: 'Erro ao buscar caderno de erros.' });
-  }
-});
-
-app.get('/api/imagem', async (req, res) => {
-  const urlStr = req.query.url as string;
-  if (!urlStr) return res.status(400).send('URL missing');
-  try {
-    const parsedUrl = new URL(urlStr);
-    const hostname = parsedUrl.hostname.toLowerCase();
-    
-    // Allowlist de domínios seguros contra SSRF
-    const allowedHostsEnv = process.env.ALLOWED_IMAGE_HOSTS || '';
-    const extraHosts = allowedHostsEnv.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
-    
-    const isAllowedHost = hostname === 'enem.dev' || 
-                          hostname === 'api.enem.dev' || 
-                          extraHosts.includes(hostname);
-
-    if (!isAllowedHost) {
-      return res.status(403).send('Acesso negado: domínio não permitido.');
-    }
-
-    const response = await fetch(urlStr, { 
-      headers: { 'User-Agent': 'Mozilla', 'Referer': 'https://enem.dev/' },
-      redirect: 'manual'
-    });
-    
-    // Bloqueia redirecionamentos para evitar desvio de DNS/Allowlist (SSRF)
-    if (response.status >= 300 && response.status < 400) {
-      return res.status(403).send('Acesso negado: redirecionamentos não são permitidos.');
-    }
-    
-    if (!response.ok) return res.status(response.status).send('Fetch error');
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
-  } catch (error) { res.status(500).send('Proxy error'); }
-});
-
-// LGPD Consent log endpoint
-app.post('/api/lgpd/consent-log', (req, res) => {
-  // Retorna 200 OK para evitar erro de 404 no console do navegador
-  console.log('[LGPD] Consent preferences received:', req.body);
+  log.info('[LGPD] Consent preferences received:', req.body);
   res.json({ success: true });
 });
 
@@ -2138,7 +1983,7 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
       .getObject(filePath);
 
     if (error || !data) {
-      console.error('[Storage] GetObject error:', error);
+      log.error('[Storage] GetObject error:', error);
       return res.status(500).json({ error: 'Erro ao buscar arquivo no Storage.' });
     }
 
@@ -2155,7 +2000,7 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
     const buffer = Buffer.concat(chunks);
     res.send(buffer);
   } catch (error: any) {
-    console.error('[GET /api/storage/object] Error:', error);
+    log.error('[GET /api/storage/object] Error:', error);
     res.status(500).json({ error: 'Erro ao servir arquivo.' });
   }
 });
@@ -2165,31 +2010,69 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Middleware de tratamento de erros centralizado
+app.use((err: any, req: any, res: any, next: any) => {
+  log.error('[Unhandled Error]', err?.message || err);
+  
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: 'JSON mal formatado no corpo da requisição.' });
+  }
+  
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Erro ao interpretar JSON.' });
+  }
+  
+  res.status(err.status || 500).json({ 
+    error: err.message || 'Erro interno do servidor.' 
+  });
+});
+
 async function applyDbMigration() {
   try {
-    console.log('[DB Migration] Checking database schema...');
-    // Verificar se o tipo da coluna 'id' em public.questions já é varchar
+    log.info('[DB Migration] Checking database schema...');
+    
+    // Verifica se a migration já foi aplicada (usando uma flag no banco)
+    const migrationFlag = 'migration_caderno_erros_applied';
+    const { rows: flagRows } = await query(`
+      SELECT 1 FROM public.revoked_tokens WHERE token = $1 LIMIT 1
+    `, [migrationFlag]).catch(() => ({ rows: [] }));
+    
+    if (flagRows.length > 0) {
+      log.info('[DB Migration] Database schema is already up to date.');
+      return;
+    }
+    
+    // Verifica se o tipo da coluna 'id' em public.questions ainda é uuid
     const typeCheck = await query(`
       SELECT data_type 
       FROM information_schema.columns 
       WHERE table_name = 'questions' AND column_name = 'id'
-    `);
+    `).catch(() => ({ rows: [] }));
     
     if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'uuid') {
-      console.log('[DB Migration] Found uuid column in questions table. Applying migration...');
-      const sqlPath = path.join(process.cwd(), 'migration_caderno_erros.sql');
-      if (fs.existsSync(sqlPath)) {
-        const sql = fs.readFileSync(sqlPath, 'utf8');
+      log.info('[DB Migration] Found uuid column in questions table. Applying migration...');
+      const sqlPath = path.join(process.cwd(), 'supabase', 'migration_caderno_erros.sql');
+      const fallbackPath = path.join(process.cwd(), 'migration_caderno_erros.sql');
+      
+      const resolvedPath = fs.existsSync(sqlPath) ? sqlPath : (fs.existsSync(fallbackPath) ? fallbackPath : null);
+      
+      if (resolvedPath) {
+        const sql = fs.readFileSync(resolvedPath, 'utf8');
         await query(sql);
-        console.log('[DB Migration] Database migration applied successfully!');
+        // Marca a migration como aplicada (usa revoked_tokens como flag store)
+        await query(
+          'INSERT INTO public.revoked_tokens (token, expires_at) VALUES ($1, NOW() + INTERVAL \'100 years\') ON CONFLICT DO NOTHING',
+          [migrationFlag]
+        ).catch(() => {});
+        log.info('[DB Migration] Database migration applied successfully!');
       } else {
-        console.error('[DB Migration] migration_caderno_erros.sql file not found!');
+        log.warn('[DB Migration] migration_caderno_erros.sql file not found!');
       }
     } else {
-      console.log('[DB Migration] Database schema is already up to date.');
+      log.info('[DB Migration] Database schema is already up to date.');
     }
   } catch (err) {
-    console.error('[DB Migration] Failed to run database migration:', err);
+    log.error('[DB Migration] Failed to run database migration:', err);
   }
 }
 
@@ -2224,11 +2107,11 @@ async function initVite() {
         const dir = path.dirname(target);
         if (fs.existsSync(dir)) {
           fs.copyFileSync(logoSource, target);
-          console.log(`[Logo Setup] Copied main logo to ${target}`);
+          log.info(`[Logo Setup] Copied main logo to ${target}`);
         }
       }
     } else {
-      console.log('[Logo Setup] Main logo not found at src/components/logo.png.');
+      log.info('[Logo Setup] Main logo not found at src/components/logo.png.');
     }
 
     if (fs.existsSync(faviconSourcePng)) {
@@ -2245,11 +2128,11 @@ async function initVite() {
         const dir = path.dirname(target);
         if (fs.existsSync(dir)) {
           fs.copyFileSync(faviconSourcePng, target);
-          console.log(`[Logo Setup] Copied PNG favicon asset to ${target}`);
+          log.info(`[Logo Setup] Copied PNG favicon asset to ${target}`);
         }
       }
     } else {
-      console.log('[Logo Setup] PNG favicon source not found at src/components/logotopo.png.');
+      log.info('[Logo Setup] PNG favicon source not found at src/components/logotopo.png.');
     }
 
     if (fs.existsSync(faviconSourceIco)) {
@@ -2263,41 +2146,41 @@ async function initVite() {
         const dir = path.dirname(target);
         if (fs.existsSync(dir)) {
           fs.copyFileSync(faviconSourceIco, target);
-          console.log(`[Logo Setup] Copied ICO favicon asset to ${target}`);
+          log.info(`[Logo Setup] Copied ICO favicon asset to ${target}`);
         }
       }
     } else {
-      console.log('[Logo Setup] ICO favicon source not found at src/components/favicon.ico.');
+      log.info('[Logo Setup] ICO favicon source not found at src/components/favicon.ico.');
     }
   } catch (err) {
-    console.error('[Logo Setup] Error copying logo/favicon assets:', err);
+    log.error('[Logo Setup] Error copying logo/favicon assets:', err);
   }
   await applyDbMigration();
 })();
 
 if (!process.env.VERCEL) {
   const PORT = Number(process.env.PORT || 3000);
-  const server = app.listen(PORT, '0.0.0.0', () => console.log(`Server production-ready on port ${PORT}`));
+  const server = app.listen(PORT, '0.0.0.0', () => log.info(`Server production-ready on port ${PORT}`));
 
   // Graceful shutdown: garante zero downtime em rolling updates (Docker Swarm / EasyPanel).
   // Ao receber SIGTERM, para de aceitar novas conexões, drena as requisições em voo
   // e fecha o pool do Postgres antes de encerrar o processo.
   const shutdown = (signal: string) => {
-    console.log(`${signal} recebido. Encerrando graciosamente...`);
+    log.info(`${signal} recebido. Encerrando graciosamente...`);
     server.close(async () => {
       try {
         await pool.end();
-        console.log('Pool do Postgres fechado. Processo encerrado.');
+        log.info('Pool do Postgres fechado. Processo encerrado.');
         process.exit(0);
       } catch (err) {
-        console.error('Erro ao fechar o pool do Postgres:', err);
+        log.error('Erro ao fechar o pool do Postgres:', err);
         process.exit(1);
       }
     });
 
     // Failsafe: se o drain travar, força a saída antes do SIGKILL do orquestrador.
     setTimeout(() => {
-      console.error('Shutdown forçado após timeout.');
+      log.error('Shutdown forçado após timeout.');
       process.exit(1);
     }, 10000).unref();
   };

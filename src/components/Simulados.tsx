@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -57,17 +57,37 @@ export default function Simulados({
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
   };
 
+  // Timer baseado em Date.now() para precisão
+  const timerStartRef = useRef<number | null>(null);
+  
   useEffect(() => {
     let interval: any;
     if (view === 'simulation' && timer > 0) {
+      if (!timerStartRef.current) {
+        timerStartRef.current = Date.now();
+      }
+      const totalSeconds = (selectedSim?.durationMinutes || 330) * 60;
       interval = setInterval(() => {
-        setTimer(prev => prev - 1);
-      }, 1000); // Decréscimo a cada segundo para o cronômetro realista do ENEM!
-    } else if (view === 'simulation' && timer === 0) {
-      handleFinishSimulation(true);
+        if (timerStartRef.current) {
+          const elapsedMs = Date.now() - timerStartRef.current;
+          const expectedSecondsPassed = Math.floor(elapsedMs / 1000);
+          // Recalcula o timer baseado no tempo real decorrido
+          const remainingSeconds = Math.max(0, totalSeconds - expectedSecondsPassed);
+          setTimer(remainingSeconds);
+          
+          // Auto-finaliza quando o tempo acabar
+          if (remainingSeconds <= 0) {
+            clearInterval(interval);
+            timerStartRef.current = null;
+            handleFinishSimulation(true);
+          }
+        }
+      }, 250); // Verifica 4x/segundo para precisão
+    } else if (view === 'simulation') {
+      timerStartRef.current = null;
     }
     return () => clearInterval(interval);
-  }, [view, timer]);
+  }, [view]); // Só depende de view, não de timer
 
   useEffect(() => {
     if (onSimulationActiveChange) {

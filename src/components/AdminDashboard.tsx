@@ -30,7 +30,15 @@ import {
   LogOut,
   UserCircle,
   Sun,
-  Moon
+  Moon,
+  X,
+  TrendingUp,
+  School,
+  ChevronRight,
+  ChevronDown,
+  Download,
+  ShieldAlert,
+  CheckSquare
 } from 'lucide-react';
 import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
@@ -137,6 +145,15 @@ const getCanonicalSchoolMap = (rawSchools: (string | null | undefined)[]): Recor
   return canonicalMap;
 };
 
+const getStudentRankInfo = (level: number) => {
+  if (level >= 15) return { label: '👑 Mestre', classes: 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30' };
+  if (level >= 10) return { label: '💎 Diamante', classes: 'bg-cyan-500/10 text-cyan-500 border border-cyan-500/30' };
+  if (level >= 7) return { label: '✨ Platina', classes: 'bg-purple-500/10 text-purple-500 border border-purple-500/30' };
+  if (level >= 4) return { label: '🏆 Ouro', classes: 'bg-amber-500/10 text-amber-500 border border-amber-500/30' };
+  if (level >= 2) return { label: '🥈 Prata', classes: 'bg-slate-500/10 text-slate-500 border border-slate-500/30' };
+  return { label: '🥉 Bronze', classes: 'bg-orange-600/10 text-orange-600 border border-orange-600/30' };
+};
+
 
 
 interface AdminDashboardProps {
@@ -201,6 +218,12 @@ export default function AdminDashboard({
   const [filterCity, setFilterCity] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterGremio, setFilterGremio] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'top10' | 'new' | 'inactive'>('all');
+  const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
+  const [customXpAmount, setCustomXpAmount] = useState('');
+  const [isGivingXp, setIsGivingXp] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [drawerAlert, setDrawerAlert] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const schoolMap = useMemo(() => {
     const rawSchools = students.map(s => s.school);
@@ -208,7 +231,7 @@ export default function AdminDashboard({
   }, [students]);
 
   const filteredStudents = useMemo(() => {
-    return students
+    let result = students
       .filter(student => {
         const matchesSearch = (student.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                              (student.email || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -227,11 +250,30 @@ export default function AdminDashboard({
         const matchesGremio = filterGremio 
           ? (student.gremio && normalizeString(student.gremio) === normalizeString(filterGremio)) 
           : true;
+
+        const matchesInactive = filterType === 'inactive'
+          ? (student.xp || 0) === 0
+          : true;
           
-        return matchesSearch && matchesCity && matchesSchool && matchesGremio;
-      })
-      .sort((a, b) => (b.xp || 0) - (a.xp || 0));
-  }, [students, searchTerm, filterCity, filterSchool, filterGremio, schoolMap]);
+        return matchesSearch && matchesCity && matchesSchool && matchesGremio && matchesInactive;
+      });
+
+    if (filterType === 'new') {
+      result.sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+    } else {
+      result.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+    }
+
+    if (filterType === 'top10') {
+      result = result.slice(0, 10);
+    }
+
+    return result;
+  }, [students, searchTerm, filterCity, filterSchool, filterGremio, filterType, schoolMap]);
 
   const citiesMA = useMemo(() => {
     const cities = cidadesEscolasData.map(item => item.city);
@@ -432,6 +474,52 @@ export default function AdminDashboard({
       setAvatarUploadError(error?.message || 'Nao foi possivel salvar a foto.');
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleGiveXp = async (amount: number) => {
+    if (!selectedStudent) return;
+    setIsGivingXp(true);
+    setDrawerAlert(null);
+    try {
+      const newXp = (selectedStudent.xp || 0) + amount;
+      const { level: newLevel } = calculateLevelAndProgression(newXp);
+      
+      const response = await userService.updateProfile({
+        email: selectedStudent.email,
+        xp: newXp,
+        level: newLevel
+      });
+
+      if (response.success) {
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, xp: newXp, level: newLevel } : s));
+        setSelectedStudent(prev => prev ? { ...prev, xp: newXp, level: newLevel } : null);
+        setCustomXpAmount('');
+        setDrawerAlert({ type: 'success', message: `${amount} XP concedidos com sucesso!` });
+      } else {
+        throw new Error('Falha ao atualizar XP');
+      }
+    } catch (error: any) {
+      setDrawerAlert({ type: 'error', message: error.message || 'Erro ao conceder XP' });
+    } finally {
+      setIsGivingXp(false);
+    }
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return;
+    setDrawerAlert(null);
+    try {
+      const response = await userService.deleteProfile(selectedStudent.email);
+      if (response.success) {
+        setStudents(prev => prev.filter(s => s.id !== selectedStudent.id));
+        setSelectedStudent(null);
+        setShowDeleteConfirm(false);
+      } else {
+        throw new Error('Falha ao excluir perfil');
+      }
+    } catch (error: any) {
+      setDrawerAlert({ type: 'error', message: error.message || 'Erro ao excluir aluno' });
     }
   };
 
@@ -2121,15 +2209,17 @@ export default function AdminDashboard({
               </div>
             ) : activeTab === 'alunos' ? (
               <div className="lg:col-span-12">
-                <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-8 md:p-12">
+                <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-8 md:p-12 relative overflow-hidden">
+                    {/* Header */}
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-8">
                        <div className="flex-1">
                          <h3 className="text-2xl font-black text-text-main tracking-tight">Estudantes Ativos</h3>
                          <p className="text-sm text-text-secondary font-medium mt-1">Gestão da rede de alunos vinculados ao projeto.</p>
                        </div>
                        
-                       <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-                         <div className="relative w-full sm:w-72">
+                       <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
+                         {/* Barra de busca */}
+                         <div className="relative w-full md:w-72 shrink-0">
                             <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none text-brand-primary opacity-40">
                               <Users size={18} />
                             </div>
@@ -2142,34 +2232,87 @@ export default function AdminDashboard({
                               placeholder="Buscar por nome ou email..."
                             />
                          </div>
-                       </div>
-                     </div>
 
-                     {/* Destaques de engajamento */}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 mt-6">
-                       <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
-                         <div className="w-12 h-12 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
-                           <Trophy size={24} />
-                         </div>
-                         <div>
-                           <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Cidade mais engajada</p>
-                           <h4 className="text-lg font-black text-text-main leading-tight">{mostEngagedCity.name}</h4>
-                           <p className="text-[10px] font-bold text-brand-primary mt-1">{mostEngagedCity.xp.toLocaleString()} XP Total</p>
+                         {/* Filtros Rápidos */}
+                         <div className="flex flex-wrap items-center gap-2 text-xs w-full md:w-auto">
+                           <span className="text-text-secondary font-bold mr-1">Ver:</span>
+                           <button 
+                             onClick={() => setFilterType('all')}
+                             className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold ${filterType === 'all' ? 'bg-brand-primary text-white border-brand-primary/30 shadow-md shadow-brand-primary/10' : 'bg-bg-sidebar/40 text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar/60'}`}
+                           >
+                             Todos
+                           </button>
+                           <button 
+                             onClick={() => setFilterType('top10')}
+                             className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold ${filterType === 'top10' ? 'bg-brand-primary text-white border-brand-primary/30 shadow-md shadow-brand-primary/10' : 'bg-bg-sidebar/40 text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar/60'}`}
+                           >
+                             Os 10+
+                           </button>
+                           <button 
+                             onClick={() => setFilterType('new')}
+                             className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold ${filterType === 'new' ? 'bg-brand-primary text-white border-brand-primary/30 shadow-md shadow-brand-primary/10' : 'bg-bg-sidebar/40 text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar/60'}`}
+                           >
+                             Novos
+                           </button>
+                           <button 
+                             onClick={() => setFilterType('inactive')}
+                             className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold ${filterType === 'inactive' ? 'bg-brand-primary text-white border-brand-primary/30 shadow-md shadow-brand-primary/10' : 'bg-bg-sidebar/40 text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar/60'}`}
+                           >
+                             Inativos
+                           </button>
                          </div>
                        </div>
-                       <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
-                         <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
-                           <Library size={24} />
-                         </div>
-                         <div>
-                           <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Escola mais engajada</p>
-                           <h4 className="text-lg font-black text-text-main leading-tight truncate max-w-[200px]" title={mostEngagedSchool.name}>{mostEngagedSchool.name}</h4>
-                           <p className="text-[10px] font-bold text-purple-500 mt-1">{mostEngagedSchool.xp.toLocaleString()} XP Total</p>
-                         </div>
-                       </div>
-                     </div>
+                    </div>
 
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                    {/* Cards de Métricas (KPIs) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10 mt-6">
+                      <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                        <div className="w-12 h-12 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
+                          <Users size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Alunos Ativos</p>
+                          <h4 className="text-xl font-black text-text-main leading-tight">{students.length}</h4>
+                          <p className="text-[10px] font-bold text-brand-primary mt-1">Total cadastrados</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                        <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                          <Trophy size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Média de XP</p>
+                          <h4 className="text-xl font-black text-text-main leading-tight">{averageXp.toLocaleString()} XP</h4>
+                          <p className="text-[10px] font-bold text-amber-500 mt-1">Por estudante</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                        <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-500 shrink-0">
+                          <TrendingUp size={24} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Cidade Líder</p>
+                          <h4 className="text-lg font-black text-text-main leading-tight truncate">{mostEngagedCity.name}</h4>
+                          <p className="text-[10px] font-bold text-cyan-500 mt-1 truncate">{mostEngagedCity.xp.toLocaleString()} XP</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-bg-sidebar/40 border border-border-color rounded-2xl p-6 flex items-center gap-6 shadow-sm relative overflow-hidden group">
+                        <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0">
+                          <School size={24} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-black text-text-secondary uppercase tracking-wider opacity-50 mb-1">Escola Campeã</p>
+                          <h4 className="text-lg font-black text-text-main leading-tight truncate" title={mostEngagedSchool.name}>{mostEngagedSchool.name}</h4>
+                          <p className="text-[10px] font-bold text-purple-500 mt-1 truncate">{mostEngagedSchool.xp.toLocaleString()} XP</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filtros em Grade */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                       <div className="space-y-2">
                         <label htmlFor="filterCity" className="text-[10px] font-black text-text-secondary tracking-wider opacity-40 ml-4">Cidades</label>
                         <div className="relative">
@@ -2188,8 +2331,8 @@ export default function AdminDashboard({
                                <option key={city} value={city}>{city}</option>
                              ))}
                            </select>
-                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
-                             <ArrowRight className="rotate-90" size={16} />
+                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 text-text-main">
+                             <ChevronDown size={16} />
                            </div>
                         </div>
                       </div>
@@ -2209,8 +2352,8 @@ export default function AdminDashboard({
                                <option key={school} value={school}>{school}</option>
                              ))}
                            </select>
-                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
-                             <ArrowRight className="rotate-90" size={16} />
+                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 text-text-main">
+                             <ChevronDown size={16} />
                            </div>
                         </div>
                       </div>
@@ -2230,158 +2373,477 @@ export default function AdminDashboard({
                                <option key={gremio} value={gremio}>{gremio}</option>
                              ))}
                            </select>
-                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
-                             <ArrowRight className="rotate-90" size={16} />
+                           <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-30 text-text-main">
+                             <ChevronDown size={16} />
                            </div>
                         </div>
                      </div>
-                   </div>
+                    </div>
 
-                   <div className="hidden lg:block overflow-x-auto">
-                     <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-border-color">
-                            <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 pl-4 w-[30%]">Aluno</th>
-                            <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[20%]">Localização</th>
-                            <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[20%]">Escola / Grêmio</th>
-                            <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[20%]">Progresso</th>
-                            <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 text-right pr-4 w-[10%]">Nível</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-color/50">
-                          {filteredStudents.map((student) => (
-                            <tr key={student.id} className="group hover:bg-text-main/[0.02] transition-colors relative">
-                              <td className="py-6 pl-4">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
-                                    {student.avatarUrl || student.avatar ? (
-                                      <img 
-                                        src={student.avatarUrl || student.avatar || ''} 
-                                        alt="" 
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      student.name?.charAt(0) || '?'
-                                    )}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="text-text-main font-bold text-sm truncate">{student.name}</div>
-                                    <div className="text-text-secondary text-[10px] font-medium opacity-40 truncate">{student.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-6">
-                                <div className="text-text-main font-bold text-sm">{student.city}</div>
-                                <div className="text-text-secondary text-[10px] font-bold tracking-wider opacity-60">MA</div>
-                              </td>
-                              <td className="py-6">
-                                <div className="text-text-main font-bold text-sm">{student.school}</div>
-                                <div className="text-brand-primary text-[10px] font-black tracking-wider leading-none mt-1">{student.gremio}</div>
-                              </td>
-                              <td className="py-6">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-32 h-1.5 bg-text-main/5 rounded-full overflow-hidden">
-                                     {(() => {
-                                       const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
-                                       const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
-                                       const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
-                                       const xpPercentage = xpNeededInCurrentLevel > 0 
-                                         ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
-                                         : 0;
-                                       return (
-                                         <div 
-                                          ref={(el) => { if (el) el.style.width = `${xpPercentage}%`; }}
-                                          className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
+                    {/* Tabela Desktop */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full text-left">
+                         <thead>
+                           <tr className="border-b border-border-color">
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 pl-4 w-[25%]">Aluno</th>
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[20%]">Rank / Categoria</th>
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[15%]">Localização</th>
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[20%]">Escola / Grêmio</th>
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 w-[15%]">Progresso</th>
+                             <th className="pb-6 text-[10px] font-black text-text-secondary tracking-wider opacity-40 text-right pr-4 w-[5%]">Nível</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-border-color/50">
+                           {filteredStudents.map((student) => {
+                             const rankInfo = getStudentRankInfo(student.level || calculateLevelAndProgression(student.xp || 0).level);
+                             return (
+                               <tr 
+                                 key={student.id} 
+                                 onClick={() => {
+                                   setSelectedStudent(student);
+                                   setCustomXpAmount('');
+                                   setDrawerAlert(null);
+                                   setShowDeleteConfirm(false);
+                                 }}
+                                 className="group hover:bg-text-main/[0.04] transition-colors relative cursor-pointer"
+                               >
+                                 <td className="py-6 pl-4">
+                                   <div className="flex items-center gap-4">
+                                     <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
+                                       {student.avatarUrl || student.avatar ? (
+                                         <img 
+                                           src={student.avatarUrl || student.avatar || ''} 
+                                           alt="" 
+                                           className="w-full h-full object-cover"
                                          />
-                                       );
-                                     })()}
-                                  </div>
-                                  <span className="text-[10px] font-black text-text-secondary opacity-60">{student.xp} XP</span>
+                                       ) : (
+                                         student.name?.charAt(0) || '?'
+                                       )}
+                                     </div>
+                                     <div className="min-w-0">
+                                       <div className="text-text-main font-bold text-sm truncate">{student.name}</div>
+                                       <div className="text-text-secondary text-[10px] font-medium opacity-40 truncate">{student.email}</div>
+                                     </div>
+                                   </div>
+                                 </td>
+                                 <td className="py-6">
+                                   <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg uppercase tracking-wider ${rankInfo.classes}`}>
+                                     {rankInfo.label}
+                                   </span>
+                                 </td>
+                                 <td className="py-6">
+                                   <div className="text-text-main font-bold text-sm">{student.city || 'Desconhecida'}</div>
+                                   <div className="text-text-secondary text-[10px] font-bold tracking-wider opacity-60">MA</div>
+                                 </td>
+                                 <td className="py-6">
+                                   <div className="text-text-main font-bold text-sm truncate max-w-[200px]" title={student.school}>{student.school || 'Sem escola'}</div>
+                                   <div className="text-brand-primary text-[10px] font-black tracking-wider leading-none mt-1">{student.gremio || 'Sem grêmio'}</div>
+                                 </td>
+                                 <td className="py-6">
+                                   <div className="flex items-center gap-3">
+                                     <div className="w-24 h-1.5 bg-text-main/5 rounded-full overflow-hidden">
+                                        {(() => {
+                                          const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
+                                          const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
+                                          const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+                                          const xpPercentage = xpNeededInCurrentLevel > 0 
+                                            ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+                                            : 0;
+                                          return (
+                                            <div 
+                                             style={{ width: `${xpPercentage}%` }}
+                                             className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
+                                            />
+                                          );
+                                        })()}
+                                     </div>
+                                     <span className="text-[10px] font-black text-text-secondary opacity-60">{student.xp?.toLocaleString() || 0} XP</span>
+                                   </div>
+                                 </td>
+                                 <td className="py-6 text-right pr-4">
+                                   <span className="text-xl font-black text-text-main">{calculateLevelAndProgression(student.xp || 0).level}</span>
+                                 </td>
+                               </tr>
+                             );
+                           })}
+                         </tbody>
+                      </table>
+                    </div>
+
+                    {/* Cards Mobile */}
+                    <div className="lg:hidden space-y-4">
+                      {filteredStudents.map((student) => {
+                        const rankInfo = getStudentRankInfo(student.level || calculateLevelAndProgression(student.xp || 0).level);
+                        return (
+                          <div 
+                            key={student.id} 
+                            onClick={() => {
+                              setSelectedStudent(student);
+                              setCustomXpAmount('');
+                              setDrawerAlert(null);
+                              setShowDeleteConfirm(false);
+                            }}
+                            className="bg-bg-sidebar/30 border border-border-color rounded-[32px] p-6 cursor-pointer hover:border-brand-primary/30 transition-all"
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-6">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-lg shrink-0">
+                                  {student.avatarUrl || student.avatar ? (
+                                    <img 
+                                      src={student.avatarUrl || student.avatar || ''} 
+                                      alt="" 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    student.name?.charAt(0) || '?'
+                                  )}
                                 </div>
-                              </td>
-                              <td className="py-6 text-right pr-4">
-                                <span className="text-xl font-black text-text-main">{calculateLevelAndProgression(student.xp || 0).level}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                     </table>
-                   </div>
-
-                   {/* Mobile Cards for Students */}
-                   <div className="lg:hidden space-y-4">
-                     {filteredStudents.map((student) => (
-                       <div key={student.id} className="bg-bg-sidebar/30 border border-border-color rounded-[32px] p-6">
-                         <div className="flex items-center gap-4 mb-6">
-                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-lg shrink-0">
-                             {student.avatarUrl || student.avatar ? (
-                               <img 
-                                 src={student.avatarUrl || student.avatar || ''} 
-                                 alt="" 
-                                 className="w-full h-full object-cover"
-                               />
-                             ) : (
-                               student.name?.charAt(0) || '?'
-                             )}
-                           </div>
-                           <div className="min-w-0">
-                             <div className="text-text-main font-black text-base truncate">{student.name}</div>
-                             <div className="text-text-secondary text-[11px] font-medium opacity-40 truncate">{student.email}</div>
-                           </div>
-                         </div>
-                         
-                         <div className="grid grid-cols-2 gap-4 mb-6">
-                           <div>
-                             <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1">Localização</div>
-                             <div className="text-text-main font-bold text-xs">{student.city}, MA</div>
-                           </div>
-                           <div>
-                             <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1">Escola / Grêmio</div>
-                             <div className="text-text-main font-bold text-xs truncate">{student.school}</div>
-                             <div className="text-brand-primary text-[8px] font-black tracking-wider">{student.gremio}</div>
-                           </div>
-                         </div>
-
-                         <div className="flex items-end justify-between border-t border-border-color pt-6">
-                           <div className="flex-1 mr-4">
-                              <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-2">Progresso</div>
-                              <div className="flex items-center gap-3">
-                                 <div className="flex-1 h-1 bg-text-main/5 rounded-full overflow-hidden">
-                                   {(() => {
-                                     const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
-                                     const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
-                                     const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
-                                     const xpPercentage = xpNeededInCurrentLevel > 0 
-                                       ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
-                                       : 0;
-                                     return (
-                                       <div 
-                                         className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
-                                         ref={(el) => { if (el) el.style.width = `${xpPercentage}%`; }}
-                                       />
-                                     );
-                                   })()}
-                                 </div>
-                                 <span className="text-[9px] font-black text-text-secondary opacity-60 shrink-0">{student.xp} XP</span>
+                                <div className="min-w-0">
+                                  <div className="text-text-main font-black text-base truncate">{student.name}</div>
+                                  <div className="text-text-secondary text-[11px] font-medium opacity-40 truncate">{student.email}</div>
+                                </div>
                               </div>
-                           </div>
-                           <div className="text-right shrink-0">
-                              <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1 leading-none">Nível</div>
-                              <div className="text-2xl font-black text-text-main leading-none">{calculateLevelAndProgression(student.xp || 0).level}</div>
-                           </div>
-                         </div>
-                         
+                              <span className={`px-2 py-0.5 text-[9px] font-black rounded uppercase tracking-wider shrink-0 ${rankInfo.classes}`}>
+                                {rankInfo.label}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                              <div>
+                                <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1">Localização</div>
+                                <div className="text-text-main font-bold text-xs">{student.city || 'Desconhecida'}, MA</div>
+                              </div>
+                              <div>
+                                <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1">Escola / Grêmio</div>
+                                <div className="text-text-main font-bold text-xs truncate">{student.school || 'Sem escola'}</div>
+                                <div className="text-brand-primary text-[8px] font-black tracking-wider">{student.gremio || 'Sem grêmio'}</div>
+                              </div>
+                            </div>
 
-                       </div>
-                     ))}
-                   </div>
+                            <div className="flex items-end justify-between border-t border-border-color pt-6">
+                              <div className="flex-1 mr-4">
+                                 <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-2">Progresso</div>
+                                 <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-1 bg-text-main/5 rounded-full overflow-hidden">
+                                      {(() => {
+                                        const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(student.xp || 0);
+                                        const xpInCurrentLevel = (student.xp || 0) - currentLevelMinXp;
+                                        const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+                                        const xpPercentage = xpNeededInCurrentLevel > 0 
+                                          ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+                                          : 0;
+                                        return (
+                                          <div 
+                                            className="h-full bg-brand-primary rounded-full transition-all duration-1000" 
+                                            style={{ width: `${xpPercentage}%` }}
+                                          />
+                                        );
+                                      })()}
+                                    </div>
+                                    <span className="text-[9px] font-black text-text-secondary opacity-60 shrink-0">{student.xp || 0} XP</span>
+                                 </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                 <div className="text-[9px] font-black text-text-secondary tracking-wider opacity-40 mb-1 leading-none">Nível</div>
+                                 <div className="text-2xl font-black text-text-main leading-none">{calculateLevelAndProgression(student.xp || 0).level}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                   {filteredStudents.length === 0 && (
-                     <div className="py-20 text-center">
-                       <Users size={40} className="mx-auto mb-4 text-brand-primary opacity-20" />
-                       <p className="text-text-secondary font-bold text-[10px] tracking-wider opacity-40">Nenhum aluno encontrado</p>
-                     </div>
-                   )}
+                    {filteredStudents.length === 0 && (
+                      <div className="py-20 text-center">
+                        <Users size={40} className="mx-auto mb-4 text-brand-primary opacity-20" />
+                        <p className="text-text-secondary font-bold text-[10px] tracking-wider opacity-40">Nenhum aluno encontrado</p>
+                      </div>
+                    )}
+
+                    {/* Drawer de Detalhes do Aluno (Framer Motion) */}
+                    <AnimatePresence>
+                      {selectedStudent && (
+                        <>
+                          {/* Backdrop */}
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.5 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedStudent(null)}
+                            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+                          />
+                          {/* Drawer Panel */}
+                          <motion.div
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-bg-card border-l border-border-color shadow-2xl z-50 flex flex-col h-full overflow-hidden"
+                          >
+                            {/* Header */}
+                            <div className="p-6 border-b border-border-color flex items-center justify-between shrink-0">
+                              <div>
+                                <h3 className="text-lg font-black text-text-main">Ficha do Estudante</h3>
+                                <p className="text-xs text-text-secondary">Dados cadastrais, atividades e ações rápidas</p>
+                              </div>
+                              <button 
+                                onClick={() => setSelectedStudent(null)} 
+                                className="p-2 rounded-xl bg-text-main/5 text-text-secondary hover:text-text-main hover:bg-text-main/10 transition-all cursor-pointer"
+                              >
+                                <X size={18} />
+                              </button>
+                            </div>
+
+                            {/* Scrollable Content */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                              {/* Alerta de Feedback se houver */}
+                              {drawerAlert && (
+                                <div className={`p-4 rounded-xl text-xs font-bold border ${drawerAlert.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                                  {drawerAlert.message}
+                                </div>
+                              )}
+
+                              {/* Perfil Header Card */}
+                              <div className="flex items-center gap-4 p-4 rounded-3xl bg-bg-sidebar/30 border border-border-color">
+                                <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/30 flex items-center justify-center text-xl font-black text-brand-primary shrink-0 overflow-hidden">
+                                  {selectedStudent.avatarUrl || selectedStudent.avatar ? (
+                                    <img 
+                                      src={selectedStudent.avatarUrl || selectedStudent.avatar || ''} 
+                                      alt="" 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    selectedStudent.name?.charAt(0) || '?'
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-base font-black text-text-main truncate">{selectedStudent.name}</h4>
+                                  <p className="text-xs text-text-secondary font-semibold truncate">{selectedStudent.email}</p>
+                                  <span className={`inline-block mt-2 px-2.5 py-0.5 text-[9px] font-black rounded uppercase tracking-wider ${getStudentRankInfo(selectedStudent.level || calculateLevelAndProgression(selectedStudent.xp || 0).level).classes}`}>
+                                    {getStudentRankInfo(selectedStudent.level || calculateLevelAndProgression(selectedStudent.xp || 0).level).label}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Dados Escolares / Localidade */}
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 rounded-2xl bg-bg-main/30 border border-border-color">
+                                  <span className="text-[9px] font-black uppercase text-text-secondary">Cidade</span>
+                                  <h5 className="text-xs font-bold mt-1 text-text-main">{selectedStudent.city || 'Desconhecida'}, MA</h5>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-bg-main/30 border border-border-color">
+                                  <span className="text-[9px] font-black uppercase text-text-secondary">Grêmio</span>
+                                  <h5 className="text-xs font-bold mt-1 text-brand-primary truncate">{selectedStudent.gremio || 'Sem grêmio'}</h5>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-bg-main/30 border border-border-color col-span-2">
+                                  <span className="text-[9px] font-black uppercase text-text-secondary">Instituição de Ensino</span>
+                                  <h5 className="text-xs font-bold mt-1 text-text-main truncate" title={selectedStudent.school}>{selectedStudent.school || 'Sem escola cadastrada'}</h5>
+                                </div>
+                              </div>
+
+                              {/* Progressão de Nível / XP */}
+                              <div className="p-5 rounded-2xl bg-gradient-to-br from-brand-primary/10 to-transparent border border-brand-primary/20">
+                                <div className="flex justify-between items-baseline mb-3">
+                                  <span className="text-xs font-black text-text-main">
+                                    Nível Atual: <span className="text-lg font-black text-brand-primary">{calculateLevelAndProgression(selectedStudent.xp || 0).level}</span>
+                                  </span>
+                                  <span className="text-xs font-extrabold text-text-main">{selectedStudent.xp?.toLocaleString() || 0} XP Total</span>
+                                </div>
+                                {/* Barra de progresso */}
+                                <div className="w-full h-2.5 bg-text-main/5 rounded-full overflow-hidden mb-2">
+                                  {(() => {
+                                    const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(selectedStudent.xp || 0);
+                                    const xpInCurrentLevel = (selectedStudent.xp || 0) - currentLevelMinXp;
+                                    const xpNeededInCurrentLevel = nextLevelXp - currentLevelMinXp;
+                                    const xpPercentage = xpNeededInCurrentLevel > 0 
+                                      ? Math.min((xpInCurrentLevel / xpNeededInCurrentLevel) * 100, 100) 
+                                      : 0;
+                                    return (
+                                      <div 
+                                        style={{ width: `${xpPercentage}%` }}
+                                        className="h-full bg-brand-primary rounded-full transition-all duration-500" 
+                                      />
+                                    );
+                                  })()}
+                                </div>
+                                <div className="flex justify-between text-[10px] text-text-secondary font-semibold">
+                                  {(() => {
+                                    const { currentLevelMinXp, nextLevelXp } = calculateLevelAndProgression(selectedStudent.xp || 0);
+                                    const xpNeeded = nextLevelXp - (selectedStudent.xp || 0);
+                                    return (
+                                      <>
+                                        <span>Min: {currentLevelMinXp.toLocaleString()} XP</span>
+                                        <span>Faltam {xpNeeded.toLocaleString()} XP para o Nível {calculateLevelAndProgression(selectedStudent.xp || 0).level + 1}</span>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+
+                              {/* Histórico Recente de Atividades */}
+                              <div className="space-y-3">
+                                <h4 className="text-xs font-black text-text-secondary uppercase tracking-wider">Histórico de Atividade</h4>
+                                <div className="space-y-2">
+                                  {(() => {
+                                    const studentActivities = liveActivities.filter(
+                                      act => act.user && normalizeString(act.user) === normalizeString(selectedStudent.name)
+                                    );
+                                    
+                                    if (studentActivities.length > 0) {
+                                      return studentActivities.map(act => (
+                                        <div key={act.id} className="p-3.5 rounded-xl bg-bg-main/30 border border-border-color flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="w-6 h-6 rounded bg-brand-primary/10 text-brand-primary flex items-center justify-center">
+                                              <Activity size={14} />
+                                            </div>
+                                            <div>
+                                              <h6 className="font-bold text-text-main">{act.action}</h6>
+                                              <p className="text-[10px] text-text-secondary">{act.time}</p>
+                                            </div>
+                                          </div>
+                                          <span className="text-text-secondary text-[10px] font-bold">{act.city}</span>
+                                        </div>
+                                      ));
+                                    }
+
+                                    // Fallback simulado para enriquecer o visual
+                                    return (
+                                      <>
+                                        <div className="p-3.5 rounded-xl bg-bg-main/30 border border-border-color flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="w-6 h-6 rounded bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                                              <CheckSquare size={14} />
+                                            </div>
+                                            <div>
+                                              <h6 className="font-bold text-text-main">Simulado Concluído</h6>
+                                              <p className="text-[10px] text-text-secondary">Matemática e Suas Tecnologias</p>
+                                            </div>
+                                          </div>
+                                          <span className="text-emerald-400 font-bold">+450 XP</span>
+                                        </div>
+
+                                        <div className="p-3.5 rounded-xl bg-bg-main/30 border border-border-color flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="w-6 h-6 rounded bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                                              <Video size={14} />
+                                            </div>
+                                            <div>
+                                              <h6 className="font-bold text-text-main">Videoaula Assistida</h6>
+                                              <p className="text-[10px] text-text-secondary">Introdução às Funções Afins</p>
+                                            </div>
+                                          </div>
+                                          <span className="text-indigo-400 font-bold">+150 XP</span>
+                                        </div>
+
+                                        <div className="p-3.5 rounded-xl bg-bg-main/30 border border-border-color flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="w-6 h-6 rounded bg-violet-500/10 text-violet-400 flex items-center justify-center">
+                                              <FileText size={14} />
+                                            </div>
+                                            <div>
+                                              <h6 className="font-bold text-text-main">Material Baixado</h6>
+                                              <p className="text-[10px] text-text-secondary">Resumo Teórico ENEM - Redação</p>
+                                            </div>
+                                          </div>
+                                          <span className="text-violet-400 font-bold">+50 XP</span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Drawer Footer / Actions Panel */}
+                            <div className="p-6 border-t border-border-color bg-bg-main/20 shrink-0 space-y-4">
+                              {/* Painel de XP */}
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-black uppercase text-text-secondary tracking-wider">Conceder XP Bônus</span>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  <button 
+                                    disabled={isGivingXp}
+                                    onClick={() => handleGiveXp(50)}
+                                    className="px-3 py-1.5 text-xs font-bold bg-bg-main border border-border-color text-text-main hover:bg-text-main/5 hover:border-text-main/20 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    +50 XP
+                                  </button>
+                                  <button 
+                                    disabled={isGivingXp}
+                                    onClick={() => handleGiveXp(100)}
+                                    className="px-3 py-1.5 text-xs font-bold bg-bg-main border border-border-color text-text-main hover:bg-text-main/5 hover:border-text-main/20 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    +100 XP
+                                  </button>
+                                  <button 
+                                    disabled={isGivingXp}
+                                    onClick={() => handleGiveXp(500)}
+                                    className="px-3 py-1.5 text-xs font-bold bg-bg-main border border-border-color text-text-main hover:bg-text-main/5 hover:border-text-main/20 rounded-xl transition-all cursor-pointer disabled:opacity-50"
+                                  >
+                                    +500 XP
+                                  </button>
+                                </div>
+                                <div className="flex gap-2">
+                                  <input 
+                                    type="number"
+                                    placeholder="Valor personalizado..."
+                                    value={customXpAmount}
+                                    onChange={(e) => setCustomXpAmount(e.target.value)}
+                                    disabled={isGivingXp}
+                                    className="flex-1 bg-bg-main border border-border-color text-xs rounded-xl px-4 py-2.5 outline-none focus:border-brand-primary/50 text-text-main"
+                                  />
+                                  <button 
+                                    disabled={isGivingXp || !customXpAmount}
+                                    onClick={() => {
+                                      const val = parseInt(customXpAmount, 10);
+                                      if (!isNaN(val) && val > 0) {
+                                        handleGiveXp(val);
+                                      }
+                                    }}
+                                    className="px-4 py-2.5 text-xs font-extrabold text-white bg-brand-primary rounded-xl hover:bg-brand-primary/90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 shrink-0"
+                                  >
+                                    {isGivingXp && <Loader2 size={12} className="animate-spin" />}
+                                    Enviar
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Ações de Gerenciamento / Exclusão */}
+                              <div className="pt-2 border-t border-border-color/50">
+                                {!showDeleteConfirm ? (
+                                  <button 
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                    className="w-full py-3 border border-red-500/20 hover:bg-red-500/10 text-red-400 hover:text-red-300 font-bold text-xs flex items-center justify-center gap-2 rounded-2xl transition-all cursor-pointer"
+                                  >
+                                    <ShieldAlert size={14} />
+                                    Excluir Perfil do Estudante
+                                  </button>
+                                ) : (
+                                  <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-2xl space-y-3">
+                                    <p className="text-[10px] text-red-300 font-bold text-center leading-tight">
+                                      ATENÇÃO: Isso excluirá permanentemente o aluno da base de dados e da autenticação. Deseja prosseguir?
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => setShowDeleteConfirm(false)}
+                                        className="flex-1 py-2 text-xs font-bold bg-bg-main border border-border-color text-text-secondary hover:text-text-main rounded-xl transition-all cursor-pointer"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      <button 
+                                        onClick={handleDeleteStudent}
+                                        className="flex-1 py-2 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white rounded-xl transition-all cursor-pointer"
+                                      >
+                                        Sim, Excluir
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
                 </div>
               </div>
             ) : activeTab === 'mural' ? (
