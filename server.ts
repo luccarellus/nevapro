@@ -77,6 +77,36 @@ const log = {
   error: (...args: any[]) => { console.error(...args); } // Erros sempre logados
 };
 
+const isUpstashRedisConfigured = () => {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+};
+
+const runUpstashRedisCommand = async (command: string[]) => {
+  if (!isUpstashRedisConfigured()) {
+    return null;
+  }
+
+  const response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify([command])
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upstash Redis respondeu com status ${response.status}`);
+  }
+
+  const [result] = await response.json() as Array<{ result?: unknown; error?: string }>;
+  if (result?.error) {
+    throw new Error(result.error);
+  }
+
+  return result?.result;
+};
+
 // Validação simples de corpo de requisição
 const validateBody = (requiredFields: string[]) => {
   return (req: any, res: any, next: any) => {
@@ -2006,8 +2036,24 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
 });
 
 // Rota de Health Check para o Docker Compose
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const redis = {
+    configured: isUpstashRedisConfigured(),
+    status: 'not_configured',
+    ping: null as unknown
+  };
+
+  if (redis.configured) {
+    try {
+      redis.ping = await runUpstashRedisCommand(['PING']);
+      redis.status = redis.ping === 'PONG' ? 'healthy' : 'unexpected_response';
+    } catch (error: any) {
+      redis.status = 'error';
+      log.warn('[Health] Upstash Redis indisponivel:', error?.message || error);
+    }
+  }
+
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString(), redis });
 });
 
 // Middleware de tratamento de erros centralizado
