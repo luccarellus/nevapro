@@ -24,7 +24,7 @@ import CookiePolicy from './components/CookiePolicy';
 import Maintenance from './components/Maintenance';
 import ComingSoon from './components/ComingSoon';
 import { UserProfile } from './types';
-import { Sun, Moon, ShieldCheck, User as UserIcon, BookOpen, PenTool, Sparkles } from 'lucide-react';
+import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
@@ -309,7 +309,6 @@ export default function App() {
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
 
-  // Toggle this flag to true to enable the maintenance screen and block the entire system
   const IS_UNDER_MAINTENANCE = false;
 
   if (IS_UNDER_MAINTENANCE) {

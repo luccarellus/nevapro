@@ -1,44 +1,33 @@
+import { request } from '../lib/apiService';
 import { UserProfile } from '../types';
 
 export const userService = {
   async getProfile(email?: string): Promise<UserProfile> {
-    try {
-      const url = email ? `/api/user/profile?email=${email}` : '/api/user/profile';
-      const response = await fetch(url);
-      if (!response.ok) {
-        const error = new Error('Failed to fetch profile') as any;
-        error.status = response.status;
-        throw error;
-      }
-      return response.json();
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    const url = email ? `/api/user/profile?email=${encodeURIComponent(email)}` : '/api/user/profile';
+    const response = await fetch(url);
+    if (!response.ok) {
+      const error: any = new Error('Failed to fetch profile');
+      error.status = response.status;
       throw error;
     }
+    return response.json();
   },
 
   async updateProfile(data: Partial<UserProfile>): Promise<{ success: boolean; user: UserProfile }> {
-    const response = await fetch('/api/user/profile', {
+    return request('/api/user/profile', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      body: data,
     });
-    if (!response.ok) throw new Error('Failed to update profile');
-    return response.json();
   },
 
   async deleteProfile(email?: string): Promise<{ success: boolean }> {
-    const url = email ? `/api/user/profile?email=${encodeURIComponent(email)}` : '/api/user/profile';
-    const response = await fetch(url, {
-      method: 'DELETE',
-    });
-    if (!response.ok) throw new Error('Failed to delete profile');
-    return response.json();
+    const url = email 
+      ? `/api/user/profile?email=${encodeURIComponent(email)}` 
+      : '/api/user/profile';
+    return request(url, { method: 'DELETE' });
   },
 
-  async login(credentials: { email: string, password?: string }): Promise<{ success: boolean; user: UserProfile }> {
+  async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -49,7 +38,7 @@ export const userService = {
       try {
         const error = await response.json();
         errorMsg = error.error || errorMsg;
-      } catch (e) {
+      } catch {
         errorMsg = 'Servidor indisponível (Erro 500)';
       }
       throw new Error(errorMsg);
@@ -68,7 +57,7 @@ export const userService = {
       try {
         const error = await response.json();
         errorMsg = error.error || errorMsg;
-      } catch (e) {
+      } catch {
         errorMsg = 'Servidor indisponível (Erro 500)';
       }
       throw new Error(errorMsg);
@@ -78,11 +67,9 @@ export const userService = {
 
   async getLeaderboard(): Promise<UserProfile[]> {
     try {
-      const response = await fetch('/api/leaderboard');
-      if (!response.ok) throw new Error('Failed to fetch leaderboard');
-      return response.json();
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
+      return request<UserProfile[]>('/api/leaderboard');
+    } catch {
+      console.error('Error fetching leaderboard:');
       return [];
     }
   },
@@ -98,9 +85,9 @@ export const userService = {
       try {
         const error = await response.json();
         errorMsg = error.error || errorMsg;
-      } catch (e) {}
+      } catch {}
       throw new Error(errorMsg);
     }
     return response.json();
-  }
+  },
 };

@@ -7,6 +7,8 @@ import { MOCK_SIMULADOS, ENEM_YEARS } from '../data/mockData';
 import { Question, UserProfile } from '../types';
 import { enemService } from '../services/enemService';
 import { ClipboardList, Clock, ArrowRight, Loader2, Award, Check, X, Info, ChevronDown, AlertTriangle } from 'lucide-react';
+import { MarkdownImage } from './ProxiedImage';
+import QuestionOption from './QuestionOption';
 
 interface SimuladosProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -449,23 +451,7 @@ export default function Simulados({
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
                         components={{
-                          img: (props) => {
-                            const { src, alt } = props;
-                            if (!src) return null;
-                            const isProxy = src.startsWith('/api/imagem');
-                            const fullUrl = isProxy ? src : `/api/imagem?url=${encodeURIComponent(src)}`;
-                            return (
-                              <span className="block my-6">
-                                <img 
-                                  src={fullUrl} 
-                                  alt={alt || 'Imagem da questão'} 
-                                  className="max-w-full h-auto rounded-2xl mx-auto bg-bg-sidebar p-3 shadow-inner ring-1 ring-border-color" 
-                                  referrerPolicy="no-referrer"
-                                  loading="lazy"
-                                />
-                              </span>
-                            );
-                          },
+                          img: MarkdownImage,
                           p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed whitespace-pre-wrap">{children}</p>
                         }}
                       >
@@ -487,66 +473,19 @@ export default function Simulados({
 
                   {/* Options List */}
                   <div className="grid grid-cols-1 gap-3.5">
-                    {q.options.map((option, optIdx) => {
-                      const isSelected = answer === optIdx;
-                      const isCorrectOption = optIdx === q.correctOptionIndex;
-                      const optionImage = q.optionImages?.[optIdx];
-
-                      let optStyle = "bg-text-main/5 border-transparent";
-                      let badge = null;
-
-                      if (isCorrectOption) {
-                        optStyle = "bg-brand-primary/10 border-brand-primary ring-1 ring-brand-primary";
-                        badge = (
-                          <span className="ml-auto text-[9px] font-black text-brand-primary uppercase tracking-wider flex items-center gap-1 shrink-0">
-                            <Check size={12} /> Gabarito
-                          </span>
-                        );
-                      } else if (isSelected && !isCorrectOption) {
-                        optStyle = "bg-red-500/10 border-red-500 ring-1 ring-red-500";
-                        badge = (
-                          <span className="ml-auto text-[9px] font-black text-red-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                            <X size={12} /> Sua Resposta
-                          </span>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={optIdx}
-                          className={`w-full p-4 sm:p-5 rounded-2xl border text-left flex flex-col gap-3.5 transition-all ${optStyle}`}
-                        >
-                          <div className="flex items-center gap-3 sm:gap-4">
-                            <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
-                              isCorrectOption 
-                              ? 'bg-brand-primary text-white shadow-md shadow-brand-primary/20' 
-                              : isSelected 
-                                ? 'bg-red-500 text-white shadow-md shadow-red-500/20' 
-                                : 'bg-text-main/10 text-text-secondary'
-                            }`}>
-                              {String.fromCharCode(65 + optIdx)}
-                            </span>
-                            {option && (
-                              <span className="font-bold text-xs md:text-sm text-text-main leading-snug flex-1">
-                                {option}
-                              </span>
-                            )}
-                            {badge}
-                          </div>
-
-                          {optionImage && (
-                            <div className="ml-0 sm:ml-12 rounded-xl overflow-hidden max-w-full md:max-w-xs bg-bg-sidebar p-2 ring-1 ring-border-color">
-                              <img 
-                                src={optionImage} 
-                                alt={`Opção ${String.fromCharCode(65 + optIdx)}`}
-                                className="w-full h-auto object-contain"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {q.options.map((option, optIdx) => (
+                      <QuestionOption
+                        key={optIdx}
+                        index={optIdx}
+                        text={option}
+                        imageUrl={q.optionImages?.[optIdx]}
+                        isSelected={answer === optIdx}
+                        isCorrectOption={optIdx === q.correctOptionIndex}
+                        isUserWrong={answer === optIdx && answer !== q.correctOptionIndex}
+                        interactive={false}
+                        size="md"
+                      />
+                    ))}
                   </div>
                 </motion.div>
               );
@@ -601,38 +540,7 @@ export default function Simulados({
                  remarkPlugins={[remarkGfm]}
                  rehypePlugins={[rehypeRaw]}
                  components={{
-                   img: (props) => {
-                     const { src, alt } = props;
-                     if (!src) return null;
-                     
-                     const isProxy = src.startsWith('/api/imagem');
-                     const fullUrl = isProxy ? src : `/api/imagem?url=${encodeURIComponent(src)}`;
-
-                     return (
-                       <span className="block my-8 md:my-10">
-                         <img 
-                           src={fullUrl} 
-                           alt={alt || 'Imagem da questão'} 
-                           className="max-w-full h-auto rounded-3xl mx-auto bg-bg-sidebar p-4 shadow-inner ring-1 ring-border-color" 
-                           referrerPolicy="no-referrer"
-                           loading="lazy"
-                           onError={(e) => {
-                             const target = e.target as HTMLImageElement;
-                             if (target.src.includes('/api/imagem')) {
-                               const urlParams = new URLSearchParams(target.src.split('?')[1]);
-                               const original = urlParams.get('url');
-                               if (original && !target.dataset.triedOriginal) {
-                                 target.dataset.triedOriginal = 'true';
-                                 target.src = original;
-                                 return;
-                               }
-                             }
-                             target.style.display = 'none';
-                           }}
-                         />
-                       </span>
-                     );
-                   },
+                   img: MarkdownImage,
                    p: ({ children }) => <p className="mb-6 last:mb-0 leading-relaxed opacity-95 whitespace-pre-wrap">{children}</p>
                  }}
               >
@@ -666,61 +574,18 @@ export default function Simulados({
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:gap-4">
-             {currentQuestion.options.map((option, index) => {
-                const isSelected = userAnswers[currentIndex] === index;
-                const optionImage = currentQuestion.optionImages?.[index];
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleOptionSelect(index)}
-                    className={`w-full text-left p-4 sm:p-5 md:p-6 rounded-[24px] border-transparent transition-all duration-300 flex flex-col gap-3 sm:gap-4 group/opt ${
-                      isSelected 
-                      ? 'bg-brand-primary/10 ring-2 ring-brand-primary shadow-lg shadow-brand-primary/5' 
-                      : 'bg-text-main/5 hover:bg-text-main/10'
-                    }`}
-                  >
-                    <div className="flex items-start md:items-center gap-3 sm:gap-4 md:gap-5">
-                      <span className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center font-black text-xs md:text-sm shrink-0 transition-all ${
-                        isSelected 
-                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20 scale-105 md:scale-110' 
-                        : 'bg-text-main/10 text-text-secondary group-hover/opt:text-text-main'
-                      }`}>
-                        {String.fromCharCode(65 + index)}
-                      </span>
-                      {option && (
-                        <span className={`font-bold text-sm md:text-base leading-snug mt-1 md:mt-0 transition-colors ${isSelected ? 'text-text-main' : 'text-text-secondary group-hover/opt:text-text-main'}`}>
-                          {option}
-                        </span>
-                      )}
-                    </div>
-                    
-                    {optionImage && (
-                      <div className="ml-0 sm:ml-12 md:ml-14 rounded-xl overflow-hidden max-w-full md:max-w-md bg-bg-sidebar p-2 md:p-3 ring-1 ring-border-color">
-                        <img 
-                          src={optionImage} 
-                          alt={`Opção ${String.fromCharCode(65 + index)}`}
-                          className="w-full h-auto object-contain"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            if (target.src.includes('/api/imagem')) {
-                              const urlParams = new URLSearchParams(target.src.split('?')[1]);
-                              const original = urlParams.get('url');
-                              if (original && !target.dataset.triedOriginal) {
-                                target.dataset.triedOriginal = 'true';
-                                target.src = original;
-                                return;
-                              }
-                            }
-                            target.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                  </button>
-                );
-             })}
+             {currentQuestion.options.map((option, index) => (
+                <QuestionOption
+                  key={index}
+                  index={index}
+                  text={option}
+                  imageUrl={currentQuestion.optionImages?.[index]}
+                  isSelected={userAnswers[currentIndex] === index}
+                  interactive
+                  size="md"
+                  onSelect={handleOptionSelect}
+                />
+             ))}
           </div>
         </motion.div>
 

@@ -5,10 +5,12 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import confetti from 'canvas-confetti';
 import { 
-  AlertOctagon, BookOpen, Clock, ArrowRight, Loader2, Award, 
-  Check, X, Info, ChevronDown, Eye, MessageSquare, 
+  AlertOctagon, ArrowRight, Loader2, Award, 
+  Check, X, ChevronDown, MessageSquare, 
   BarChart2, CheckCircle2, Frown, Sparkles, Search, RotateCcw
 } from 'lucide-react';
+import { MarkdownImage } from './ProxiedImage';
+import QuestionOption from './QuestionOption';
 import { UserProfile } from '../types';
 
 interface ErrorQuestion {
@@ -193,7 +195,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
     }
   };
 
-  const formatLetter = (idx: number) => String.fromCharCode(97 + idx); // a, b, c, d, e
+  const formatLetter = (idx: number) => String.fromCharCode(65 + idx); // A, B, C, D, E
 
   if (loading) {
     return (
@@ -459,22 +461,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                                 remarkPlugins={[remarkGfm]}
                                 rehypePlugins={[rehypeRaw]}
                                 components={{
-                                  img: (props) => {
-                                    const { src, alt } = props;
-                                    if (!src) return null;
-                                    const fullUrl = src.startsWith('/api/imagem') ? src : `/api/imagem?url=${encodeURIComponent(src)}`;
-                                    return (
-                                      <span className="block my-6">
-                                        <img 
-                                          src={fullUrl} 
-                                          alt={alt || 'Imagem da questão'} 
-                                          className="max-w-full h-auto rounded-xl mx-auto bg-bg-sidebar p-3 shadow-inner ring-1 ring-border-color" 
-                                          referrerPolicy="no-referrer"
-                                          loading="lazy"
-                                        />
-                                      </span>
-                                    );
-                                  },
+                                  img: MarkdownImage,
                                   p: ({ children }) => <p className="mb-4 last:mb-0 whitespace-pre-wrap">{children}</p>
                                 }}
                               >
@@ -496,65 +483,23 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
 
                             {/* Lista de Alternativas Estilizada */}
                             <div className="grid grid-cols-1 gap-3.5">
-                              {q.options.map((option, optIdx) => {
-                                const isCorrectOption = optIdx === q.correctOptionIndex;
-                                const isUserMarked = optIdx === q.selectedOptionIndex;
-                                
-                                // Estado interativo na tentativa de refazer
-                                const isSelectedInRetry = selectedRetry === optIdx;
-
-                                let optStyle = "bg-bg-main/30 border-transparent hover:border-border-color/60 cursor-pointer";
-                                let circleStyle = "bg-bg-sidebar text-text-secondary border border-border-color";
-
-                                if (status === 'idle') {
-                                  // Se está exibindo a revisão original dos erros
-                                  if (isCorrectOption) {
-                                    optStyle = "bg-emerald-500/10 border-emerald-500 text-emerald-100 ring-1 ring-emerald-500 font-medium";
-                                    circleStyle = "bg-emerald-500 text-white font-black shadow-md shadow-emerald-500/20";
-                                  } else if (isUserMarked) {
-                                    optStyle = "bg-red-500/10 border-red-500 text-red-100 ring-1 ring-red-500 font-medium";
-                                    circleStyle = "bg-red-500 text-white font-black shadow-md shadow-red-500/20";
-                                  }
-                                } else {
-                                  // Modo Interativo (Tentando resolver novamente)
-                                  if (isSelectedInRetry) {
-                                    optStyle = "bg-rose-500/10 border-rose-500 text-rose-100 ring-2 ring-rose-500 font-medium";
-                                    circleStyle = "bg-rose-500 text-white font-black";
-                                  }
-                                }
-
-                                return (
-                                  <button
-                                    key={optIdx}
-                                    onClick={() => {
-                                      setRetrySelectedOption(prev => ({ ...prev, [q.id]: optIdx }));
-                                      setRetryStatus(prev => ({ ...prev, [q.id]: 'interactive' }));
-                                    }}
-                                    className={`w-full p-4 sm:p-5 rounded-2xl border text-left flex items-start gap-4 transition-all duration-300 group/opt ${optStyle}`}
-                                  >
-                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 select-none transition-all ${circleStyle}`}>
-                                      {formatLetter(optIdx)}
-                                    </span>
-                                    {option && (
-                                      <span className="font-bold text-xs sm:text-sm leading-snug pt-1">
-                                        {option}
-                                      </span>
-                                    )}
-
-                                    {/* Imagens das alternativas (caso existam) */}
-                                    {q.optionImages?.[optIdx] && (
-                                      <div className="mt-3 rounded-lg overflow-hidden max-w-xs bg-bg-sidebar p-1 ring-1 ring-border-color block">
-                                        <img 
-                                          src={q.optionImages[optIdx]!} 
-                                          alt={`Opção ${formatLetter(optIdx)}`}
-                                          className="max-h-32 object-contain"
-                                          referrerPolicy="no-referrer"
-                                        />
-                                      </div>
-                                    )}
-                                  </button>
-                                );
-                              })}
+                              {q.options.map((option, optIdx) => (
+                                <QuestionOption
+                                  key={optIdx}
+                                  index={optIdx}
+                                  text={option}
+                                  imageUrl={q.optionImages?.[optIdx]}
+                                  isSelected={status !== 'idle' ? selectedRetry === optIdx : optIdx === q.selectedOptionIndex}
+                                  isCorrectOption={optIdx === q.correctOptionIndex}
+                                  isUserWrong={status === 'idle' && optIdx === q.selectedOptionIndex && optIdx !== q.correctOptionIndex}
+                                  interactive={true}
+                                  size="md"
+                                  onSelect={(idx) => {
+                                    setRetrySelectedOption(prev => ({ ...prev, [q.id]: idx }));
+                                    setRetryStatus(prev => ({ ...prev, [q.id]: 'interactive' }));
+                                  }}
+                                />
+                              ))}
                             </div>
 
                             {/* Barra de Status e Ações do Mockup */}

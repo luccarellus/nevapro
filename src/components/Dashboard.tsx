@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import { 
-  TrendingUp, Award, Flame, CheckCircle2, X, BookOpen, MessageSquare, 
+  TrendingUp, Award, Flame, CheckCircle2, X, 
   Zap, Trophy, MapPin, Users, ArrowRight, Star, FileText, Lightbulb
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -14,16 +14,6 @@ interface DashboardProps {
   onTabChange?: (tab: string) => void;
   onEarnXp?: (amount: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
 }
-
-const WEEKLY_DATA = [
-  { day: 'Seg', xp: 520 },
-  { day: 'Ter', xp: 890 },
-  { day: 'Qua', xp: 1200 },
-  { day: 'Qui', xp: 900 },
-  { day: 'Sex', xp: 1450 },
-  { day: 'Sáb', xp: 2100 },
-  { day: 'Dom', xp: 1100 },
-];
 
 const DAILY_QUESTIONS = [
   {

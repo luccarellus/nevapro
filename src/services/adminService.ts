@@ -1,3 +1,4 @@
+import { request } from '../lib/apiService';
 import { UserProfile } from '../types';
 
 export interface AdminActivity {
@@ -20,14 +21,10 @@ export interface AdminActivitiesResponse {
 
 export const adminService = {
   async getStudents(): Promise<UserProfile[]> {
-    const response = await fetch('/api/admin/users');
-    if (!response.ok) throw new Error('Failed to fetch students');
-    return response.json();
+    return request<UserProfile[]>('/api/admin/users');
   },
 
   async getActivities(): Promise<AdminActivitiesResponse> {
-    const response = await fetch('/api/admin/activities');
-    if (!response.ok) throw new Error('Failed to fetch admin activities');
-    return response.json();
-  }
+    return request<AdminActivitiesResponse>('/api/admin/activities');
+  },
 };

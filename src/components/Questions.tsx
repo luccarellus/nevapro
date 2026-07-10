@@ -6,7 +6,9 @@ import rehypeRaw from 'rehype-raw';
 import { Question, UserProfile } from '../types';
 import { ENEM_YEARS, ENEM_SUBJECTS } from '../data/mockData';
 import { enemService } from '../services/enemService';
-import { Check, X, ArrowRight, Info, Award, Loader2, BookOpen } from 'lucide-react';
+import { ArrowRight, Award, Loader2, BookOpen } from 'lucide-react';
+import { MarkdownImage } from './ProxiedImage';
+import QuestionOption from './QuestionOption';
 
 interface QuestionsProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -292,25 +294,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw]}
                   components={{
-                    img: (props) => {
-                      const { src, alt } = props;
-                      if (!src) return null;
-                      
-                      const isProxy = src.startsWith('/api/imagem');
-                      const fullUrl = isProxy ? src : `/api/imagem?url=${encodeURIComponent(src)}`;
-
-                      return (
-                        <div className="my-6 md:my-14 flex justify-center">
-                          <img 
-                            src={fullUrl} 
-                            alt={alt || 'Imagem da questão'} 
-                            className="max-w-full h-auto rounded-2xl md:rounded-3xl bg-bg-sidebar p-3 md:p-6 shadow-2xl ring-1 ring-border-color" 
-                            referrerPolicy="no-referrer"
-                            loading="lazy"
-                          />
-                        </div>
-                      );
-                    },
+                    img: MarkdownImage,
                     p: ({ children }) => <p className="mb-6 last:mb-0 leading-relaxed opacity-95">{children}</p>
                   }}
                 >
@@ -320,56 +304,18 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             </div>
 
             <div className="space-y-3.5 md:space-y-5 relative z-10">
-              {currentQuestion.options.map((option, index) => {
-                const isSelected = userAnswers[currentIndex] === index;
-                const optionImage = currentQuestion.optionImages?.[index];
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleOptionSelect(index)}
-                    className={`w-full text-left p-4 md:p-6 rounded-2xl md:rounded-[32px] border transition-all duration-500 group/opt relative overflow-hidden ${
-                      isSelected 
-                      ? 'bg-brand-primary/10 border-brand-primary/30 shadow-xl shadow-brand-primary/10' 
-                      : 'bg-bg-main/30 border-transparent hover:border-border-color hover:bg-bg-main/50'
-                    }`}
-                  >
-                    <div className="flex items-start gap-4 md:gap-6 relative z-10">
-                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center font-black text-xs md:text-sm shrink-0 transition-all duration-500 ${
-                        isSelected 
-                        ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/40 rotate-[360deg] scale-110' 
-                        : 'bg-bg-sidebar text-text-secondary group-hover/opt:text-brand-primary border border-border-color'
-                      }`}>
-                        {String.fromCharCode(64 + index + 1)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {option && (
-                          <p className={`font-bold text-sm sm:text-base md:text-lg leading-snug transition-colors ${isSelected ? 'text-text-main' : 'text-text-secondary group-hover/opt:text-text-main'}`}>
-                            {option}
-                          </p>
-                        )}
-                        
-                        {optionImage && (
-                          <div className="mt-4 sm:mt-6 rounded-2xl bg-bg-sidebar p-3 ring-1 ring-border-color inline-block overflow-hidden max-w-full">
-                            <img 
-                               src={optionImage} 
-                              alt={`Opção ${String.fromCharCode(65 + index)}`} 
-                              className="max-h-64 object-contain"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {isSelected && (
-                       <motion.div 
-                         layoutId="check-bg"
-                         className="absolute inset-0 bg-gradient-to-r from-brand-primary/5 to-transparent pointer-events-none"
-                       />
-                    )}
-                  </button>
-                );
-              })}
+              {currentQuestion.options.map((option, index) => (
+                <QuestionOption
+                  key={index}
+                  index={index}
+                  text={option}
+                  imageUrl={currentQuestion.optionImages?.[index]}
+                  isSelected={userAnswers[currentIndex] === index}
+                  interactive
+                  size="lg"
+                  onSelect={handleOptionSelect}
+                />
+              ))}
             </div>
           </div>
 
