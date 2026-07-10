@@ -107,6 +107,102 @@ const runUpstashRedisCommand = async (command: string[]) => {
   return result?.result;
 };
 
+// Helper para executar múltiplos comandos Redis em uma única chamada pipeline
+const runUpstashRedisPipeline = async (commands: string[][]) => {
+  if (!isUpstashRedisConfigured()) {
+    return null;
+  }
+
+  const response = await fetch(`${process.env.UPSTASH_REDIS_REST_URL}/pipeline`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(commands)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upstash Redis pipeline respondeu com status ${response.status}`);
+  }
+
+  const results = await response.json() as Array<{ result?: unknown; error?: string }>;
+
+  for (const r of results) {
+    if (r?.error) {
+      throw new Error(r.error);
+    }
+  }
+
+  return results;
+};
+
+// ============================================================
+// SISTEMA DE CACHE COM REDIS UPSTASH
+// ============================================================
+// Cache para consultas frequentes: leaderboard, materiais, recados, eventos, admin.
+// Usa padrão cache-aside: verifica Redis primeiro, se não encontrar busca no DB.
+// Invalidação manual: endpoints de escrita (POST/PUT/DELETE) limpam as chaves afetadas.
+// TTLs moderados (1-5 min) porque os dados mudam com frequência moderada.
+
+const CACHE_KEYS = {
+  LEADERBOARD: 'cache:leaderboard',
+  MATERIALS: 'cache:materials',
+  RECADOS: 'cache:recados',
+  EVENTOS: 'cache:eventos',
+  ADMIN_USERS: 'cache:admin:users',
+  ADMIN_ACTIVITIES: 'cache:admin:activities',
+} as const;
+
+const CACHE_TTL: Record<string, number> = {
+  [CACHE_KEYS.LEADERBOARD]: 60,        // 1 minuto (XP muda toda hora)
+  [CACHE_KEYS.MATERIALS]: 300,         // 5 minutos
+  [CACHE_KEYS.RECADOS]: 300,           // 5 minutos
+  [CACHE_KEYS.EVENTOS]: 300,           // 5 minutos
+  [CACHE_KEYS.ADMIN_USERS]: 120,       // 2 minutos
+  [CACHE_KEYS.ADMIN_ACTIVITIES]: 120,  // 2 minutos
+};
+
+// TTL para cache de questões do ENEM (dados históricos imutáveis, 10 minutos)
+const CACHE_TTL_QUESTOES = 600;
+
+// Tenta obter dado do cache Redis
+const cacheGet = async <T>(key: string): Promise<T | null> => {
+  if (!isUpstashRedisConfigured()) return null;
+  try {
+    const raw = await runUpstashRedisCommand(['GET', key]);
+    if (!raw || typeof raw !== 'string') return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+// Armazena dado no cache Redis com TTL pré-definido
+const cacheSet = async (key: string, data: unknown): Promise<void> => {
+  if (!isUpstashRedisConfigured()) return;
+  const ttl = CACHE_TTL[key] || 300;
+  try {
+    await runUpstashRedisPipeline([
+      ['SET', key, JSON.stringify(data)],
+      ['EXPIRE', key, String(ttl)]
+    ]);
+  } catch {
+    // Cache é opcional — falha silenciosa
+  }
+};
+
+// Invalida (remove) chaves específicas do cache
+const cacheInvalidate = async (...keys: string[]): Promise<void> => {
+  if (!isUpstashRedisConfigured() || keys.length === 0) return;
+  try {
+    const commands = keys.map(k => ['DEL', k]);
+    await runUpstashRedisPipeline(commands);
+  } catch {
+    // Falha silenciosa
+  }
+};
+
 // Validação simples de corpo de requisição
 const validateBody = (requiredFields: string[]) => {
   return (req: any, res: any, next: any) => {
@@ -197,59 +293,45 @@ const requireAdmin = (req: any, res: any, next: any) => {
   });
 };
 
-// Rate Limiter DB-backed (funciona em serverless/multi-instância)
+// Rate Limiter: Redis (Upstash)
+// Usa janela fixa por IP+rota com TTL automático via Redis
+// Se Redis não estiver configurado ou falhar, permite a requisição (fail-open)
 const rateLimiter = (limit: number, windowMs: number) => {
   return async (req: any, res: any, next: any) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const key = `rl:${ip}:${req.path || req.url}`;
-    const now = new Date();
-    
-    try {
-      // Tenta limpar entradas expiradas (sem阻塞 a requisição)
-      await query('DELETE FROM public.rate_limits WHERE expires_at < NOW()').catch(() => {});
-      
-      const { rows } = await query(
-        'SELECT count, expires_at FROM public.rate_limits WHERE key = $1',
-        [key]
-      );
-      
-      if (rows.length === 0) {
-        const expiresAt = new Date(Date.now() + windowMs);
-        await query(
-          'INSERT INTO public.rate_limits (key, count, expires_at) VALUES ($1, 1, $2) ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = $2',
-          [key, expiresAt.toISOString()]
-        );
-        return next();
+    const path = req.path || req.url;
+
+    if (isUpstashRedisConfigured()) {
+      try {
+        const windowKey = Math.floor(Date.now() / windowMs);
+        const key = `rl:${ip}:${path}:${windowKey}`;
+        const ttlSeconds = Math.ceil(windowMs / 1000);
+
+        const results = await runUpstashRedisPipeline([
+          ['INCR', key],
+          ['EXPIRE', key, String(ttlSeconds)]
+        ]);
+
+        if (results && results.length >= 2) {
+          const count = Number(results[0]?.result ?? 0);
+
+          if (count > limit) {
+            const ttlResult = await runUpstashRedisCommand(['TTL', key]);
+            const waitTime = typeof ttlResult === 'number' ? ttlResult : ttlSeconds;
+            return res.status(429).json({
+              error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.`
+            });
+          }
+
+          return next();
+        }
+      } catch (err) {
+        log.warn('[RateLimiter] Redis error, allowing request:', err);
       }
-      
-      const row = rows[0];
-      const expiresAt = new Date(row.expires_at);
-      
-      if (now > expiresAt) {
-        // Janela expirou, resetar
-        const newExpiresAt = new Date(Date.now() + windowMs);
-        await query(
-          'INSERT INTO public.rate_limits (key, count, expires_at) VALUES ($1, 1, $2) ON CONFLICT (key) DO UPDATE SET count = 1, expires_at = $2',
-          [key, newExpiresAt.toISOString()]
-        );
-        return next();
-      }
-      
-      if (row.count >= limit) {
-        const waitTime = Math.ceil((expiresAt.getTime() - now.getTime()) / 1000);
-        return res.status(429).json({ error: `Muitas requisições. Por favor, aguarde ${waitTime} segundos.` });
-      }
-      
-      await query(
-        'UPDATE public.rate_limits SET count = count + 1 WHERE key = $1',
-        [key]
-      );
-      next();
-    } catch (err) {
-      // Fallback: se o DB falhar, permite a requisição
-      log.error('[RateLimiter] DB error, allowing request:', err);
-      next();
     }
+
+    // Redis não configurado ou falhou — permite a requisição
+    next();
   };
 };
 
@@ -943,6 +1025,7 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
             created_at: new Date().toISOString()
           }]);
         }
+        await cacheInvalidate(CACHE_KEYS.LEADERBOARD);
         return res.json({ success: true, user: getUserWithRole(ins.data) });
       } else {
         const newAdminPayload = {
@@ -970,6 +1053,8 @@ app.post('/api/user/profile', requireAuth, async (req, res) => {
       }]);
     }
 
+    // Se houver alteração de XP, invalida cache do leaderboard
+    await cacheInvalidate(CACHE_KEYS.LEADERBOARD);
     res.json({ success: true, user: getUserWithRole(data) });
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao salvar.' });
@@ -1164,6 +1249,10 @@ app.get('/api/user/stats', requireAuth, async (req, res) => {
 // LEADERBOARD (Real Users Ranking)
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    // Cache Redis: leaderboard público
+    const cached = await cacheGet<any[]>(CACHE_KEYS.LEADERBOARD);
+    if (cached) return res.json(cached);
+
     const { data, error } = await dbAdmin
       .from('users')
       .select('name, email, city, xp, level, role, show_in_leaderboard, avatar_url');
@@ -1188,6 +1277,7 @@ app.get('/api/leaderboard', async (req, res) => {
       .sort((a, b) => b.xp - a.xp)
       .slice(0, 20);
 
+    await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);
     res.json(filteredLeaderboard);
   } catch (err) {
     log.error('Erro ao buscar ranking:', err);
@@ -1198,6 +1288,10 @@ app.get('/api/leaderboard', async (req, res) => {
 // ADMIN ENDPOINTS
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
+    // Cache Redis: lista de alunos do admin
+    const cached = await cacheGet<any[]>(CACHE_KEYS.ADMIN_USERS);
+    if (cached) return res.json(cached);
+
     const { data, error } = await dbAdmin
       .from('users')
       .select('*')
@@ -1211,6 +1305,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
       ...u,
       avatarUrl: u.avatar_url || u.avatarUrl || u.avatar || ''
     }));
+    await cacheSet(CACHE_KEYS.ADMIN_USERS, regularStudents);
     res.json(regularStudents);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -1294,6 +1389,10 @@ app.post('/api/admin/sync-auth-users', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/activities', requireAdmin, async (req, res) => {
   try {
+    // Cache Redis: atividades do admin
+    const cached = await cacheGet<{ activities: any[]; production: any[] }>(CACHE_KEYS.ADMIN_ACTIVITIES);
+    if (cached) return res.json(cached);
+
     const { rows: logs } = await query(`
       SELECT x.*, u.name as user_name, u.city as user_city
       FROM xp_logs x
@@ -1353,7 +1452,9 @@ app.get('/api/admin/activities', requireAdmin, async (req, res) => {
       value: production[day]
     }));
 
-    res.json({ activities, production: productionList });
+    const result = { activities, production: productionList };
+    await cacheSet(CACHE_KEYS.ADMIN_ACTIVITIES, result);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch activities' });
   }
@@ -1493,6 +1594,10 @@ const formatDbDate = (date: any): string => {
 // MATERIALS
 app.get('/api/materials', requireAuth, async (req, res) => {
   try {
+    // Cache Redis: materiais didáticos
+    const cached = await cacheGet<any[]>(CACHE_KEYS.MATERIALS);
+    if (cached) return res.json(cached);
+
     const { data, error } = await dbAdmin.from('materials').select('*').order('id', { ascending: false });
     if (error) throw error;
 
@@ -1507,6 +1612,7 @@ app.get('/api/materials', requireAuth, async (req, res) => {
       uploadedAt: formatDbDate(mat.created_at)
     }));
 
+    await cacheSet(CACHE_KEYS.MATERIALS, mapped);
     res.json(mapped);
   } catch (err) {
     res.json([]);
@@ -1536,6 +1642,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
       uploadedAt: formatDbDate(data.created_at)
     };
 
+    await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES);
     await addNotification('Novo Material', `"${req.body.title}" em ${dbRecord.subject}.`, 'material', { id: data?.id });
     res.status(201).json(mappedResult);
   } catch (error) {
@@ -1546,9 +1653,10 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
 
 app.delete('/api/materials/:id', requireAdmin, async (req, res) => {
   try {
+    await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES);
     await dbAdmin.from('materials').delete().eq('id', req.params.id);
     res.status(204).end();
-  } catch (err) { res.status(204).end(); }
+  } catch (err) { await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES).catch(() => {}); res.status(204).end(); }
 });
 
 app.put('/api/materials/:id', requireAdmin, async (req, res) => {
@@ -1573,6 +1681,7 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
       type: data.type,
       uploadedAt: formatDbDate(data.created_at)
     };
+    await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES);
     res.json(mappedResult);
   } catch (error) {
     log.error('[PUT /api/materials/:id] Error updating:', error);
@@ -1583,6 +1692,10 @@ app.put('/api/materials/:id', requireAdmin, async (req, res) => {
 // MURAL
 app.get('/api/recados', requireAuth, async (req, res) => {
   try {
+    // Cache Redis: mural de recados
+    const cached = await cacheGet<any[]>(CACHE_KEYS.RECADOS);
+    if (cached) return res.json(cached);
+
     const { data, error } = await dbAdmin.from('mural').select('*').order('created_at', { ascending: false });
     if (error) throw error;
 
@@ -1596,6 +1709,7 @@ app.get('/api/recados', requireAuth, async (req, res) => {
       tag: item.type || 'Geral'
     }));
 
+    await cacheSet(CACHE_KEYS.RECADOS, mapped);
     res.json(mapped);
   } catch (err) {
     res.json([]);
@@ -1626,6 +1740,7 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
       tag: data.type || 'Geral'
     };
 
+    await cacheInvalidate(CACHE_KEYS.RECADOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     await addNotification('Novo Recado', `${req.body.title}`, 'mural', { id: data?.id });
     res.status(201).json(mappedResult);
   } catch (err: any) {
@@ -1636,9 +1751,11 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
 
 app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   try {
+    await cacheInvalidate(CACHE_KEYS.RECADOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     const { error } = await dbAdmin.from('mural').delete().eq('id', req.params.id);
     res.status(204).end();
   } catch (err) {
+    await cacheInvalidate(CACHE_KEYS.RECADOS, CACHE_KEYS.ADMIN_ACTIVITIES).catch(() => {});
     res.status(204).end();
   }
 });
@@ -1663,6 +1780,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
       category: (data.type || 'geral').toLowerCase(),
       tag: data.type || 'Geral'
     };
+    await cacheInvalidate(CACHE_KEYS.RECADOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     res.json(mappedResult);
   } catch (err: any) {
     log.error('[PUT /api/recados/:id] Failed to update recado:', err);
@@ -1673,6 +1791,10 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
 // EVENTOS
 app.get('/api/eventos', requireAuth, async (req, res) => {
   try {
+    // Cache Redis: calendário de eventos
+    const cached = await cacheGet<any[]>(CACHE_KEYS.EVENTOS);
+    if (cached) return res.json(cached);
+
     const { data, error } = await dbAdmin
       .from('events')
       .select('*')
@@ -1691,6 +1813,7 @@ app.get('/api/eventos', requireAuth, async (req, res) => {
       xpReward: evt.xp_reward,
       observation: evt.observation
     }));
+    await cacheSet(CACHE_KEYS.EVENTOS, mapped);
     res.json(mapped);
   } catch (err) {
     log.error('[GET /api/eventos] Error:', err);
@@ -1733,6 +1856,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
       observation: data.observation
     };
 
+    await cacheInvalidate(CACHE_KEYS.EVENTOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     await addNotification('Novo Evento', `${req.body.title}`, 'evento', { id: data.id });
     res.status(201).json(mapped);
   } catch (err: any) {
@@ -1743,6 +1867,7 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
 
 app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   try {
+    await cacheInvalidate(CACHE_KEYS.EVENTOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     const { error } = await dbAdmin
       .from('events')
       .delete()
@@ -1750,6 +1875,7 @@ app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
     if (error) throw error;
     res.status(204).end();
   } catch (err) {
+    await cacheInvalidate(CACHE_KEYS.EVENTOS, CACHE_KEYS.ADMIN_ACTIVITIES).catch(() => {});
     log.error('[DELETE /api/eventos/:id] Error:', err);
     res.status(500).json({ error: 'Failed to delete event' });
   }
@@ -1776,9 +1902,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
-
-    const mapped = {
+    if (error) throw error;    const mapped = {
       id: data.id,
       title: data.title,
       description: data.description,
@@ -1790,7 +1914,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
       xpReward: data.xp_reward,
       observation: data.observation
     };
-
+    await cacheInvalidate(CACHE_KEYS.EVENTOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     res.json(mapped);
   } catch (err: any) {
     log.error('[PUT /api/eventos/:id] Failed to update event:', err);
@@ -1802,13 +1926,48 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
 app.get('/api/questoes', requireAuth, async (req, res) => {
   const { year, limit = 50, offset = 0 } = req.query;
   if (!year) return res.status(400).json({ error: 'Ano necessário' });
+
+  // Cache Redis: questões do ENEM são dados estáticos (históricos), cache longo (10 min)
+  const cacheKey = `cache:questoes:${year}:${limit}:${offset}`;
   try {
-    const { data: dbData } = await dbAdmin.from('questions').select('*, question_options(*)').eq('year', year).order('index', { ascending: true }).range(Number(offset), Number(offset) + Number(limit) - 1);
-    if (dbData?.length) return res.json({ questions: dbData.map(q => ({ ...q, alternatives: q.question_options?.sort((a: any, b: any) => a.letter.localeCompare(b.letter)) || [] })) });
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    const { data: dbData } = await dbAdmin
+      .from('questions')
+      .select('*, question_options(*)')
+      .eq('year', year)
+      .order('index', { ascending: true })
+      .range(Number(offset), Number(offset) + Number(limit) - 1);
+
+    if (dbData?.length) {
+      const result = {
+        questions: dbData.map(q => ({
+          ...q,
+          alternatives: q.question_options?.sort((a: any, b: any) => a.letter.localeCompare(b.letter)) || []
+        }))
+      };
+      if (isUpstashRedisConfigured()) {
+        await runUpstashRedisPipeline([
+          ['SET', cacheKey, JSON.stringify(result)],
+          ['EXPIRE', cacheKey, String(CACHE_TTL_QUESTOES)]
+        ]).catch(() => {});
+      }
+      return res.json(result);
+    }
+
     const response = await fetch(`https://api.enem.dev/v1/exams/${year}/questions?limit=${limit}&offset=${offset}`);
     const data = await response.json();
+    if (isUpstashRedisConfigured()) {
+      await runUpstashRedisPipeline([
+        ['SET', cacheKey, JSON.stringify(data)],
+        ['EXPIRE', cacheKey, String(CACHE_TTL_QUESTOES)]
+      ]).catch(() => {});
+    }
     res.json(data);
-  } catch (error) { res.status(500).json({ error: 'Erro ao buscar questões' }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar questões' });
+  }
 });
 
 app.post('/api/answers', requireAuth, async (req, res) => {

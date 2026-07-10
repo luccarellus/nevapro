@@ -10,3 +10,6 @@ uploads/
 crop.ps1
 public/icon-512.png.bak
 
+# Scripts temporários de migração/refatoração
+/scripts/
+
