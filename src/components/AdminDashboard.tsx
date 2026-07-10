@@ -154,7 +154,7 @@ export default function AdminDashboard({
       if (editingId) {
         await muralService.updateRecado(editingId, { title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content });
       } else {
-        await muralService.addRecado({ title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content, sender: 'Administracao', date: new Date().toISOString() });
+        await muralService.addRecado({ title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content, sender: 'Administração', date: new Date().toISOString() });
       }
       setIsSuccess(true); fetchData();
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
@@ -240,7 +240,7 @@ export default function AdminDashboard({
         <div className="text-center">
           <ShieldCheck size={64} className="mx-auto mb-6 text-red-500" />
           <h1 className="text-3xl font-black mb-2">Acesso Restrito</h1>
-          <p className="text-text-secondary mb-8">Esta area e exclusiva para administradores.</p>
+          <p className="text-text-secondary mb-8">Esta área é exclusiva para administradores.</p>
           <button onClick={() => { localStorage.removeItem('neva_student_session'); onLogout(); }}
             className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white">Sair do sistema</button>
         </div>
@@ -317,18 +317,18 @@ export default function AdminDashboard({
               {showModal === 'evento' && (
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Titulo do evento</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título do evento</label>
                     <input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Aulao no Cinema" />
+                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Aulão no Cinema" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Data de liberacao</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Data de liberação</label>
                     <input type="datetime-local" value={eventForm.releaseDate}
                       onChange={(e) => setEventForm({...eventForm, releaseDate: e.target.value})}
                       className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all [color-scheme:dark]" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">XP de Participacao</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">XP de Participação</label>
                     <input type="number" value={eventForm.xpReward}
                       onChange={(e) => setEventForm({...eventForm, xpReward: e.target.value})}
                       className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" />
@@ -338,17 +338,17 @@ export default function AdminDashboard({
                     <div className="relative">
                       <select value={eventForm.category} onChange={(e) => setEventForm({...eventForm, category: e.target.value})}
                         className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
-                        <option value="Evento">Evento</option><option value="Aulao">Aulao</option>
+                        <option value="Evento">Evento</option><option value="Aulão">Aulão</option>
                         <option value="Simulado">Simulado</option><option value="Entrega">Entrega</option>
                       </select>
                       <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Observacao</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Observação</label>
                     <textarea value={eventForm.observation} onChange={(e) => setEventForm({...eventForm, observation: e.target.value})}
                       rows={4} className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all resize-none"
-                      placeholder="Ex: Liberar somente para os alunos do 3o ano" />
+                      placeholder="Ex: Liberar somente para os alunos do 3º ano" />
                   </div>
                   <div className="flex gap-4 pt-4">
                     <button onClick={handleSaveEvent} disabled={isLoading}
@@ -365,9 +365,9 @@ export default function AdminDashboard({
               {showModal === 'recado' && (
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Titulo</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
                     <input value={muralForm.title} onChange={(e) => setMuralForm({...muralForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Simulado aberto para inscricao" />
+                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Simulado aberto para inscrição" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
@@ -405,16 +405,16 @@ export default function AdminDashboard({
               {showModal === 'material' && (
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Titulo</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
                     <input value={materialForm.title} onChange={(e) => setMaterialForm({...materialForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all" placeholder="Ex: Lista de revisao" />
+                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all" placeholder="Ex: Lista de revisão" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Tipo</label>
                     <div className="relative">
                       <select value={materialForm.type} onChange={(e) => setMaterialForm({...materialForm, type: e.target.value})}
                         className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
-                        <option value="pdf">PDF</option><option value="video">VIDEO</option><option value="link">LINK EXTERNO</option>
+                        <option value="pdf">PDF</option><option value="video">VÍDEO</option><option value="link">LINK EXTERNO</option>
                       </select>
                       <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
                     </div>
@@ -444,10 +444,10 @@ export default function AdminDashboard({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Descricao</label>
+                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Descrição</label>
                     <textarea value={materialForm.description} onChange={(e) => setMaterialForm({...materialForm, description: e.target.value})}
                       rows={4} className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all resize-none"
-                      placeholder="Resumo do conteudo e instrucoes de uso." />
+                      placeholder="Resumo do conteúdo e instruções de uso." />
                   </div>
                   <div className="flex gap-4 pt-4">
                     <button onClick={handleSaveMaterial} disabled={isLoading}
@@ -478,7 +478,7 @@ export default function AdminDashboard({
                   Excluir {deleteConfirm.type === 'evento' ? 'evento' : deleteConfirm.type === 'material' ? 'material' : 'recado'}
                 </h3>
                 <p className="text-sm text-text-secondary font-medium mb-6">
-                  Tem certeza que deseja excluir <strong className="text-text-main">{deleteConfirm.title}</strong>? Esta acao nao pode ser desfeita.
+                  Tem certeza que deseja excluir <strong className="text-text-main">{deleteConfirm.title}</strong>? Esta ação não pode ser desfeita.
                 </p>
                 <div className="flex gap-3">
                   <button onClick={() => setDeleteConfirm(null)}
@@ -486,7 +486,7 @@ export default function AdminDashboard({
                   <button onClick={handleConfirmDelete} disabled={isLoading}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
                     {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Confirmar exclusao</button>
+                    Confirmar exclusão</button>
                 </div>
               </div>
             </motion.div>
