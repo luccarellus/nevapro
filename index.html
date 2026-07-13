@@ -13,6 +13,26 @@
   <meta name="apple-mobile-web-app-title" content="Neva Pro" />
   <link rel="apple-touch-icon" href="/favicon.png?v=1" />
   <title>Neva Pro</title>
+  <script>
+    (function () {
+      // Aplica o tema ANTES do primeiro paint para eliminar o flash/delay no F5
+      var theme = localStorage.getItem('neva_custom_theme');
+      var isDark = localStorage.getItem('neva_dark_mode');
+      var isDarkMode = isDark !== 'false'; // default: true
+
+      if (theme && theme !== 'default') {
+        document.documentElement.setAttribute('data-theme', theme);
+      } else {
+        document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+      }
+
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
   <script type="text/javascript">
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments) };
