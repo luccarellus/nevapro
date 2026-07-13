@@ -228,6 +228,19 @@ export default function AdminDashboard({
     else { throw new Error('Falha ao atualizar XP'); }
   };
 
+  const handleUpdateAccuracy = async (student: UserProfile, answeredQuestions: number, correctAnswers: number): Promise<void> => {
+    const response = await userService.updateProfile({
+      email: student.email,
+      answeredQuestions,
+      correctAnswers
+    });
+    if (response.success) {
+      setStudents(prev => prev.map(s => s.id === student.id ? { ...s, answeredQuestions, correctAnswers } : s));
+    } else {
+      throw new Error('Falha ao atualizar precisao');
+    }
+  };
+
   const handleDeleteStudent = async (student: UserProfile): Promise<void> => {
     const response = await userService.deleteProfile(student.email);
     if (response.success) { setStudents(prev => prev.filter(s => s.id !== student.id)); }
@@ -286,7 +299,7 @@ export default function AdminDashboard({
                   filterGremio={filterGremio} onFilterGremioChange={setFilterGremio}
                   filterType={filterType} onFilterTypeChange={setFilterType}
                   cidadeOptions={citiesMA} escolaOptions={schoolsMA} gremioOptions={gremiosMA}
-                  onGiveXp={handleGiveXp} onDeleteStudent={handleDeleteStudent}
+                  onGiveXp={handleGiveXp} onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
                 />
               )}
             </div>

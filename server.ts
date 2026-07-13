@@ -517,6 +517,8 @@ const getUserWithRole = (user: any) => {
     role: isAdmin ? 'admin' : 'student',
     showInLeaderboard: user.show_in_leaderboard !== false, // default true
     languagePreference: user.language_preference || 'ingles',
+    answeredQuestions: user.answered_questions || user.answeredQuestions || 0,
+    correctAnswers: user.correct_answers || user.correctAnswers || 0,
     avatarUrl: user.avatar_url || user.avatarUrl || user.avatar || '',
     flashQuizCompleted: !!user.flash_quiz_completed
   };
@@ -1161,7 +1163,7 @@ app.post('/api/user/profile', rateLimiter(10, 60 * 1000), requireAuth, async (re
             created_at: new Date().toISOString()
           }]);
         }
-        await cacheInvalidate(CACHE_KEYS.LEADERBOARD);
+        await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
         return res.json({ success: true, user: getUserWithRole(ins.data) });
       } else {
         const newAdminPayload = {
@@ -1190,7 +1192,7 @@ app.post('/api/user/profile', rateLimiter(10, 60 * 1000), requireAuth, async (re
     }
 
     // Se houver alteração de XP, invalida cache do leaderboard
-    await cacheInvalidate(CACHE_KEYS.LEADERBOARD);
+    await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
     res.json({ success: true, user: getUserWithRole(data) });
   } catch (error: any) {
     res.status(500).json({ error: 'Erro ao salvar.' });
@@ -1232,6 +1234,7 @@ app.delete('/api/user/profile', requireAuth, async (req, res) => {
       }
     }
 
+    await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
     res.json({ success: true });
   } catch (err: any) {
     log.error('[DELETE /api/user/profile] Error:', err);
@@ -1439,6 +1442,8 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
       return !isAdmin;
     }).map(u => ({
       ...u,
+      answeredQuestions: u.answered_questions || u.answeredQuestions || 0,
+      correctAnswers: u.correct_answers || u.correctAnswers || 0,
       avatarUrl: u.avatar_url || u.avatarUrl || u.avatar || ''
     }));
     await cacheSet(CACHE_KEYS.ADMIN_USERS, regularStudents);

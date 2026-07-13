@@ -25,6 +25,7 @@ interface AdminAlunosProps {
   escolaOptions: string[];
   gremioOptions: string[];
   onGiveXp: (student: UserProfile, amount: number) => Promise<void>;
+  onUpdateAccuracy: (student: UserProfile, answeredQuestions: number, correctAnswers: number) => Promise<void>;
   onDeleteStudent: (student: UserProfile) => Promise<void>;
 }
 
@@ -45,11 +46,15 @@ export default function AdminAlunos({
   escolaOptions,
   gremioOptions,
   onGiveXp,
+  onUpdateAccuracy,
   onDeleteStudent,
 }: AdminAlunosProps) {
   const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
   const [customXpAmount, setCustomXpAmount] = useState('');
+  const [answeredQuestionsInput, setAnsweredQuestionsInput] = useState('');
+  const [correctAnswersInput, setCorrectAnswersInput] = useState('');
   const [isGivingXp, setIsGivingXp] = useState(false);
+  const [isUpdatingAccuracy, setIsUpdatingAccuracy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [drawerAlert, setDrawerAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -96,6 +101,43 @@ export default function AdminAlunos({
       setDrawerAlert({ type: 'error', message: error.message || 'Erro ao conceder XP' });
     } finally {
       setIsGivingXp(false);
+    }
+  };
+
+  const openStudentDrawer = (student: UserProfile) => {
+    setSelectedStudent(student);
+    setCustomXpAmount('');
+    setAnsweredQuestionsInput(String(student.answeredQuestions || 0));
+    setCorrectAnswersInput(String(student.correctAnswers || 0));
+    setDrawerAlert(null);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleUpdateAccuracy = async () => {
+    if (!currentSelectedStudent) return;
+
+    const answeredQuestions = Math.max(0, Math.floor(Number(answeredQuestionsInput)));
+    const correctAnswers = Math.max(0, Math.floor(Number(correctAnswersInput)));
+
+    if (!Number.isFinite(answeredQuestions) || !Number.isFinite(correctAnswers)) {
+      setDrawerAlert({ type: 'error', message: 'Informe apenas numeros validos.' });
+      return;
+    }
+
+    if (correctAnswers > answeredQuestions) {
+      setDrawerAlert({ type: 'error', message: 'Acertos nao podem ser maiores que respondidas.' });
+      return;
+    }
+
+    setIsUpdatingAccuracy(true);
+    setDrawerAlert(null);
+    try {
+      await onUpdateAccuracy(currentSelectedStudent, answeredQuestions, correctAnswers);
+      setDrawerAlert({ type: 'success', message: 'Precisao atualizada com sucesso!' });
+    } catch (error: any) {
+      setDrawerAlert({ type: 'error', message: error.message || 'Erro ao atualizar precisao' });
+    } finally {
+      setIsUpdatingAccuracy(false);
     }
   };
 
@@ -271,7 +313,7 @@ export default function AdminAlunos({
                   return (
                     <tr
                       key={student.id}
-                      onClick={() => { setSelectedStudent(student); setCustomXpAmount(''); setDrawerAlert(null); setShowDeleteConfirm(false); }}
+                      onClick={() => openStudentDrawer(student)}
                       className={`group hover:bg-text-main/[0.04] transition-colors relative cursor-pointer ${
                         selectedStudent?.id === student.id ? 'bg-brand-primary/[0.03]' : ''
                       }`}
@@ -333,7 +375,7 @@ export default function AdminAlunos({
               return (
                 <div
                   key={student.id}
-                  onClick={() => { setSelectedStudent(student); setCustomXpAmount(''); setDrawerAlert(null); setShowDeleteConfirm(false); }}
+                  onClick={() => openStudentDrawer(student)}
                   className="bg-bg-main/50 border border-border-color rounded-2xl p-5 cursor-pointer hover:bg-bg-main/70 transition-all"
                 >
                   <div className="flex items-start gap-3 mb-3">
@@ -415,6 +457,19 @@ export default function AdminAlunos({
                     <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">XP Total</span>
                     <span className="block text-3xl font-black text-text-main">{(currentSelectedStudent.xp || 0).toLocaleString()}</span>
                   </div>
+                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">Respondidas</span>
+                    <span className="block text-3xl font-black text-text-main">{currentSelectedStudent.answeredQuestions || 0}</span>
+                  </div>
+                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
+                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">Precisao</span>
+                    <span className="block text-3xl font-black text-text-main">
+                      {currentSelectedStudent.answeredQuestions
+                        ? Math.round(((currentSelectedStudent.correctAnswers || 0) / currentSelectedStudent.answeredQuestions) * 100)
+                        : 0}
+                      <span className="text-sm text-text-secondary ml-1">%</span>
+                    </span>
+                  </div>
                 </div>
 
                 {/* Rank Badge */}
@@ -465,6 +520,41 @@ export default function AdminAlunos({
                       </span>
                     </div>
                   </div>
+                </div>
+
+                {/* Accuracy Management */}
+                <div className="border-t border-border-color pt-6 mb-6">
+                  <h4 className="text-sm font-black text-text-main mb-4">Gerenciar precisao</h4>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-2">Respondidas</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={answeredQuestionsInput}
+                        onChange={(e) => setAnsweredQuestionsInput(e.target.value)}
+                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-3 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-2">Acertos</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={correctAnswersInput}
+                        onChange={(e) => setCorrectAnswersInput(e.target.value)}
+                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-3 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleUpdateAccuracy}
+                    disabled={isUpdatingAccuracy}
+                    className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-3 rounded-xl font-black text-[10px] tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isUpdatingAccuracy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    Salvar precisao
+                  </button>
                 </div>
 
                 {/* XP Management */}
