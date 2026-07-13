@@ -30,7 +30,10 @@ export const userService = {
   async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       body: JSON.stringify(credentials),
     });
     if (!response.ok) {
@@ -49,7 +52,10 @@ export const userService = {
   async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
     const response = await fetch('/api/auth/register', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       body: JSON.stringify(userData),
     });
     if (!response.ok) {
@@ -77,7 +83,10 @@ export const userService = {
   async changePassword(data: { email: string; currentPassword?: string; newPassword?: string }): Promise<{ success: boolean; message?: string }> {
     const response = await fetch('/api/auth/change-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       body: JSON.stringify(data),
     });
     if (!response.ok) {

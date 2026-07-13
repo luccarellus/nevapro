@@ -23,7 +23,10 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   
   const options: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
   };
 
   if (body && method !== 'GET') {

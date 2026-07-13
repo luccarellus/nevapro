@@ -24,13 +24,38 @@ export const app = express();
 app.set('trust proxy', 1);
 app.disable('etag');
 
+// Origem permitida para CORS e proteção CSRF (compartilhada entre middlewares)
+const normalizeOrigin = (value: string) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value;
+  }
+};
+const ALLOWED_ORIGIN = normalizeOrigin(process.env.FRONTEND_URL || 'https://neva.pro');
+const ALLOWED_ORIGINS = new Set([
+  ALLOWED_ORIGIN,
+  ...(process.env.NODE_ENV !== 'production'
+    ? ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173']
+    : [])
+]);
+
+const isAllowedOrigin = (value?: string | string[]) => {
+  const originValue = Array.isArray(value) ? value[0] : value;
+  if (!originValue) return false;
+  try {
+    return ALLOWED_ORIGINS.has(new URL(originValue).origin);
+  } catch {
+    return false;
+  }
+};
+
 // Configuração nativa de CORS
 app.use((req, res, next) => {
-  const origin = process.env.FRONTEND_URL || 'https://neva.pro';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
   
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -66,7 +91,8 @@ app.use(helmet({
   } : false,
   crossOriginEmbedderPolicy: false
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // --- SISTEMA DE LOG E VALIDAÇÃO ---
 // Logger condicional: em produção só loga se DEBUG=true
@@ -293,38 +319,150 @@ const requireAdmin = (req: any, res: any, next: any) => {
   });
 };
 
-// Rate limiter local. Upstash Redis is used only as application cache.
+// ============================================================
+// PROTEÇÃO CSRF: Validação de Origin/Referer + X-Requested-With
+// ============================================================
+// Middleware aplicado em requisições que modificam estado (POST, PUT, DELETE).
+// Em navegadores modernos o header Origin é obrigatório e confiável.
+// Como fallback, valida o header Referer.
+// Para requisições sem Origin nem Referer (ex: server-to-server), exige
+// o header X-Requested-With: XMLHttpRequest como camada adicional.
+// A validação é ignorada em desenvolvimento para não quebrar o HMR do Vite.
+
+const csrfProtection = (req: any, res: any, next: any) => {
+  // Ignora em desenvolvimento para não quebrar o HMR e ferramentas de dev
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+
+  // Ignora requisições idempotentes (GET, HEAD, OPTIONS)
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+
+  // 1. Validação do header Origin (padrão moderno e mais confiável)
+  const origin = req.headers.origin;
+  if (origin) {
+    if (!isAllowedOrigin(origin)) {
+      log.warn(`[CSRF] Origem rejeitada: ${origin} (esperado: ${ALLOWED_ORIGIN})`);
+      return res.status(403).json({ error: 'Acesso negado: origem não autorizada.' });
+    }
+    return next();
+  }
+
+  // 2. Fallback: validação do header Referer
+  const referer = req.headers.referer || req.headers.referrer;
+  if (referer) {
+    try {
+      const refererUrl = new URL(Array.isArray(referer) ? referer[0] : referer);
+      if (!isAllowedOrigin(refererUrl.origin)) {
+        log.warn(`[CSRF] Referer rejeitado: ${refererUrl.origin} (esperado: ${ALLOWED_ORIGIN})`);
+        return res.status(403).json({ error: 'Acesso negado: referenciador não autorizado.' });
+      }
+      return next();
+    } catch {
+      return res.status(400).json({ error: 'Header Referer mal formatado.' });
+    }
+  }
+
+  // 3. Sem Origin nem Referer: exige X-Requested-With para garantir
+  // que a requisição veio do frontend legítimo (não de um form externo)
+  const requestedWith = req.headers['x-requested-with'];
+  if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
+    log.warn('[CSRF] Requisição sem Origin/Referer nem X-Requested-With');
+    return res.status(403).json({ error: 'Acesso negado: cabeçalho de segurança ausente.' });
+  }
+
+  return next();
+};
+
+// Aplica proteção CSRF globalmente em todas as rotas da API
+app.use('/api', csrfProtection);
+
+// ============================================================
+// RATE LIMITER HÍBRIDO: Upstash Redis + Fallback In-Memory
+// ============================================================
+// Tenta usar Redis primeiro (escalável horizontalmente).
+// Se Redis não estiver configurado ou falhar, usa fallback in-memory.
+// Chave Redis: ratelimit:<ip>:<path>:<window> com TTL automático.
+
+const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
+const RATE_LIMITER_MAX_ENTRIES = 10_000;
+
 const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
 
+// Limpeza periódica do Map in-memory (fallback)
+setInterval(() => {
+  const now = Date.now();
+  for (const [entryKey, entry] of inMemoryRateLimit) {
+    if (entry.resetAt <= now) {
+      inMemoryRateLimit.delete(entryKey);
+    }
+  }
+  if (inMemoryRateLimit.size > RATE_LIMITER_MAX_ENTRIES) {
+    const entries = [...inMemoryRateLimit.entries()]
+      .sort(([, a], [, b]) => a.resetAt - b.resetAt);
+    const toDelete = entries.slice(0, entries.length - RATE_LIMITER_MAX_ENTRIES);
+    for (const [key] of toDelete) {
+      inMemoryRateLimit.delete(key);
+    }
+  }
+}, RATE_LIMITER_CLEANUP_INTERVAL_MS).unref();
+
 const rateLimiter = (limit: number, windowMs: number) => {
-  return (req: any, res: any, next: any) => {
+  return async (req: any, res: any, next: any) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     const path = req.path || req.url;
     const now = Date.now();
-    for (const [entryKey, entry] of inMemoryRateLimit) {
-      if (entry.resetAt <= now) {
-        inMemoryRateLimit.delete(entryKey);
+    const windowKey = Math.floor(now / windowMs);
+
+    // --- Tenta Redis primeiro (escalável entre instâncias) ---
+    if (isUpstashRedisConfigured()) {
+      const redisKey = `ratelimit:${ip}:${path}:${windowKey}`;
+      const ttlSeconds = Math.ceil(windowMs / 1000);
+
+      try {
+        const results = await runUpstashRedisPipeline([
+          ['SET', redisKey, '0', 'EX', String(ttlSeconds), 'NX'],
+          ['INCR', redisKey]
+        ]);
+
+        if (results && results.length === 2) {
+          // INCR result is the second item — atual valor do contador
+          const incrResult = results[1]?.result;
+          const currentCount = typeof incrResult === 'number' ? incrResult : Number(incrResult);
+
+          if (!isNaN(currentCount) && currentCount > limit) {
+            return res.status(429).json({
+              error: 'Muitas requisições. Tente novamente mais tarde.'
+            });
+          }
+
+          return next();
+        }
+      } catch (err) {
+        // Redis falhou — fallback para in-memory
+        log.warn('[RateLimiter] Redis indisponível, usando fallback in-memory');
+        console.warn('[RateLimiter] Redis indisponível — taxa será contada in-memory nesta instância.');
       }
     }
 
-    const windowKey = Math.floor(now / windowMs);
-    const key = `${ip}:${path}:${windowKey}`;
+    // --- Fallback In-Memory (quando Redis não está disponível) ---
+    const memKey = `${ip}:${path}:${windowKey}`;
     const resetAt = (windowKey + 1) * windowMs;
-    const current = inMemoryRateLimit.get(key) || { count: 0, resetAt };
+    const current = inMemoryRateLimit.get(memKey) || { count: 0, resetAt };
 
     current.count += 1;
     current.resetAt = resetAt;
-    inMemoryRateLimit.set(key, current);
+    inMemoryRateLimit.set(memKey, current);
 
     if (current.count > limit) {
-      const waitTime = Math.max(1, Math.ceil((resetAt - now) / 1000));
       return res.status(429).json({
-        error: `Muitas requisicoes. Por favor, aguarde ${waitTime} segundos.`
+        error: 'Muitas requisições. Tente novamente mais tarde.'
       });
     }
 
     return next();
-
   };
 };
 
@@ -430,6 +568,8 @@ app.use((req, res, next) => {
   log.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
+
+app.use('/api', rateLimiter(300, 15 * 60 * 1000));
 
 // Auth Endpoints (LOGIN)
 app.post('/api/auth/login', rateLimiter(5, 60 * 1000), async (req, res) => {
@@ -698,7 +838,7 @@ app.post('/api/auth/register', rateLimiter(5, 60 * 1000), async (req, res) => {
 });
 
 // DELETE USER
-app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
+app.post('/api/auth/delete-user', rateLimiter(3, 60 * 1000), requireAuth, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'E-mail é obrigatório.' });
   const cleanEmail = email.toLowerCase().trim();
@@ -736,7 +876,7 @@ app.post('/api/auth/delete-user', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+app.post('/api/auth/change-password', rateLimiter(3, 60 * 1000), requireAuth, async (req, res) => {
   const { email, currentPassword, newPassword } = req.body;
   if (!email || !currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Todos os campos são obrigatórios.' });
@@ -853,7 +993,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     return res.json({ success: true, message: 'Senha atualizada com sucesso.' });
   } catch (err: any) {
     log.error('[Change Password] Error:', err.message);
-    res.status(500).json({ error: 'Erro interno ao alterar a senha.', details: err?.message });
+    res.status(500).json({ error: 'Erro interno ao alterar a senha.' });
   }
 });
 
@@ -917,7 +1057,7 @@ app.get('/api/user/profile', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/user/profile', requireAuth, async (req, res) => {
+app.post('/api/user/profile', rateLimiter(10, 60 * 1000), requireAuth, async (req, res) => {
   const updateData = req.body;
   const email = (updateData.email || '').toLowerCase().trim();
   if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
@@ -1309,7 +1449,7 @@ app.get('/api/admin/users', requireAdmin, async (req, res) => {
 });
 
 // Endpoint para sincronizar manualmente auth.users → admin_users
-app.post('/api/admin/sync-auth-users', requireAdmin, async (req, res) => {
+app.post('/api/admin/sync-auth-users', rateLimiter(1, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const { data: authResult, error: authError } = await dbAdmin.auth.admin.listUsers();
     if (authError) throw authError;
@@ -1379,7 +1519,7 @@ app.post('/api/admin/sync-auth-users', requireAdmin, async (req, res) => {
     });
   } catch (err: any) {
     log.error('[POST /api/admin/sync-auth-users] Error:', err);
-    res.status(500).json({ error: 'Erro ao sincronizar usuários do Auth.', details: err?.message });
+    res.status(500).json({ error: 'Erro ao sincronizar usuários do Auth.' });
   }
 });
 
@@ -1524,7 +1664,9 @@ const upload = multer({
       'image/jpg',
       'image/gif'
     ];
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    const allowedExtensions = new Set(['.pdf', '.png', '.jpg', '.jpeg', '.gif']);
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    if (allowedMimeTypes.includes(file.mimetype) && allowedExtensions.has(fileExt)) {
       cb(null, true);
     } else {
       cb(new Error('Tipo de arquivo não permitido. Apenas PDFs e imagens (PNG, JPEG, GIF) são aceitos.'));
@@ -1532,7 +1674,7 @@ const upload = multer({
   }
 });
 
-app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
+app.post('/api/upload', rateLimiter(5, 60 * 1000), requireAuth, (req: any, res: any, next: any) => {
   upload.single('file')(req, res, (err: any) => {
     if (err) {
       return res.status(400).json({ error: err.message });
@@ -1546,7 +1688,7 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
     }
 
     const file = req.file;
-    const fileExt = path.extname(file.originalname);
+    const fileExt = path.extname(file.originalname).toLowerCase();
     const baseName = path.basename(file.originalname, fileExt)
       .replace(/[^a-zA-Z0-9]/g, '_');
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -1564,7 +1706,7 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
 
     if (error) {
       log.error('[Storage] Upload error:', error);
-      return res.status(500).json({ error: 'Erro ao fazer upload no Storage: ' + error.message });
+      return res.status(500).json({ error: 'Erro ao fazer upload no Storage.' });
     }
 
     const proxyUrl = `/api/storage/object?file=${encodeURIComponent(filename)}`;
@@ -1572,7 +1714,7 @@ app.post('/api/upload', requireAuth, (req: any, res: any, next: any) => {
     res.json({ url: proxyUrl });
   } catch (error: any) {
     log.error('[POST /api/upload] Error:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload do arquivo: ' + error.message });
+    res.status(500).json({ error: 'Erro ao fazer upload do arquivo.' });
   }
 });
 
@@ -1615,7 +1757,7 @@ app.get('/api/materials', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/materials', requireAdmin, async (req, res) => {
+app.post('/api/materials', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1647,7 +1789,7 @@ app.post('/api/materials', requireAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/materials/:id', requireAdmin, async (req, res) => {
+app.delete('/api/materials/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES);
     await dbAdmin.from('materials').delete().eq('id', req.params.id);
@@ -1655,7 +1797,7 @@ app.delete('/api/materials/:id', requireAdmin, async (req, res) => {
   } catch (err) { await cacheInvalidate(CACHE_KEYS.MATERIALS, CACHE_KEYS.ADMIN_ACTIVITIES).catch(() => {}); res.status(204).end(); }
 });
 
-app.put('/api/materials/:id', requireAdmin, async (req, res) => {
+app.put('/api/materials/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1712,7 +1854,7 @@ app.get('/api/recados', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/recados', requireAdmin, async (req, res) => {
+app.post('/api/recados', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbBody = {
       title: req.body.title,
@@ -1741,11 +1883,11 @@ app.post('/api/recados', requireAdmin, async (req, res) => {
     res.status(201).json(mappedResult);
   } catch (err: any) {
     log.error('[POST /api/recados] Failed to insert recado:', err);
-    res.status(500).json({ error: 'Failed to insert recado', details: err?.message || err });
+    res.status(500).json({ error: 'Failed to insert recado' });
   }
 });
 
-app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
+app.delete('/api/recados/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     await cacheInvalidate(CACHE_KEYS.RECADOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     const { error } = await dbAdmin.from('mural').delete().eq('id', req.params.id);
@@ -1756,7 +1898,7 @@ app.delete('/api/recados/:id', requireAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/recados/:id', requireAdmin, async (req, res) => {
+app.put('/api/recados/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbBody = {
       title: req.body.title,
@@ -1780,7 +1922,7 @@ app.put('/api/recados/:id', requireAdmin, async (req, res) => {
     res.json(mappedResult);
   } catch (err: any) {
     log.error('[PUT /api/recados/:id] Failed to update recado:', err);
-    res.status(500).json({ error: 'Failed to update recado', details: err?.message || err });
+    res.status(500).json({ error: 'Failed to update recado' });
   }
 });
 
@@ -1817,7 +1959,7 @@ app.get('/api/eventos', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/eventos', requireAdmin, async (req, res) => {
+app.post('/api/eventos', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1857,11 +1999,11 @@ app.post('/api/eventos', requireAdmin, async (req, res) => {
     res.status(201).json(mapped);
   } catch (err: any) {
     log.error('[POST /api/eventos] Failed to insert event:', err);
-    res.status(500).json({ error: 'Failed to insert evento', details: err?.message || err });
+    res.status(500).json({ error: 'Failed to insert evento' });
   }
 });
 
-app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
+app.delete('/api/eventos/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     await cacheInvalidate(CACHE_KEYS.EVENTOS, CACHE_KEYS.ADMIN_ACTIVITIES);
     const { error } = await dbAdmin
@@ -1877,7 +2019,7 @@ app.delete('/api/eventos/:id', requireAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
+app.put('/api/eventos/:id', rateLimiter(30, 60 * 1000), requireAdmin, async (req, res) => {
   try {
     const dbRecord = {
       title: req.body.title,
@@ -1914,7 +2056,7 @@ app.put('/api/eventos/:id', requireAdmin, async (req, res) => {
     res.json(mapped);
   } catch (err: any) {
     log.error('[PUT /api/eventos/:id] Failed to update event:', err);
-    res.status(500).json({ error: 'Failed to update event', details: err?.message });
+    res.status(500).json({ error: 'Failed to update event' });
   }
 });
 
@@ -1966,7 +2108,7 @@ app.get('/api/questoes', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/answers', requireAuth, async (req, res) => {
+app.post('/api/answers', rateLimiter(30, 60 * 1000), requireAuth, async (req, res) => {
   const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
   try {
     // 1. Verificar se a questão já existe no banco
@@ -2223,8 +2365,9 @@ app.use((err: any, req: any, res: any, next: any) => {
     return res.status(400).json({ error: 'Erro ao interpretar JSON.' });
   }
   
-  res.status(err.status || 500).json({ 
-    error: err.message || 'Erro interno do servidor.' 
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: status >= 500 ? 'Erro interno do servidor.' : (err.message || 'Erro ao processar requisiÃ§Ã£o.')
   });
 });
 
