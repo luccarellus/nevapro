@@ -307,7 +307,7 @@ export default function AdminPanorama({
           </div>
           <div className="flex justify-between items-center pt-4 border-t border-border-color">
             <span className="text-[10px] font-bold text-text-secondary opacity-60">{activeStudentsCount} alunos com XP - {xpGrantingEvents.length} eventos com XP</span>
-            <span className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
+            <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
           </div>
         </div>
 
