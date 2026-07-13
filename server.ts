@@ -517,6 +517,9 @@ const getUserWithRole = (user: any) => {
     role: isAdmin ? 'admin' : 'student',
     showInLeaderboard: user.show_in_leaderboard !== false, // default true
     languagePreference: user.language_preference || 'ingles',
+    answeredQuestions: user.answered_questions ?? user.answeredQuestions ?? 0,
+    correctAnswers: user.correct_answers ?? user.correctAnswers ?? 0,
+    accuracyPercent: user.accuracy_percent ?? user.accuracyPercent ?? 0,
     avatarUrl: user.avatar_url || user.avatarUrl || user.avatar || '',
     flashQuizCompleted: !!user.flash_quiz_completed
   };
@@ -1091,16 +1094,16 @@ app.post('/api/user/profile', rateLimiter(10, 60 * 1000), requireAuth, async (re
     gremio: 'gremio',
     showInLeaderboard: 'show_in_leaderboard',
     languagePreference: 'language_preference',
-    avatarUrl: 'avatar_url'
+    avatarUrl: 'avatar_url',
+    answeredQuestions: 'answered_questions',
+    correctAnswers: 'correct_answers',
+    streak: 'streak'
   };
 
   if (req.user.role === 'admin') {
     fieldMapping.xp = 'xp';
     fieldMapping.level = 'level';
     fieldMapping.role = 'role';
-    fieldMapping.answeredQuestions = 'answered_questions';
-    fieldMapping.correctAnswers = 'correct_answers';
-    fieldMapping.streak = 'streak';
   }
 
   Object.entries(fieldMapping).forEach(([camelKey, snakeKey]) => {

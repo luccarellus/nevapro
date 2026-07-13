@@ -222,7 +222,15 @@ export default function App() {
 
     // Persist to server
     try {
-      await userService.updateProfile(updatedUser);
+      const result = await userService.updateProfile(updatedUser);
+      if (result.user) {
+        const { nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(result.user.xp || 0);
+        const syncedUser = { ...result.user, nextLevelXp, currentLevelMinXp };
+        setUser(syncedUser);
+        localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+      } else {
+        localStorage.setItem('neva_student_session', JSON.stringify(updatedUser));
+      }
     } catch (error) {
       console.error('Failed to sync XP with server:', error);
     }

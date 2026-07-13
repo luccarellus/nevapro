@@ -23,8 +23,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     points INTEGER DEFAULT 0,
     answered_questions INTEGER DEFAULT 0,
     correct_answers INTEGER DEFAULT 0,
-    answered_questions INTEGER DEFAULT 0,
-    correct_answers INTEGER DEFAULT 0,
+    accuracy_percent NUMERIC(5,2) GENERATED ALWAYS AS (
+        CASE
+            WHEN answered_questions > 0
+                THEN ROUND((correct_answers::numeric / answered_questions::numeric) * 100, 2)
+            ELSE 0
+        END
+    ) STORED,
     streak INTEGER DEFAULT 0,
     flash_quiz_completed BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
