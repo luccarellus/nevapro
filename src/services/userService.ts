@@ -1,6 +1,17 @@
 import { request } from '../lib/apiService';
 import { UserProfile } from '../types';
 
+const normalizeUserProfile = (profile: any): UserProfile => ({
+  ...profile,
+  answeredQuestions: profile.answeredQuestions ?? profile.answered_questions ?? 0,
+  correctAnswers: profile.correctAnswers ?? profile.correct_answers ?? 0,
+  accuracyPercent: profile.accuracyPercent ?? profile.accuracy_percent ?? 0,
+  avatarUrl: profile.avatarUrl ?? profile.avatar_url ?? profile.avatar ?? '',
+  languagePreference: profile.languagePreference ?? profile.language_preference,
+  showInLeaderboard: profile.showInLeaderboard ?? profile.show_in_leaderboard,
+  flashQuizCompleted: profile.flashQuizCompleted ?? profile.flash_quiz_completed,
+});
+
 export const userService = {
   async getProfile(email?: string): Promise<UserProfile> {
     const url = email ? `/api/user/profile?email=${encodeURIComponent(email)}` : '/api/user/profile';
@@ -10,14 +21,18 @@ export const userService = {
       error.status = response.status;
       throw error;
     }
-    return response.json();
+    return normalizeUserProfile(await response.json());
   },
 
   async updateProfile(data: Partial<UserProfile>): Promise<{ success: boolean; user: UserProfile }> {
-    return request('/api/user/profile', {
+    const result = await request<{ success: boolean; user: UserProfile }>('/api/user/profile', {
       method: 'POST',
       body: data,
     });
+    return {
+      ...result,
+      user: result.user ? normalizeUserProfile(result.user) : result.user,
+    };
   },
 
   async deleteProfile(email?: string): Promise<{ success: boolean }> {
@@ -46,7 +61,11 @@ export const userService = {
       }
       throw new Error(errorMsg);
     }
-    return response.json();
+    const result = await response.json();
+    return {
+      ...result,
+      user: result.user ? normalizeUserProfile(result.user) : result.user,
+    };
   },
 
   async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
@@ -68,12 +87,17 @@ export const userService = {
       }
       throw new Error(errorMsg);
     }
-    return response.json();
+    const result = await response.json();
+    return {
+      ...result,
+      user: result.user ? normalizeUserProfile(result.user) : result.user,
+    };
   },
 
   async getLeaderboard(): Promise<UserProfile[]> {
     try {
-      return request<UserProfile[]>('/api/leaderboard');
+      const users = await request<UserProfile[]>('/api/leaderboard');
+      return users.map(normalizeUserProfile);
     } catch {
       console.error('Error fetching leaderboard:');
       return [];
