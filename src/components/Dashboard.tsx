@@ -154,9 +154,6 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   const streak = user?.streak || 0;
   const answeredQuestions = user?.answeredQuestions || 0;
   const correctAnswers = user?.correctAnswers || 0;
-  const accuracyPercent = user?.accuracyPercent ?? (
-    answeredQuestions ? (correctAnswers / answeredQuestions) * 100 : 0
-  );
 
   const handleQuizComplete = () => {
     confetti({
@@ -293,7 +290,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
               </div>
               <div>
                 <p className="text-[10px] font-bold text-text-secondary mb-1 opacity-50">Precisão</p>
-                <p className="text-3xl font-black text-text-main leading-none">{accuracyPercent.toFixed(0)}<span className="text-xs text-text-secondary ml-1">%</span></p>
+                <p className="text-3xl font-black text-text-main leading-none">{answeredQuestions ? ((correctAnswers / answeredQuestions) * 100).toFixed(0) : 0}<span className="text-xs text-text-secondary ml-1">%</span></p>
               </div>
             </motion.div>
           </div>
@@ -698,4 +695,3 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     </div>
   );
 }
-

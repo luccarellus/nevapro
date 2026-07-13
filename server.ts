@@ -517,9 +517,6 @@ const getUserWithRole = (user: any) => {
     role: isAdmin ? 'admin' : 'student',
     showInLeaderboard: user.show_in_leaderboard !== false, // default true
     languagePreference: user.language_preference || 'ingles',
-    answeredQuestions: user.answered_questions ?? user.answeredQuestions ?? 0,
-    correctAnswers: user.correct_answers ?? user.correctAnswers ?? 0,
-    accuracyPercent: user.accuracy_percent ?? user.accuracyPercent ?? 0,
     avatarUrl: user.avatar_url || user.avatarUrl || user.avatar || '',
     flashQuizCompleted: !!user.flash_quiz_completed
   };

@@ -22,7 +22,6 @@ export interface UserProfile {
   rank: number;
   answeredQuestions?: number;
   correctAnswers?: number;
-  accuracyPercent?: number;
   streak?: number;
   rewards?: Reward[];
   role: 'student' | 'admin';
