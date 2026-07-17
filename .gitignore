@@ -12,6 +12,3 @@ public/icon-512.png.bak
 
 # Scripts temporários de migração/refatoração
 /scripts/
-
-# Build da API para Vercel (gerado por esbuild no deploy)
-api/index.js
