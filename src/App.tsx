@@ -309,7 +309,7 @@ export default function App() {
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
 
-  const IS_UNDER_MAINTENANCE = true;
+  const IS_UNDER_MAINTENANCE = false;
 
   if (IS_UNDER_MAINTENANCE) {
     return <Maintenance />;
