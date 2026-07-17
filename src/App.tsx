@@ -3,31 +3,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navigation from './components/Navigation';
-import Dashboard from './components/Dashboard';
-import Questions from './components/Questions';
 import Header from './components/Header';
-import Leaderboard from './components/Leaderboard';
-import Calendar from './components/Calendar';
-import AdminDashboard from './components/AdminDashboard';
-import Login from './components/Login';
-import Simulados from './components/Simulados';
-import Materiais from './components/Materiais';
-import Mural from './components/Mural';
-import Settings from './components/Settings';
-import ErrorsBook from './components/ErrorsBook';
 import CookieBanner from './components/CookieBanner';
-import PrivacyPolicy from './components/PrivacyPolicy';
-import CookiePolicy from './components/CookiePolicy';
 import Maintenance from './components/Maintenance';
-import ComingSoon from './components/ComingSoon';
 import { UserProfile } from './types';
 import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
+
+// Lazy-loaded route components (code splitting)
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Questions = lazy(() => import('./components/Questions'));
+const Leaderboard = lazy(() => import('./components/Leaderboard'));
+const Calendar = lazy(() => import('./components/Calendar'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const Login = lazy(() => import('./components/Login'));
+const Simulados = lazy(() => import('./components/Simulados'));
+const Materiais = lazy(() => import('./components/Materiais'));
+const Mural = lazy(() => import('./components/Mural'));
+const Settings = lazy(() => import('./components/Settings'));
+const ErrorsBook = lazy(() => import('./components/ErrorsBook'));
+const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
+const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
+const ComingSoon = lazy(() => import('./components/ComingSoon'));
+
+const PageLoading = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+  </div>
+);
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -346,7 +354,9 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {renderContent()}
+            <Suspense fallback={<PageLoading />}>
+              {renderContent()}
+            </Suspense>
             
             {/* Footer / Cookie Button */}
             {isLoggedIn && !isFullPageTab && (
