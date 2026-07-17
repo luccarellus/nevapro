@@ -15,4 +15,3 @@ public/icon-512.png.bak
 
 # Build da API para Vercel (gerado por esbuild no deploy)
 api/index.js
-

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "vite build && npx esbuild api/_source.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=api/index.js",
+  "buildCommand": "vite build",
   "outputDirectory": "dist",
   "rewrites": [
     {
