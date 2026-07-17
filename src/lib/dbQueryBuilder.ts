@@ -37,7 +37,7 @@ function getB2Client() {
 }
 
 
-export function getSupabaseAdminClient() {
+export function getSupabaseAdminClient(): ReturnType<typeof createClient> | any {
   if (supabaseAdminClient) return supabaseAdminClient;
 
   const supabaseUrl = process.env.SUPABASE_URL;

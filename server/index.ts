@@ -1,0 +1,387 @@
+import './instrument';
+import * as Sentry from '@sentry/node';
+import express from 'express';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import path from 'path';
+import * as dotenv from 'dotenv';
+import multer from 'multer';
+
+dotenv.config();
+
+import { log } from './utils/logger';
+import { csrfProtection } from './middleware/csrf';
+import { rateLimiter } from './middleware/rateLimiter';
+import { requireAuth } from './middleware/auth';
+import pool from '../src/lib/db';
+import { getSupabaseAdminClient, dbAdmin } from '../src/lib/dbQueryBuilder';
+import { query } from '../src/lib/db';
+
+// Route imports
+import authRoutes from './routes/auth';
+import userRoutes from './routes/users';
+import adminRoutes from './routes/admin';
+import materialRoutes from './routes/materials';
+import eventRoutes from './routes/events';
+import muralRoutes from './routes/mural';
+import notificationRoutes from './routes/notifications';
+import leaderboardRoutes from './routes/leaderboard';
+import questionRoutes from './routes/questions';
+import healthRoutes from './routes/health';
+
+export const app = express();
+
+// Trust proxy (for rate limiting behind nginx)
+app.set('trust proxy', 1);
+app.disable('etag');
+
+// ===== CORS =====
+const ALLOWED_ORIGIN = (() => {
+  try {
+    return new URL(process.env.FRONTEND_URL || 'https://neva.pro').origin;
+  } catch {
+    return process.env.FRONTEND_URL || 'https://neva.pro';
+  }
+})();
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+// ===== Anti-caching for API =====
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
+// ===== Security Middleware =====
+app.use(cookieParser());
+app.use(
+  helmet({
+    contentSecurityPolicy:
+      process.env.NODE_ENV === 'production'
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", "'unsafe-inline'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:', 'https://api.enem.dev', 'https://enem.dev'],
+              connectSrc: ["'self'", 'https://api.enem.dev'],
+              fontSrc: ["'self'", 'data:'],
+              objectSrc: ["'none'"],
+              upgradeInsecureRequests: [],
+            },
+          }
+        : false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
+
+// Body parsing
+app.use(express.json({ limit: '1mb' }));
+
+// ===== Logging =====
+app.use((req, res, next) => {
+  log.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// ===== Rate Limiting (global) =====
+app.use('/api', rateLimiter(300, 15 * 60 * 1000));
+
+// ===== CSRF Protection =====
+app.use('/api', csrfProtection);
+
+// ===== API Routes =====
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/materials', materialRoutes);
+app.use('/api/eventos', eventRoutes);
+app.use('/api/recados', muralRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/questoes', questionRoutes);
+app.use('/api/health', healthRoutes);
+
+// ===== Image Proxy =====
+app.get('/api/imagem', async (req, res) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) {
+    res.status(400).send('URL missing');
+    return;
+  }
+  try {
+    const parsedUrl = new URL(imageUrl);
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const allowedHostsEnv = process.env.ALLOWED_IMAGE_HOSTS || '';
+    const extraHosts = allowedHostsEnv.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+    const isAllowedHost = hostname === 'enem.dev' || hostname === 'api.enem.dev' || extraHosts.includes(hostname);
+    if (!isAllowedHost) {
+      res.status(403).send('Acesso negado: domínio não permitido.');
+      return;
+    }
+    const response = await fetch(imageUrl, {
+      headers: { 'User-Agent': 'Mozilla', Referer: 'https://enem.dev/' },
+      redirect: 'manual',
+    });
+    if (response.status >= 300 && response.status < 400) {
+      res.status(403).send('Acesso negado: redirecionamentos não são permitidos.');
+      return;
+    }
+    if (!response.ok) {
+      res.status(response.status).send('Fetch error');
+      return;
+    }
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch {
+    res.status(500).send('Proxy error');
+  }
+});
+
+// ===== Storage Proxy (B2) =====
+app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
+  const filePath = req.query.file as string;
+  if (!filePath) {
+    res.status(400).json({ error: 'Parâmetro file é obrigatório.' });
+    return;
+  }
+  if (filePath.includes('..') || filePath.includes('\\\\') || filePath.startsWith('/')) {
+    res.status(400).json({ error: 'Caminho de arquivo inválido.' });
+    return;
+  }
+  try {
+    const bucketName = process.env.B2_BUCKET_NAME || 'materials';
+    const { data, error } = await dbAdmin.storage.from(bucketName).getObject(filePath);
+    if (error || !data) {
+      log.error('[Storage] GetObject error:', error);
+      res.status(500).json({ error: 'Erro ao buscar arquivo no Storage.' });
+      return;
+    }
+    const { stream, contentType } = data;
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    res.send(Buffer.concat(chunks));
+  } catch (error: unknown) {
+    log.error('[Storage] Error:', error);
+    res.status(500).json({ error: 'Erro ao servir arquivo.' });
+  }
+});
+
+// ===== Answers =====
+app.post('/api/answers', rateLimiter(30, 60_000), requireAuth, async (req, res) => {
+  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  try {
+    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
+    if (qCheck.rows.length === 0 && questionData) {
+      await query(
+        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING`,
+        [questionId, questionData.subject || 'Geral', questionData.text, questionData.imageUrl || null,
+         questionData.correctOptionIndex, questionData.explanation || '', questionData.difficulty || 'médio',
+         questionData.xpReward || 50, questionData.year || 2023, questionData.index || 0],
+      );
+      if (Array.isArray(questionData.options)) {
+        for (let idx = 0; idx < questionData.options.length; idx++) {
+          const letter = String.fromCharCode(65 + idx);
+          await query(
+            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+            [questionId, questionData.options[idx], questionData.optionImages?.[idx] || null, letter, idx === questionData.correctOptionIndex],
+          );
+        }
+      }
+    }
+    await query(
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect],
+    );
+    res.json({ success: true });
+  } catch (err) {
+    log.error('[POST /api/answers] Error:', err);
+    res.status(500).json({ error: 'Erro ao registrar resposta.' });
+  }
+});
+
+// ===== Errors Book =====
+app.get('/api/user/errors', requireAuth, async (req, res) => {
+  const email = ((req.query.email as string) || req.user?.email || '').toLowerCase().trim();
+  if (req.user?.role !== 'admin' && req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    return;
+  }
+  try {
+    const userRes = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [email]);
+    if (userRes.rows.length === 0) {
+      res.status(404).json({ error: 'Usuário não encontrado' });
+      return;
+    }
+    const userId = userRes.rows[0].id;
+    const errorsQuery = `
+      WITH latest_answers AS (
+        SELECT *, ROW_NUMBER() OVER(PARTITION BY question_id ORDER BY created_at DESC) as rn
+        FROM public.answers WHERE user_id = $1
+      )
+      SELECT la.id as answer_id, la.selected_option_index, la.created_at as answered_at,
+             q.id as question_id, q.subject, q.text as question_text, q.image_url,
+             q.correct_option_index, q.explanation, q.difficulty, q.year, q.index
+      FROM latest_answers la
+      JOIN public.questions q ON la.question_id = q.id
+      WHERE la.rn = 1 AND la.is_correct = false
+      ORDER BY la.created_at DESC`;
+    const errorsRes = await query(errorsQuery, [userId]);
+    const result = [];
+    for (const errRow of errorsRes.rows) {
+      const optsRes = await query(
+        'SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC',
+        [errRow.question_id],
+      );
+      result.push({
+        id: errRow.question_id, subject: errRow.subject, text: errRow.question_text,
+        imageUrl: errRow.image_url, correctOptionIndex: errRow.correct_option_index,
+        explanation: errRow.explanation, difficulty: errRow.difficulty, year: errRow.year, index: errRow.index,
+        selectedOptionIndex: errRow.selected_option_index, answeredAt: errRow.answered_at,
+        options: optsRes.rows.map((o: any) => o.text), optionImages: optsRes.rows.map((o: any) => o.image_url),
+      });
+    }
+    res.json(result);
+  } catch (err) {
+    log.error('[GET /api/user/errors] Error:', err);
+    res.status(500).json({ error: 'Erro ao buscar caderno de erros.' });
+  }
+});
+
+// ===== LGPD Consent Log =====
+app.post('/api/lgpd/consent-log', (req, res) => {
+  log.info('[LGPD] Consent preferences received:', req.body);
+  res.json({ success: true });
+});
+
+// ===== Upload (Avatar) =====
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas imagens são permitidas'));
+    }
+  },
+});
+
+app.post('/api/upload', rateLimiter(5, 60_000), upload.single('file'), async (req: any, res: any) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+      return;
+    }
+    const bucketName = process.env.B2_BUCKET_NAME || 'neva-avatars';
+    const fileExt = req.file.originalname.split('.').pop() || 'jpg';
+    const fileName = `avatars/${crypto.randomUUID()}.${fileExt}`;
+    const { data, error } = await dbAdmin.storage.from(bucketName).upload(fileName, req.file.buffer, {
+      contentType: req.file.mimetype,
+    });
+    if (error) throw error;
+    const endpoint = (process.env.B2_ENDPOINT || '').replace(/^https?:\/\//, '');
+    const publicUrl = `https://${bucketName}.${endpoint}/${fileName}`;
+    res.json({ url: publicUrl });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Upload failed';
+    log.error('[Upload] Error:', msg);
+    res.status(500).json({ error: 'Falha ao enviar arquivo.' });
+  }
+});
+
+// ===== Vite Dev Middleware (HMR) =====
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  (async () => {
+    try {
+      const { createServer: createViteServer } = await import('vite');
+      const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+      app.use(vite.middlewares);
+      log.info('[Vite] Dev server middleware attached for HMR');
+    } catch (err) {
+      log.warn('[Vite] Dev middleware not available, running without HMR');
+    }
+  })();
+}
+
+// ===== Static Files (production only) =====
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.resolve('dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) return;
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+// ===== Centralized Error Handler =====
+Sentry.setupExpressErrorHandler(app);
+
+app.use((err: any, req: any, res: any, _next: any) => {
+  log.error('[Unhandled Error]', err?.message || err);
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'JSON mal formatado no corpo da requisição.' });
+    return;
+  }
+  if (err.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'Erro ao interpretar JSON.' });
+    return;
+  }
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: status >= 500 ? 'Erro interno do servidor.' : (err.message || 'Erro ao processar requisição.'),
+  });
+});
+
+// ===== Startup =====
+const PORT = parseInt(process.env.PORT || '3000', 10);
+
+export const startServer = () => {
+  if (process.env.VERCEL) return;
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    log.info(`[Server] Running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    log.info(`[Server] Frontend: ${ALLOWED_ORIGIN}`);
+  });
+
+  // Graceful shutdown
+  const shutdown = (signal: string) => {
+    log.info(`[Server] ${signal} recebido. Encerrando graciosamente...`);
+    server.close(async () => {
+      try {
+        await pool.end();
+        log.info('[Server] Pool do Postgres fechado. Processo encerrado.');
+        process.exit(0);
+      } catch (shutdownErr) {
+        log.error('[Server] Erro ao fechar pool:', shutdownErr);
+        process.exit(1);
+      }
+    });
+    setTimeout(() => {
+      log.error('[Server] Shutdown forçado após timeout.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+};
