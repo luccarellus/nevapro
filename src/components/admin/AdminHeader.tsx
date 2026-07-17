@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import Logo from '../Logo';
 import { userService } from '../../services/userService';
+import { uploadService } from '../../services/uploadService';
 
 type AdminTab = 'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos';
 
@@ -70,17 +71,7 @@ export default function AdminHeader({
     setAvatarUploadError('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!uploadRes.ok) {
-        const errorData = await uploadRes.json().catch(() => null);
-        throw new Error(errorData?.error || 'Falha ao enviar foto.');
-      }
-
-      const uploadData = await uploadRes.json();
-      const avatarUrl = uploadData.url;
+      const avatarUrl = await uploadService.uploadFile(file, 'Falha ao enviar foto.');
       const response = await userService.updateProfile({
         email: user.email,
         name: user.name,

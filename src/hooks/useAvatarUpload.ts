@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { uploadService } from '../services/uploadService';
 
 interface UseAvatarUploadOptions {
   email?: string;
@@ -36,17 +37,7 @@ export function useAvatarUpload(options: UseAvatarUploadOptions = {}): UseAvatar
 
     try {
       // 1. Upload file
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (!uploadRes.ok) {
-        const errData = await uploadRes.json().catch(() => null);
-        throw new Error(errData?.error || 'Falha ao enviar foto.');
-      }
-
-      const uploadData = await uploadRes.json();
-      const avatarUrl = uploadData.url;
+      const avatarUrl = await uploadService.uploadFile(file, 'Falha ao enviar foto.');
 
       // 2. Update profile with new avatar
       const profileRes = await fetch('/api/user/profile', {

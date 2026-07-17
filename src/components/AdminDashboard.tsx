@@ -9,6 +9,7 @@ import { muralService } from '../services/muralService';
 import { eventService } from '../services/eventService';
 import { adminService } from '../services/adminService';
 import { userService } from '../services/userService';
+import { uploadService } from '../services/uploadService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import cidadesEscolasData from '../data/cidades_escolas.json';
@@ -182,10 +183,7 @@ export default function AdminDashboard({
     try {
       let finalUrl = materialForm.url;
       if (selectedFile) {
-        const formData = new FormData(); formData.append('file', selectedFile);
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-        if (!uploadRes.ok) throw new Error('Falha no upload');
-        finalUrl = (await uploadRes.json()).url;
+        finalUrl = await uploadService.uploadFile(selectedFile, 'Falha no upload', false);
       }
       const payload = { title: materialForm.title, type: materialForm.type as any, foco: materialForm.foco, url: finalUrl, description: materialForm.description };
       if (editingId) { await materialService.updateMaterial(editingId, payload); }

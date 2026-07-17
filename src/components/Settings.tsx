@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
+import { uploadService } from '../services/uploadService';
 
 interface SettingsProps {
   user: UserProfile;
@@ -61,21 +62,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
     setAvatarUploadError('');
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!uploadRes.ok) {
-        const errorData = await uploadRes.json().catch(() => null);
-        throw new Error(errorData?.error || 'Falha ao enviar foto.');
-      }
-
-      const uploadData = await uploadRes.json();
-      const avatarUrl = uploadData.url;
+      const avatarUrl = await uploadService.uploadFile(file, 'Falha ao enviar foto.');
 
       const response = await userService.updateProfile({
         email: user.email,
