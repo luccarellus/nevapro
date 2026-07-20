@@ -14,6 +14,7 @@ import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
+import { invalidateRequestCache } from './lib/requestCache';
 
 // Lazy-loaded route components (code splitting)
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -153,6 +154,7 @@ export default function App() {
   };
   
   const handleLogin = async (loggedUser: UserProfile) => {
+    invalidateRequestCache();
     setIsLoggedIn(true);
     setUser(loggedUser);
     
@@ -180,6 +182,7 @@ export default function App() {
       console.error('Erro ao fazer logout no servidor:', err);
     }
     localStorage.removeItem('neva_student_session');
+    invalidateRequestCache();
     setIsLoggedIn(false);
     setActiveTab('dashboard');
   }
@@ -194,6 +197,7 @@ export default function App() {
           console.error('Erro ao fazer logout no servidor:', err);
         }
         localStorage.removeItem('neva_student_session');
+        invalidateRequestCache();
         setIsLoggedIn(false);
         setActiveTab('dashboard');
       } else {

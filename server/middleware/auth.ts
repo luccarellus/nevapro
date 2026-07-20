@@ -4,6 +4,8 @@ import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../lib/d
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
+import { createHash } from 'node:crypto';
+import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 
 // Extend Express Request globally
 declare global {
@@ -20,6 +22,10 @@ declare global {
  */
 const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser | null> => {
   try {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const cachedUser = await getUserCache<AuthenticatedUser>(userCacheKeys.auth(tokenHash));
+    if (cachedUser) return cachedUser;
+
     const { data: userData, error } = await getSupabaseAdminClient().auth.getUser(token);
     if (error || !userData?.user) return null;
 
@@ -35,12 +41,14 @@ const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser |
       .maybeSingle();
 
     if (adminRow) {
-      return {
+      const authenticatedUser: AuthenticatedUser = {
         userId: supabaseUser.id,
         email,
         role: 'admin',
         authUserId: supabaseUser.id,
       };
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+      return authenticatedUser;
     }
 
     // Check if user is a student (via users table)
@@ -51,21 +59,25 @@ const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser |
       .maybeSingle();
 
     if (studentRow) {
-      return {
+      const authenticatedUser: AuthenticatedUser = {
         userId: studentRow.id,
         email,
         role: 'student',
         authUserId: supabaseUser.id,
       };
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+      return authenticatedUser;
     }
 
     // Authenticated via Supabase but not in our DB — treat as student
-    return {
+    const authenticatedUser: AuthenticatedUser = {
       userId: supabaseUser.id,
       email,
       role: 'student',
       authUserId: supabaseUser.id,
     };
+    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+    return authenticatedUser;
   } catch (err) {
     log.error('[Auth] Error verifying Supabase session:', err);
     return null;

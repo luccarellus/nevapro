@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import confetti from 'canvas-confetti';
+import { cachedFetchJson } from '../lib/requestCache';
 
 interface DashboardProps {
   user: UserProfile;
@@ -58,55 +59,15 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Carregar materiais de maneira isolada
-        try {
-          const matRes = await fetch('/api/materials');
-          if (matRes.ok) {
-            const mats = await matRes.json();
-            setRecentMaterials(mats.slice(0, 4));
-          }
-        } catch (e) {
-          console.error('Erro ao buscar materiais do dashboard:', e);
-        }
-
-        // 2. Carregar estatísticas do usuário de maneira isolada
-        try {
-          const statsRes = await fetch(`/api/user/stats?email=${encodeURIComponent(user.email)}`);
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            if (statsData.weekly?.length > 0) {
-              setStats(statsData);
-            }
-            if (statsData.flashQuizCompleted) {
-              setDailyChallengeDone(true);
-            }
-            if (statsData.quizSecondsRemaining > 0) {
-              setSecondsLeft(statsData.quizSecondsRemaining);
-            }
-          }
-        } catch (e) {
-          console.error('Erro ao buscar estatísticas do dashboard:', e);
-        }
-
-        // 3. Carregar leaderboard de maneira isolada com dados reais
-        try {
-          const leadRes = await fetch('/api/leaderboard');
-          if (leadRes.ok) {
-            const leadData = await leadRes.json();
-            if (Array.isArray(leadData) && leadData.length > 0) {
-              setLeaderboard(leadData);
-            } else {
-              throw new Error('Ranking vazio ou inválido');
-            }
-          } else {
-            throw new Error('Resposta de rede do ranking inválida');
-          }
-        } catch (e) {
-          console.warn('Erro ao carregar leaderboard oficial:', e);
-          // Sem dados mockados, colocamos apenas o próprio usuário caso queira se ver no painel real
-          setLeaderboard([
-            { name: user.name || 'Você', city: user.city || 'Maranhão', xp: user.xp || 0, level: user.level || 1, isMe: true }
-          ]);
+        const data = await cachedFetchJson<any>('/api/bootstrap', 60_000);
+        setRecentMaterials((data.materials || []).slice(0, 4));
+        if (data.stats?.weekly?.length > 0) setStats(data.stats);
+        setDailyChallengeDone(Boolean(data.stats?.flashQuizCompleted));
+        setSecondsLeft(Number(data.stats?.quizSecondsRemaining || 0));
+        if (Array.isArray(data.leaderboard) && data.leaderboard.length > 0) {
+          setLeaderboard(data.leaderboard);
+        } else {
+          setLeaderboard([{ name: user.name || 'Você', city: user.city || 'Maranhão', xp: user.xp || 0, level: user.level || 1, isMe: true }]);
         }
       } catch (err) {
         console.error('Erro geral ao carregar dados do dashboard:', err);

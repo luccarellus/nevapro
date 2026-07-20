@@ -80,23 +80,17 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
     let correctOnes = 0;
     let totalXp = 0;
 
-    questions.forEach((q, idx) => {
+    const answerBatch = questions.map((q, idx) => {
       const isCorrect = userAnswers[idx] === q.correctOptionIndex;
       if (isCorrect) {
         correctOnes++;
         totalXp += q.xpReward;
       }
-      
-      // Log individual answer to server (fire and forget for now, or use Promise.all)
-      fetch('/api/answers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id || 'u1',
+      return {
+          userId: user.id,
           questionId: q.id,
-          selectedOption: userAnswers[idx],
+          selectedOption: userAnswers[idx] ?? null,
           isCorrect,
-          xpReward: q.xpReward,
           questionData: {
             subject: q.subject,
             text: q.text,
@@ -105,13 +99,17 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             imageUrl: q.imageUrl || null,
             correctOptionIndex: q.correctOptionIndex,
             explanation: q.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
-            difficulty: q.difficulty || 'médio',
+            difficulty: q.difficulty || 'médio', xpReward: q.xpReward,
             year: Number(selectedYear || q.id.split('-')[0] || 2023),
             index: Number(q.id.split('-')[1] || idx + 1)
-          }
-        })
-      }).catch(err => console.error('Failed to log answer:', err));
+          },
+        };
     });
+    fetch('/api/answers/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ answers: answerBatch }),
+    }).catch(err => console.error('Failed to log answers:', err));
 
     setScore(correctOnes);
     onEarnXp(totalXp, correctOnes, questions.length, false, 'Treinamento de Questões');

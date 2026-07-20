@@ -599,9 +599,9 @@ var cacheGet = async (key) => {
     return null;
   }
 };
-var cacheSet = async (key, data) => {
+var cacheSet = async (key, data, ttlSeconds) => {
   if (!isUpstashRedisConfigured()) return;
-  const ttl = CACHE_TTL[key] || 300;
+  const ttl = ttlSeconds || CACHE_TTL[key] || 300;
   try {
     await runUpstashRedisPipeline([
       ["SET", key, JSON.stringify(data)],
@@ -723,8 +723,35 @@ function resolveStoredFileUrl(value) {
 }
 
 // server/middleware/auth.ts
+import { createHash } from "node:crypto";
+
+// server/services/userCache.ts
+var userCacheKeys = {
+  profile: (email) => `cache:user:${email.toLowerCase()}:profile`,
+  stats: (email) => `cache:user:${email.toLowerCase()}:stats`,
+  errors: (email) => `cache:user:${email.toLowerCase()}:errors`,
+  notifications: (userId) => `cache:user:${userId}:notifications`,
+  bootstrap: (email) => `cache:user:${email.toLowerCase()}:bootstrap`,
+  auth: (tokenHash) => `cache:auth:${tokenHash}`
+};
+var getUserCache = cacheGet;
+var setUserCache = cacheSet;
+async function invalidateUserCache(email, userId) {
+  await cacheInvalidate(
+    userCacheKeys.profile(email),
+    userCacheKeys.stats(email),
+    userCacheKeys.errors(email),
+    userCacheKeys.bootstrap(email),
+    ...userId ? [userCacheKeys.notifications(userId)] : []
+  );
+}
+
+// server/middleware/auth.ts
 var verifySupabaseSession = async (token) => {
   try {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const cachedUser = await getUserCache(userCacheKeys.auth(tokenHash));
+    if (cachedUser) return cachedUser;
     const { data: userData, error } = await getSupabaseAdminClient().auth.getUser(token);
     if (error || !userData?.user) return null;
     const supabaseUser = userData.user;
@@ -732,28 +759,34 @@ var verifySupabaseSession = async (token) => {
     if (!email) return null;
     const { data: adminRow } = await getSupabaseAdminClient().from("admin_users").select("*").eq("email", email).maybeSingle();
     if (adminRow) {
-      return {
+      const authenticatedUser2 = {
         userId: supabaseUser.id,
         email,
         role: "admin",
         authUserId: supabaseUser.id
       };
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser2, 60);
+      return authenticatedUser2;
     }
     const { data: studentRow } = await getSupabaseAdminClient().from("users").select("id").eq("email", email).maybeSingle();
     if (studentRow) {
-      return {
+      const authenticatedUser2 = {
         userId: studentRow.id,
         email,
         role: "student",
         authUserId: supabaseUser.id
       };
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser2, 60);
+      return authenticatedUser2;
     }
-    return {
+    const authenticatedUser = {
       userId: supabaseUser.id,
       email,
       role: "student",
       authUserId: supabaseUser.id
     };
+    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+    return authenticatedUser;
   } catch (err) {
     log.error("[Auth] Error verifying Supabase session:", err);
     return null;
@@ -1178,9 +1211,16 @@ router2.get("/profile", requireAuth, async (req, res) => {
     return;
   }
   try {
+    const cachedProfile = await getUserCache(userCacheKeys.profile(cleanEmail));
+    if (cachedProfile) {
+      res.json(cachedProfile);
+      return;
+    }
     const { data: adminData } = await getSupabaseAdminClient().from("admin_users").select("*").eq("email", cleanEmail).maybeSingle();
     if (adminData) {
-      res.json(formatUserProfile(adminData, "admin"));
+      const profile2 = formatUserProfile(adminData, "admin");
+      await setUserCache(userCacheKeys.profile(cleanEmail), profile2, 60);
+      res.json(profile2);
       return;
     }
     const { data, error } = await getSupabaseAdminClient().from("users").select("*").eq("email", cleanEmail).maybeSingle();
@@ -1189,7 +1229,9 @@ router2.get("/profile", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Usu\xE1rio n\xE3o encontrado" });
       return;
     }
-    res.json(formatUserProfile(data, "student"));
+    const profile = formatUserProfile(data, "student");
+    await setUserCache(userCacheKeys.profile(cleanEmail), profile, 60);
+    res.json(profile);
   } catch (err) {
     log.error("[Profile] Error:", err);
     res.status(500).json({ error: "Erro ao buscar perfil." });
@@ -1276,6 +1318,7 @@ router2.post(
         const { data: insData } = await getSupabaseAdminClient().from(targetTable).insert([{ ...dbUpdate, id: crypto.randomUUID(), created_at: (/* @__PURE__ */ new Date()).toISOString() }]).select().single();
         if (insData) {
           await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+          await invalidateUserCache(email, insData.id);
           res.json({ success: true, user: formatUserProfile(insData, isAdmin ? "admin" : "student") });
           return;
         }
@@ -1286,6 +1329,7 @@ router2.post(
         await getSupabaseAdminClient().from("xp_logs").insert([{ user_id: userId, amount: xpDiff, reason, created_at: (/* @__PURE__ */ new Date()).toISOString() }]);
       }
       await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+      await invalidateUserCache(email, userId || void 0);
       res.json({ success: true, user: formatUserProfile(data, isAdmin ? "admin" : "student") });
     } catch (err) {
       log.error("[Profile Update] Error:", err);
@@ -1322,6 +1366,7 @@ router2.delete("/profile", requireAuth, async (req, res) => {
       await supabase.auth.admin.deleteUser(authUserId);
     }
     await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+    await invalidateUserCache(email, userData?.id);
     res.json({ success: true });
   } catch (err) {
     log.error("[DELETE /api/user/profile] Error:", err);
@@ -1335,6 +1380,11 @@ router2.get("/stats", requireAuth, async (req, res) => {
     return;
   }
   try {
+    const cachedStats = await getUserCache(userCacheKeys.stats(email));
+    if (cachedStats) {
+      res.json(cachedStats);
+      return;
+    }
     const supabase = getSupabaseAdminClient();
     const { data: user } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
     if (!user) {
@@ -1377,7 +1427,9 @@ router2.get("/stats", requireAuth, async (req, res) => {
         secondsRemaining = Math.max(0, Math.ceil((lastQuizTime + sixHours - Date.now()) / 1e3));
       }
     }
-    res.json({ weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining });
+    const stats = { weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining };
+    await setUserCache(userCacheKeys.stats(email), stats, 60);
+    res.json(stats);
   } catch (err) {
     log.error("[Stats] Error:", err);
     res.status(500).json({ error: "Erro ao processar estat\xEDsticas" });
@@ -1995,6 +2047,7 @@ async function getUserIdByEmail(email) {
   const { rows } = await query("SELECT id FROM public.users WHERE email = $1 LIMIT 1", [email]);
   return rows.length > 0 ? rows[0].id : null;
 }
+var getRequestUserId = (req, email) => req.user?.role === "student" && req.user.email === email ? Promise.resolve(req.user.userId) : getUserIdByEmail(email);
 async function markGlobalNotificationAsRead(notificationId, userId) {
   await query(
     `INSERT INTO public.notification_reads (id, user_id, notification_id, read_at)
@@ -2010,28 +2063,30 @@ router7.get("/", requireAuth, async (req, res) => {
     return;
   }
   try {
-    const userId = await getUserIdByEmail(email);
+    const userId = await getRequestUserId(req, email);
     if (!userId) {
       res.json([]);
       return;
     }
-    const { data: notifications, error } = await getSupabaseAdminClient().from("notifications").select("*").or(`user_id.eq.${userId},user_id.is.null`).order("created_at", { ascending: false });
-    if (error) throw error;
-    const { data: reads } = await getSupabaseAdminClient().from("notification_reads").select("notification_id").eq("user_id", userId);
-    const readGlobalIds = new Set((reads || []).map((r) => r.notification_id));
-    const mapped = (notifications || []).map((n) => {
-      const isGlobal = n.user_id === null;
-      return {
-        id: n.id,
-        user_id: n.user_id,
-        title: n.title,
-        message: n.content || "",
-        type: n.type,
-        read: isGlobal ? readGlobalIds.has(n.id) : !!n.is_read,
-        createdAt: n.created_at || (/* @__PURE__ */ new Date()).toISOString()
-      };
-    });
-    res.json(mapped);
+    const cacheKey = userCacheKeys.notifications(userId);
+    const cached = await getUserCache(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const { rows } = await query(
+      `SELECT n.id, n.user_id, n.title, n.content AS message, n.type,
+              CASE WHEN n.user_id IS NULL THEN (nr.notification_id IS NOT NULL) ELSE n.is_read END AS read,
+              n.created_at AS "createdAt"
+       FROM public.notifications n
+       LEFT JOIN public.notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = $1
+       WHERE n.user_id = $1 OR n.user_id IS NULL
+       ORDER BY n.created_at DESC`,
+      [userId]
+    );
+    await setUserCache(cacheKey, rows, 45);
+    res.json(rows);
   } catch (err) {
     log.error("[Notifications] Error:", err);
     res.json([]);
@@ -2044,7 +2099,7 @@ router7.post("/read-all", requireAuth, async (req, res) => {
     return;
   }
   try {
-    const userId = await getUserIdByEmail(email);
+    const userId = await getRequestUserId(req, email);
     if (!userId) {
       res.json({ success: false, error: "User not found" });
       return;
@@ -2059,6 +2114,7 @@ router7.post("/read-all", requireAuth, async (req, res) => {
          )`,
       [userId]
     );
+    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
     res.json({ success: true });
   } catch (err) {
     log.error("[Notifications ReadAll] Error:", err);
@@ -2073,7 +2129,7 @@ router7.post("/:id/read", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
       return;
     }
-    const userId = await getUserIdByEmail(req.user?.email || "");
+    const userId = await getRequestUserId(req, req.user?.email || "");
     if (req.user?.role !== "admin" && userId && notif.user_id && notif.user_id !== userId) {
       res.status(403).json({ error: "Acesso negado" });
       return;
@@ -2084,6 +2140,7 @@ router7.post("/:id/read", requireAuth, async (req, res) => {
       const { error } = await getSupabaseAdminClient().from("notifications").update({ is_read: true }).eq("id", id);
       if (error) throw error;
     }
+    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
     res.json({ success: true });
   } catch (err) {
     log.error("[Notification Read] Error:", err);
@@ -2132,6 +2189,12 @@ router9.get("/", async (req, res) => {
     return;
   }
   try {
+    const cacheKey = `cache:questions:${year}:${limit || 50}:${offset || 0}`;
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
     const apiUrl = `${BASE_URL}/questions/${year}?limit=${limit || 50}&offset=${offset || 0}`;
     const response = await fetch(apiUrl, {
       headers: { "Content-Type": "application/json" }
@@ -2141,7 +2204,9 @@ router9.get("/", async (req, res) => {
       return;
     }
     const data = await response.json();
-    res.json({ questions: data.questions || data });
+    const payload = { questions: data.questions || data };
+    await cacheSet(cacheKey, payload, 600);
+    res.json(payload);
   } catch (err) {
     log.error("[Questions Proxy] Error:", err);
     res.status(500).json({ error: "Failed to fetch questions from ENEM API" });
@@ -2161,6 +2226,170 @@ router10.get("/", (req, res) => {
   });
 });
 var health_default = router10;
+
+// server/routes/answers.ts
+init_db();
+import { Router as Router11 } from "express";
+var router11 = Router11();
+router11.post("/batch", rateLimiter(10, 6e4), requireAuth, async (req, res) => {
+  const answers = req.body?.answers;
+  if (!Array.isArray(answers) || answers.length === 0 || answers.length > 200) {
+    res.status(400).json({ error: "Envie entre 1 e 200 respostas." });
+    return;
+  }
+  const userId = answers[0]?.userId;
+  if (!userId || answers.some((answer) => answer.userId !== userId || !answer.questionId)) {
+    res.status(400).json({ error: "Lote de respostas inv\xE1lido." });
+    return;
+  }
+  if (req.user?.role !== "admin" && req.user?.userId !== userId) {
+    res.status(403).json({ error: "Acesso negado." });
+    return;
+  }
+  const questions = answers.filter((answer) => answer.questionData).map((answer) => ({
+    id: answer.questionId,
+    subject: answer.questionData?.subject || "Geral",
+    text: answer.questionData?.text || "",
+    image_url: answer.questionData?.imageUrl || null,
+    correct_option_index: answer.questionData?.correctOptionIndex ?? null,
+    explanation: answer.questionData?.explanation || "",
+    difficulty: answer.questionData?.difficulty || "m\xE9dio",
+    xp_reward: answer.questionData?.xpReward || 50,
+    year: answer.questionData?.year || 2023,
+    question_index: answer.questionData?.index || 0
+  }));
+  const options = answers.flatMap(
+    (answer) => Array.isArray(answer.questionData?.options) ? answer.questionData.options.map((text, index) => ({
+      question_id: answer.questionId,
+      text,
+      image_url: answer.questionData?.optionImages?.[index] || null,
+      letter: String.fromCharCode(65 + index),
+      is_correct: index === answer.questionData?.correctOptionIndex
+    })) : []
+  );
+  const answerRows = answers.map((answer) => ({
+    user_id: answer.userId,
+    question_id: answer.questionId,
+    selected_option_index: answer.selectedOption ?? null,
+    is_correct: Boolean(answer.isCorrect)
+  }));
+  const client = await getClient();
+  try {
+    await client.query("BEGIN");
+    if (questions.length > 0) {
+      await client.query(
+        `INSERT INTO public.questions
+          (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
+         SELECT id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, question_index
+         FROM jsonb_to_recordset($1::jsonb) AS q(
+           id varchar, subject varchar, text text, image_url text, correct_option_index integer,
+           explanation text, difficulty varchar, xp_reward integer, year integer, question_index integer
+         ) ON CONFLICT (id) DO NOTHING`,
+        [JSON.stringify(questions)]
+      );
+    }
+    if (options.length > 0) {
+      await client.query(
+        `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
+         SELECT gen_random_uuid(), o.question_id, o.text, o.image_url, o.letter, o.is_correct
+         FROM jsonb_to_recordset($1::jsonb) AS o(
+           question_id varchar, text text, image_url text, letter varchar, is_correct boolean
+         )
+         WHERE NOT EXISTS (
+           SELECT 1 FROM public.question_options existing
+           WHERE existing.question_id = o.question_id AND existing.letter = o.letter
+         )`,
+        [JSON.stringify(options)]
+      );
+    }
+    await client.query(
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
+       SELECT gen_random_uuid(), user_id, question_id, selected_option_index, is_correct, NOW()
+       FROM jsonb_to_recordset($1::jsonb) AS a(
+         user_id uuid, question_id varchar, selected_option_index integer, is_correct boolean
+       )`,
+      [JSON.stringify(answerRows)]
+    );
+    await client.query("COMMIT");
+    await invalidateUserCache(req.user?.email || "", userId);
+    res.json({ success: true, count: answers.length });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    log.error("[POST /api/answers/batch] Error:", error);
+    res.status(500).json({ error: "Erro ao registrar respostas." });
+  } finally {
+    client.release();
+  }
+});
+var answers_default = router11;
+
+// server/routes/bootstrap.ts
+init_db();
+import { Router as Router12 } from "express";
+var router12 = Router12();
+router12.get("/", requireAuth, async (req, res) => {
+  const email = req.user?.email || "";
+  const cacheKey = userCacheKeys.bootstrap(email);
+  try {
+    const cached = await getUserCache(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const { rows } = await query(
+      `WITH target AS (SELECT id FROM public.users WHERE email = $1 LIMIT 1)
+       SELECT
+         COALESCE((SELECT json_agg(json_build_object(
+           'id', m.id, 'title', m.title, 'subject', m.subject, 'foco', m.foco,
+           'description', m.description, 'url', m.url, 'type', m.type,
+           'uploadedAt', COALESCE(m.uploaded_at, m.created_at)
+         ) ORDER BY m.created_at DESC) FROM public.materials m), '[]'::json) AS materials,
+         COALESCE((SELECT json_agg(json_build_object(
+           'name', u.name, 'city', u.city, 'xp', COALESCE(u.xp, 0),
+           'level', COALESCE(u.level, 1), 'avatarUrl', COALESCE(u.avatar_url, '')
+         ) ORDER BY u.xp DESC) FROM (
+           SELECT * FROM public.users WHERE role <> 'admin' AND show_in_leaderboard = true
+           ORDER BY xp DESC LIMIT 20
+         ) u), '[]'::json) AS leaderboard,
+         COALESCE((SELECT json_agg(json_build_object('amount', x.amount, 'createdAt', x.created_at, 'reason', x.reason))
+           FROM public.xp_logs x, target t
+           WHERE x.user_id = t.id AND x.created_at >= NOW() - INTERVAL '7 days'), '[]'::json) AS xp_logs`,
+      [email]
+    );
+    const row = rows[0] || { materials: [], leaderboard: [], xp_logs: [] };
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "S\xE1b"];
+    const weekly = Array.from({ length: 7 }, (_, offset) => {
+      const date = /* @__PURE__ */ new Date();
+      date.setDate(date.getDate() - (6 - offset));
+      const dateKey = date.toISOString().slice(0, 10);
+      const xp = (row.xp_logs || []).filter((entry) => String(entry.createdAt).slice(0, 10) === dateKey).reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+      return { day: days[date.getDay()], xp, fullDate: dateKey };
+    });
+    const xps = weekly.map((entry) => entry.xp);
+    const total = xps.reduce((sum, xp) => sum + xp, 0);
+    const lastQuiz = (row.xp_logs || []).filter((entry) => entry.reason === "Flash Quiz: Maranh\xE3o").sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    const elapsed = lastQuiz ? Date.now() - new Date(lastQuiz.createdAt).getTime() : Infinity;
+    const payload = {
+      materials: row.materials || [],
+      leaderboard: (row.leaderboard || []).map((entry) => ({
+        ...entry,
+        avatarUrl: resolveStoredFileUrl(entry.avatarUrl)
+      })),
+      stats: {
+        weekly,
+        summary: { average: Math.round(total / 7), best: Math.max(...xps, 0), total },
+        flashQuizCompleted: elapsed < 6 * 60 * 60 * 1e3,
+        quizSecondsRemaining: elapsed < 6 * 60 * 60 * 1e3 ? Math.ceil((6 * 60 * 60 * 1e3 - elapsed) / 1e3) : 0
+      }
+    };
+    await setUserCache(cacheKey, payload, 60);
+    res.json(payload);
+  } catch (error) {
+    log.error("[Bootstrap] Error:", error);
+    res.status(500).json({ error: "Erro ao carregar dados iniciais." });
+  }
+});
+var bootstrap_default = router12;
 
 // server/index.ts
 dotenv3.config();
@@ -2224,6 +2453,8 @@ app.use("/api/notifications", notifications_default);
 app.use("/api/leaderboard", leaderboard_default);
 app.use("/api/questoes", questions_default);
 app.use("/api/health", health_default);
+app.use("/api/answers", answers_default);
+app.use("/api/bootstrap", bootstrap_default);
 app.get("/api/imagem", async (req, res) => {
   const imageUrl = req.query.url;
   if (!imageUrl) {
@@ -2293,6 +2524,10 @@ app.get("/api/storage/object", requireAuth, async (req, res) => {
 });
 app.post("/api/answers", rateLimiter(30, 6e4), requireAuth, async (req, res) => {
   const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  if (req.user?.role !== "admin" && req.user?.userId !== userId) {
+    res.status(403).json({ error: "Acesso negado." });
+    return;
+  }
   try {
     const qCheck = await query("SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1", [questionId]);
     if (qCheck.rows.length === 0 && questionData) {
@@ -2329,6 +2564,7 @@ app.post("/api/answers", rateLimiter(30, 6e4), requireAuth, async (req, res) => 
        VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
       [userId, questionId, selectedOption !== void 0 ? selectedOption : null, isCorrect]
     );
+    await invalidateUserCache(req.user?.email || "", userId);
     res.json({ success: true });
   } catch (err) {
     log.error("[POST /api/answers] Error:", err);
@@ -2342,6 +2578,12 @@ app.get("/api/user/errors", requireAuth, async (req, res) => {
     return;
   }
   try {
+    const errorsCacheKey = userCacheKeys.errors(email);
+    const cachedErrors = await getUserCache(errorsCacheKey);
+    if (cachedErrors) {
+      res.json(cachedErrors);
+      return;
+    }
     const userRes = await query("SELECT id FROM public.users WHERE email = $1 LIMIT 1", [email]);
     if (userRes.rows.length === 0) {
       res.status(404).json({ error: "Usu\xE1rio n\xE3o encontrado" });
@@ -2394,6 +2636,7 @@ app.get("/api/user/errors", requireAuth, async (req, res) => {
         });
       }
     }
+    await setUserCache(errorsCacheKey, result, 180);
     res.json(result);
   } catch (err) {
     log.error("[GET /api/user/errors] Error:", err);

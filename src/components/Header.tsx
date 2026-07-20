@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, Check, X, ClipboardList, BookOpen, MessageSquare, Calendar as CalendarIcon } from 'lucide-react';
 import Logo from './Logo';
+import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 
 import { UserProfile } from '../types';
 
@@ -24,6 +25,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
       try {
         const response = await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
         if (response.ok) {
+          invalidateRequestCache('/api/notifications');
           setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif));
           setUnreadCount(prev => Math.max(0, prev - 1));
         }
@@ -47,12 +49,9 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
   const fetchNotifications = async () => {
     try {
       const url = userEmail ? `/api/notifications?email=${encodeURIComponent(userEmail)}` : '/api/notifications';
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data);
-        setUnreadCount(data.filter((n: any) => !n.read).length);
-      }
+      const data = await cachedFetchJson<any[]>(url, 25_000);
+      setNotifications(data);
+      setUnreadCount(data.filter((n: any) => !n.read).length);
     } catch (err) {
       console.warn('Falha amortecida ao buscar notificações:', err);
     }
@@ -69,6 +68,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
       const url = userEmail ? `/api/notifications/read-all?email=${encodeURIComponent(userEmail)}` : '/api/notifications/read-all';
       const response = await fetch(url, { method: 'POST' });
       if (response.ok) {
+        invalidateRequestCache('/api/notifications');
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         setUnreadCount(0);
       }

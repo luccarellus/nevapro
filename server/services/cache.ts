@@ -70,9 +70,9 @@ export const cacheGet = async <T>(key: string): Promise<T | null> => {
  * Stores data in Redis cache with the appropriate TTL.
  * Silently fails if Redis is unavailable.
  */
-export const cacheSet = async (key: string, data: unknown): Promise<void> => {
+export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number): Promise<void> => {
   if (!isUpstashRedisConfigured()) return;
-  const ttl = CACHE_TTL[key] || 300;
+  const ttl = ttlSeconds || CACHE_TTL[key] || 300;
   try {
     await runUpstashRedisPipeline([
       ['SET', key, JSON.stringify(data)],

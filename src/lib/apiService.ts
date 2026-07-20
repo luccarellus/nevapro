@@ -5,6 +5,7 @@
  */
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+import { cachedFetchJson, invalidateRequestCache } from './requestCache';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -20,6 +21,7 @@ interface RequestConfig {
 
 async function request<T>(endpoint: string, config: RequestConfig = { method: 'GET' }): Promise<T> {
   const { method, body } = config;
+  if (method === 'GET') return cachedFetchJson<T>(endpoint);
   
   const options: RequestInit = {
     method,
@@ -29,7 +31,7 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
     },
   };
 
-  if (body && method !== 'GET') {
+  if (body) {
     options.body = JSON.stringify(body);
   }
 
@@ -48,10 +50,13 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
 
   // Handle 204 No Content
   if (response.status === 204) {
+    invalidateRequestCache();
     return undefined as T;
   }
 
-  return response.json();
+  const result = await response.json();
+  invalidateRequestCache();
+  return result;
 }
 
 /**

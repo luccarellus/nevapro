@@ -18,6 +18,7 @@ import pool from '../src/lib/db';
 import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
 import { sanitizeInput } from './utils/sanitize';
+import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from './services/userCache';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -30,6 +31,8 @@ import notificationRoutes from './routes/notifications';
 import leaderboardRoutes from './routes/leaderboard';
 import questionRoutes from './routes/questions';
 import healthRoutes from './routes/health';
+import answerRoutes from './routes/answers';
+import bootstrapRoutes from './routes/bootstrap';
 
 // Validate critical environment variables before starting
 validateEnv();
@@ -115,6 +118,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/questoes', questionRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/answers', answerRoutes);
+app.use('/api/bootstrap', bootstrapRoutes);
 
 // ===== Image Proxy =====
 app.get('/api/imagem', async (req, res) => {
@@ -190,6 +195,10 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
 // ===== Answers =====
 app.post('/api/answers', rateLimiter(30, 60_000), requireAuth, async (req, res) => {
   const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  if (req.user?.role !== 'admin' && req.user?.userId !== userId) {
+    res.status(403).json({ error: 'Acesso negado.' });
+    return;
+  }
   try {
     const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
     if (qCheck.rows.length === 0 && questionData) {
@@ -217,6 +226,7 @@ app.post('/api/answers', rateLimiter(30, 60_000), requireAuth, async (req, res) 
        VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
       [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect],
     );
+    await invalidateUserCache(req.user?.email || '', userId);
     res.json({ success: true });
   } catch (err) {
     log.error('[POST /api/answers] Error:', err);
@@ -232,6 +242,12 @@ app.get('/api/user/errors', requireAuth, async (req, res) => {
     return;
   }
   try {
+    const errorsCacheKey = userCacheKeys.errors(email);
+    const cachedErrors = await getUserCache<unknown[]>(errorsCacheKey);
+    if (cachedErrors) {
+      res.json(cachedErrors);
+      return;
+    }
     const userRes = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [email]);
     if (userRes.rows.length === 0) {
       res.status(404).json({ error: 'Usuário não encontrado' });
@@ -276,6 +292,7 @@ app.get('/api/user/errors', requireAuth, async (req, res) => {
         });
       }
     }
+    await setUserCache(errorsCacheKey, result, 180);
     res.json(result);
   } catch (err) {
     log.error('[GET /api/user/errors] Error:', err);

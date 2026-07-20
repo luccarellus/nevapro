@@ -4,6 +4,8 @@ import { requireAuth } from '../middleware/auth';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
+import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
+import { cacheInvalidate } from '../services/cache';
 
 const router = Router();
 
@@ -14,6 +16,11 @@ async function getUserIdByEmail(email: string): Promise<string | null> {
   const { rows } = await query('SELECT id FROM public.users WHERE email = $1 LIMIT 1', [email]);
   return rows.length > 0 ? rows[0].id : null;
 }
+
+const getRequestUserId = (req: AuthenticatedRequest, email: string): Promise<string | null> =>
+  req.user?.role === 'student' && req.user.email === email
+    ? Promise.resolve(req.user.userId)
+    : getUserIdByEmail(email);
 
 /**
  * Helper: marca uma notificação global como lida para um usuário.
@@ -38,45 +45,31 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
   }
 
   try {
-    const userId = await getUserIdByEmail(email);
+    const userId = await getRequestUserId(req, email);
     if (!userId) {
       res.json([]);
       return;
     }
 
-    // 1. Busca notificações (próprias + globais)
-    const { data: notifications, error } = await getSupabaseAdminClient()
-      .from('notifications')
-      .select('*')
-      .or(`user_id.eq.${userId},user_id.is.null`)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    // 2. Busca registros de leitura do usuário para notificações globais
-    const { data: reads } = await getSupabaseAdminClient()
-      .from('notification_reads')
-      .select('notification_id')
-      .eq('user_id', userId);
-
-    const readGlobalIds = new Set((reads || []).map((r: any) => r.notification_id));
-
-    // 3. Mergeia os dados
-    const mapped = (notifications || []).map((n: Record<string, unknown>) => {
-      const isGlobal = n.user_id === null;
-
-      return {
-        id: n.id,
-        user_id: n.user_id,
-        title: n.title,
-        message: (n as any).content || '',
-        type: n.type,
-        read: isGlobal ? readGlobalIds.has(n.id) : !!(n as any).is_read,
-        createdAt: (n as any).created_at || new Date().toISOString(),
-      };
-    });
-
-    res.json(mapped);
+    const cacheKey = userCacheKeys.notifications(userId);
+    const cached = await getUserCache<unknown[]>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const { rows } = await query(
+      `SELECT n.id, n.user_id, n.title, n.content AS message, n.type,
+              CASE WHEN n.user_id IS NULL THEN (nr.notification_id IS NOT NULL) ELSE n.is_read END AS read,
+              n.created_at AS "createdAt"
+       FROM public.notifications n
+       LEFT JOIN public.notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = $1
+       WHERE n.user_id = $1 OR n.user_id IS NULL
+       ORDER BY n.created_at DESC`,
+      [userId],
+    );
+    await setUserCache(cacheKey, rows, 45);
+    res.json(rows);
   } catch (err) {
     log.error('[Notifications] Error:', err);
     res.json([]);
@@ -93,7 +86,7 @@ router.post('/read-all', requireAuth, async (req: AuthenticatedRequest, res: Res
   }
 
   try {
-    const userId = await getUserIdByEmail(email);
+    const userId = await getRequestUserId(req, email);
     if (!userId) {
       res.json({ success: false, error: 'User not found' });
       return;
@@ -116,7 +109,7 @@ router.post('/read-all', requireAuth, async (req: AuthenticatedRequest, res: Res
          )`,
       [userId],
     );
-
+    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
     res.json({ success: true });
   } catch (err) {
     log.error('[Notifications ReadAll] Error:', err);
@@ -140,7 +133,7 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
       return;
     }
 
-    const userId = await getUserIdByEmail(req.user?.email || '');
+    const userId = await getRequestUserId(req, req.user?.email || '');
 
     if (req.user?.role !== 'admin' && userId && notif.user_id && notif.user_id !== userId) {
       res.status(403).json({ error: 'Acesso negado' });
@@ -159,6 +152,7 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
       if (error) throw error;
     }
 
+    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
     res.json({ success: true });
   } catch (err) {
     log.error('[Notification Read] Error:', err);

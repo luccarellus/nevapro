@@ -1,16 +1,11 @@
 import { request } from '../lib/apiService';
 import { UserProfile } from '../types';
+import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 
 export const userService = {
   async getProfile(email?: string): Promise<UserProfile> {
     const url = email ? `/api/user/profile?email=${encodeURIComponent(email)}` : '/api/user/profile';
-    const response = await fetch(url);
-    if (!response.ok) {
-      const error: any = new Error('Failed to fetch profile');
-      error.status = response.status;
-      throw error;
-    }
-    return response.json();
+    return cachedFetchJson<UserProfile>(url, 60_000);
   },
 
   async updateProfile(data: Partial<UserProfile>): Promise<{ success: boolean; user: UserProfile }> {
@@ -46,7 +41,9 @@ export const userService = {
       }
       throw new Error(errorMsg);
     }
-    return response.json();
+    const result = await response.json();
+    invalidateRequestCache();
+    return result;
   },
 
   async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
@@ -68,7 +65,9 @@ export const userService = {
       }
       throw new Error(errorMsg);
     }
-    return response.json();
+    const result = await response.json();
+    invalidateRequestCache();
+    return result;
   },
 
   async getLeaderboard(): Promise<UserProfile[]> {

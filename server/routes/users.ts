@@ -8,6 +8,7 @@ import { log } from '../utils/logger';
 import { cacheInvalidate } from '../services/cache';
 import { CACHE_KEYS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
+import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 
 const router = Router();
 
@@ -22,6 +23,11 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
   }
 
   try {
+    const cachedProfile = await getUserCache<Record<string, unknown>>(userCacheKeys.profile(cleanEmail));
+    if (cachedProfile) {
+      res.json(cachedProfile);
+      return;
+    }
     // Check admin
     const { data: adminData } = await getSupabaseAdminClient()
       .from('admin_users')
@@ -30,7 +36,9 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
       .maybeSingle();
 
     if (adminData) {
-      res.json(formatUserProfile(adminData, 'admin'));
+      const profile = formatUserProfile(adminData, 'admin');
+      await setUserCache(userCacheKeys.profile(cleanEmail), profile, 60);
+      res.json(profile);
       return;
     }
 
@@ -47,7 +55,9 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
       return;
     }
 
-    res.json(formatUserProfile(data, 'student'));
+    const profile = formatUserProfile(data, 'student');
+    await setUserCache(userCacheKeys.profile(cleanEmail), profile, 60);
+    res.json(profile);
   } catch (err) {
     log.error('[Profile] Error:', err);
     res.status(500).json({ error: 'Erro ao buscar perfil.' });
@@ -181,6 +191,7 @@ router.post(
 
         if (insData) {
           await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+          await invalidateUserCache(email, insData.id);
           res.json({ success: true, user: formatUserProfile(insData, isAdmin ? 'admin' : 'student') });
           return;
         }
@@ -197,6 +208,7 @@ router.post(
       }
 
       await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+      await invalidateUserCache(email, userId || undefined);
       res.json({ success: true, user: formatUserProfile(data, isAdmin ? 'admin' : 'student') });
     } catch (err: unknown) {
       log.error('[Profile Update] Error:', err);
@@ -244,6 +256,7 @@ router.delete('/profile', requireAuth, async (req: AuthenticatedRequest, res: Re
     }
 
     await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+    await invalidateUserCache(email, userData?.id);
     res.json({ success: true });
   } catch (err) {
     log.error('[DELETE /api/user/profile] Error:', err);
@@ -261,6 +274,11 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
   }
 
   try {
+    const cachedStats = await getUserCache<Record<string, unknown>>(userCacheKeys.stats(email));
+    if (cachedStats) {
+      res.json(cachedStats);
+      return;
+    }
     const supabase = getSupabaseAdminClient();
     const { data: user } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
     if (!user) {
@@ -325,7 +343,9 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
       }
     }
 
-    res.json({ weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining });
+    const stats = { weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining };
+    await setUserCache(userCacheKeys.stats(email), stats, 60);
+    res.json(stats);
   } catch (err) {
     log.error('[Stats] Error:', err);
     res.status(500).json({ error: 'Erro ao processar estatísticas' });

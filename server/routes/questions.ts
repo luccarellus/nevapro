@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { log } from '../utils/logger';
+import { cacheGet, cacheSet } from '../services/cache';
 
 const router = Router();
 
@@ -15,6 +16,12 @@ router.get('/', async (req, res: Response) => {
   }
 
   try {
+    const cacheKey = `cache:questions:${year}:${limit || 50}:${offset || 0}`;
+    const cached = await cacheGet<unknown>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
     const apiUrl = `${BASE_URL}/questions/${year}?limit=${limit || 50}&offset=${offset || 0}`;
     const response = await fetch(apiUrl, {
       headers: { 'Content-Type': 'application/json' },
@@ -26,7 +33,9 @@ router.get('/', async (req, res: Response) => {
     }
 
     const data = await response.json();
-    res.json({ questions: data.questions || data });
+    const payload = { questions: data.questions || data };
+    await cacheSet(cacheKey, payload, 600);
+    res.json(payload);
   } catch (err) {
     log.error('[Questions Proxy] Error:', err);
     res.status(500).json({ error: 'Failed to fetch questions from ENEM API' });
