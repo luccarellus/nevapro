@@ -314,16 +314,41 @@ app.post('/api/lgpd/consent-log', async (req, res) => {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req: any, file: any, cb: any) => {
-    if (file.mimetype.startsWith('image/')) {
+  fileFilter: (req: any, file: any, cb: any) => {
+    const extension = file.originalname.toLowerCase().split('.').pop() || '';
+    const isMaterial = req.query.kind === 'material';
+    const imageTypes: Record<string, string[]> = {
+      jpg: ['image/jpeg'], jpeg: ['image/jpeg'], png: ['image/png'],
+      gif: ['image/gif'], webp: ['image/webp'],
+    };
+    const materialTypes: Record<string, string[]> = {
+      ...imageTypes, pdf: ['application/pdf'], mp4: ['video/mp4'], webm: ['video/webm'],
+    };
+    const allowedTypes = isMaterial ? materialTypes : imageTypes;
+    if (allowedTypes[extension]?.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Apenas imagens são permitidas'));
+      cb(new Error(isMaterial
+        ? 'Formato não permitido. Envie PDF, JPG, PNG, GIF, WEBP, MP4 ou WEBM.'
+        : 'Formato não permitido. Envie uma imagem JPG, PNG, GIF ou WEBP.'));
     }
   },
 });
 
-app.post('/api/upload', rateLimiter(5, 60_000), upload.single('file'), async (req: any, res: any) => {
+const receiveUpload = (req: any, res: any, next: any) => {
+  upload.single('file')(req, res, (error: unknown) => {
+    if (error) {
+      const message = error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE'
+        ? 'O arquivo deve ter no máximo 5 MB.'
+        : error instanceof Error ? error.message : 'Arquivo inválido.';
+      res.status(400).json({ error: message });
+      return;
+    }
+    next();
+  });
+};
+
+app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, async (req: any, res: any) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Nenhum arquivo enviado.' });
@@ -331,7 +356,8 @@ app.post('/api/upload', rateLimiter(5, 60_000), upload.single('file'), async (re
     }
     const bucketName = process.env.B2_BUCKET_NAME || 'neva-avatars';
     const fileExt = req.file.originalname.split('.').pop() || 'jpg';
-    const fileName = `avatars/${crypto.randomUUID()}.${fileExt}`;
+    const prefix = req.query.kind === 'material' ? 'materials' : 'avatars';
+    const fileName = `${prefix}/${crypto.randomUUID()}.${fileExt.toLowerCase()}`;
     const { data, error } = await dbAdmin.storage.from(bucketName).upload(fileName, req.file.buffer, {
       contentType: req.file.mimetype,
     });

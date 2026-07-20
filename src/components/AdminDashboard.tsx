@@ -183,7 +183,7 @@ export default function AdminDashboard({
     try {
       let finalUrl = materialForm.url;
       if (selectedFile) {
-        finalUrl = await uploadService.uploadFile(selectedFile, 'Falha no upload', false);
+        finalUrl = await uploadService.uploadFile(selectedFile, 'Falha no upload', true, 'material');
       }
       const payload = { title: materialForm.title, type: materialForm.type as any, foco: materialForm.foco, url: finalUrl, description: materialForm.description };
       if (editingId) { await materialService.updateMaterial(editingId, payload); }
@@ -447,7 +447,7 @@ export default function AdminDashboard({
                       className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all mb-3" placeholder="link ou arquivo" />
                     <div className="flex flex-col sm:flex-row items-center gap-4">
                       <div className="flex-1 bg-bg-main border border-border-color rounded-2xl px-4 py-3 flex items-center gap-3 overflow-hidden w-full">
-                        <input type="file" id="file-upload" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                        <input type="file" id="file-upload" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                         <label htmlFor="file-upload"
                           className="bg-bg-sidebar border border-border-color text-text-main px-4 py-1.5 rounded-lg text-[10px] font-black tracking-wide cursor-pointer hover:bg-bg-card transition-all shrink-0">Escolher arquivo</label>
                         <span className="text-[10px] font-bold text-text-secondary truncate opacity-50">{selectedFile ? selectedFile.name : 'Nenhum arquivo escolhido'}</span>

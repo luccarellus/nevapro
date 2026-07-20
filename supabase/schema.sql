@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS public.mural (
     title VARCHAR(255) NOT NULL,
     content TEXT,
     type VARCHAR(50) DEFAULT 'GERAL',
+    tag VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 

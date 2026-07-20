@@ -77,7 +77,7 @@ router.post('/', rateLimiter(10, 60_000), requireAdmin, async (req, res: Respons
       sender: 'Administração',
       date: result.created_at || new Date().toISOString(),
       category: (result.type || 'geral').toLowerCase(),
-      tag: result.type || 'Geral',
+      tag: result.tag || '',
     };
     res.status(201).json(mappedResult);
   } catch (err) {

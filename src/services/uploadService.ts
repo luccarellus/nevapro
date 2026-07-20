@@ -11,12 +11,13 @@ export const uploadService = {
   async uploadFile(
     file: File,
     fallbackMessage = 'Falha no upload',
-    useServerError = true
+    useServerError = true,
+    kind: 'avatar' | 'material' = 'avatar'
   ): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/upload', {
+    const response = await fetch(`/api/upload?kind=${kind}`, {
       method: 'POST',
       body: formData
     });

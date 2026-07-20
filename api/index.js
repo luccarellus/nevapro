@@ -1926,7 +1926,7 @@ router6.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
       sender: "Administra\xE7\xE3o",
       date: result.created_at || (/* @__PURE__ */ new Date()).toISOString(),
       category: (result.type || "geral").toLowerCase(),
-      tag: result.type || "Geral"
+      tag: result.tag || ""
     };
     res.status(201).json(mappedResult);
   } catch (err) {
@@ -2404,15 +2404,41 @@ app.post("/api/lgpd/consent-log", async (req, res) => {
 var upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+  fileFilter: (req, file, cb) => {
+    const extension = file.originalname.toLowerCase().split(".").pop() || "";
+    const isMaterial = req.query.kind === "material";
+    const imageTypes = {
+      jpg: ["image/jpeg"],
+      jpeg: ["image/jpeg"],
+      png: ["image/png"],
+      gif: ["image/gif"],
+      webp: ["image/webp"]
+    };
+    const materialTypes = {
+      ...imageTypes,
+      pdf: ["application/pdf"],
+      mp4: ["video/mp4"],
+      webm: ["video/webm"]
+    };
+    const allowedTypes = isMaterial ? materialTypes : imageTypes;
+    if (allowedTypes[extension]?.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Apenas imagens s\xE3o permitidas"));
+      cb(new Error(isMaterial ? "Formato n\xE3o permitido. Envie PDF, JPG, PNG, GIF, WEBP, MP4 ou WEBM." : "Formato n\xE3o permitido. Envie uma imagem JPG, PNG, GIF ou WEBP."));
     }
   }
 });
-app.post("/api/upload", rateLimiter(5, 6e4), upload.single("file"), async (req, res) => {
+var receiveUpload = (req, res, next) => {
+  upload.single("file")(req, res, (error) => {
+    if (error) {
+      const message = error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE" ? "O arquivo deve ter no m\xE1ximo 5 MB." : error instanceof Error ? error.message : "Arquivo inv\xE1lido.";
+      res.status(400).json({ error: message });
+      return;
+    }
+    next();
+  });
+};
+app.post("/api/upload", rateLimiter(5, 6e4), requireAuth, receiveUpload, async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: "Nenhum arquivo enviado." });
@@ -2420,7 +2446,8 @@ app.post("/api/upload", rateLimiter(5, 6e4), upload.single("file"), async (req, 
     }
     const bucketName = process.env.B2_BUCKET_NAME || "neva-avatars";
     const fileExt = req.file.originalname.split(".").pop() || "jpg";
-    const fileName = `avatars/${crypto.randomUUID()}.${fileExt}`;
+    const prefix = req.query.kind === "material" ? "materials" : "avatars";
+    const fileName = `${prefix}/${crypto.randomUUID()}.${fileExt.toLowerCase()}`;
     const { data, error } = await dbAdmin.storage.from(bucketName).upload(fileName, req.file.buffer, {
       contentType: req.file.mimetype
     });
