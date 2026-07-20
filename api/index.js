@@ -52,7 +52,7 @@ var init_db = __esm({
   }
 });
 
-// src/lib/dbQueryBuilder.ts
+// server/lib/dbQueryBuilder.ts
 var dbQueryBuilder_exports = {};
 __export(dbQueryBuilder_exports, {
   dbAdmin: () => dbAdmin,
@@ -128,7 +128,7 @@ function sanitizeSelectCols(cols) {
   const parts = cols.split(",");
   for (let part of parts) {
     part = part.trim();
-    if (!/^[a-zA-Z0-9_\*\(\)]+$/.test(part)) {
+    if (!/^[a-zA-Z0-9_*\\(\\)]+$/.test(part)) {
       throw new Error(`Coluna de select insegura detectada: ${part}`);
     }
   }
@@ -136,7 +136,7 @@ function sanitizeSelectCols(cols) {
 }
 var supabaseAdminClient, supabaseAnonClient, s3Client, PostgresQueryBuilder, dbAdmin;
 var init_dbQueryBuilder = __esm({
-  "src/lib/dbQueryBuilder.ts"() {
+  "server/lib/dbQueryBuilder.ts"() {
     init_db();
     supabaseAdminClient = null;
     supabaseAnonClient = null;
@@ -381,6 +381,43 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import * as dotenv3 from "dotenv";
 import multer from "multer";
+
+// server/utils/env.ts
+var REQUIRED_VARS = [
+  "DATABASE_URL",
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY"
+];
+var CONDITIONAL_VARS = [
+  { vars: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"], purpose: "Supabase Auth/Storage admin" },
+  { vars: ["SUPABASE_URL", "SUPABASE_ANON_KEY"], purpose: "Supabase Auth login" },
+  { vars: ["B2_ENDPOINT", "B2_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_NAME"], purpose: "Backblaze B2 file storage" },
+  { vars: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], purpose: "Redis caching (via Upstash)" },
+  { vars: ["SENTRY_DSN"], purpose: "Sentry error tracking" },
+  { vars: ["GEMINI_API_KEY"], purpose: "Gemini AI API" }
+];
+function validateEnv() {
+  const missing = [];
+  for (const name of REQUIRED_VARS) {
+    if (!process.env[name]) {
+      missing.push(name);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `[ENV] Vari\xE1veis obrigat\xF3rias ausentes: ${missing.join(", ")}. Verifique seu arquivo .env ou as configura\xE7\xF5es de ambiente.`
+    );
+  }
+  for (const group of CONDITIONAL_VARS) {
+    const allMissing = group.vars.every((v) => !process.env[v]);
+    const someMissing = group.vars.some((v) => !process.env[v]);
+    if (allMissing) {
+      console.warn(`[ENV] Aviso: ${group.purpose} n\xE3o configurado. Funcionalidade indispon\xEDvel.`);
+    } else if (someMissing) {
+      console.warn(`[ENV] Aviso: Configura\xE7\xE3o incompleta para ${group.purpose}. Alguns recursos podem falhar.`);
+    }
+  }
+}
 
 // server/utils/logger.ts
 import * as Sentry2 from "@sentry/node";
@@ -710,18 +747,6 @@ var requireAuth = async (req, res, next) => {
       token = req.headers.authorization.substring(7);
     }
     if (!token) {
-      token = req.cookies?.session_token;
-      if (token) {
-        try {
-          const parts = token.split(":");
-          if (parts.length === 5) {
-            const [userId, email, role] = parts;
-            req.user = { userId, email, role };
-            return next();
-          }
-        } catch {
-        }
-      }
       res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Por favor, fa\xE7a login novamente." });
       return;
     }
@@ -774,12 +799,47 @@ var ensureAdminUser = async (email, authUserId) => {
 };
 var authenticateUser = async (email, password) => {
   const supabase = getSupabaseAnonClient();
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
     password
   });
   if (authError || !authData.user) {
-    return { error: "E-mail ou senha inv\xE1lidos." };
+    const cleanEmail2 = email.toLowerCase().trim();
+    const admin = getSupabaseAdminClient();
+    const { data: legacyStudent } = await admin.from("users").select("password_hash").eq("email", cleanEmail2).maybeSingle();
+    const passwordHash = legacyStudent?.password_hash;
+    if (!passwordHash) return { error: "E-mail ou senha inv\xE1lidos." };
+    const bcrypt = await import("bcryptjs");
+    const legacyPasswordIsValid = await bcrypt.compare(password, passwordHash).catch(() => false);
+    if (!legacyPasswordIsValid) return { error: "E-mail ou senha inv\xE1lidos." };
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: cleanEmail2,
+      password,
+      email_confirm: true,
+      user_metadata: { role: "student" }
+    });
+    if (createError || !created.user) {
+      let existingAuthUserId;
+      for (let page = 1; page <= 10 && !existingAuthUserId; page++) {
+        const { data: pageData, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 100 });
+        if (listError) break;
+        existingAuthUserId = pageData.users.find(
+          (user) => user.email?.toLowerCase().trim() === cleanEmail2
+        )?.id;
+        if (pageData.users.length < 100) break;
+      }
+      if (!existingAuthUserId) return { error: "E-mail ou senha inv\xE1lidos." };
+      const { error: updateError } = await admin.auth.admin.updateUserById(existingAuthUserId, {
+        password,
+        email_confirm: true
+      });
+      if (updateError) return { error: "E-mail ou senha inv\xE1lidos." };
+    }
+    ({ data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanEmail2,
+      password
+    }));
+    if (authError || !authData.user) return { error: "E-mail ou senha inv\xE1lidos." };
   }
   const cleanEmail = email.toLowerCase().trim();
   const authUserId = authData.user.id;
@@ -902,15 +962,10 @@ router.post("/login", rateLimiter(5, 6e4), async (req, res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
+        path: "/",
         maxAge: 24 * 60 * 60 * 1e3
       });
     }
-    res.cookie("session_token", `${result.user.id}:${cleanEmail}:${result.user.role}:${Date.now() + 864e5}:placeholder`, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 24 * 60 * 60 * 1e3
-    });
     res.json({ success: true, user: result.user });
   } catch (err) {
     log.error("[Auth] Login error:", err);
@@ -946,8 +1001,23 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
       res.status(400).json({ error: "E-mail j\xE1 cadastrado." });
       return;
     }
-    const { data, error } = await getSupabaseAdminClient().from("users").insert([
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: cleanEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { name: safeName || cleanEmail.split("@")[0], role: "student" }
+    });
+    if (authError || !authData.user) {
+      if (authError?.message?.toLowerCase().includes("already")) {
+        res.status(400).json({ error: "E-mail j\xE1 cadastrado." });
+        return;
+      }
+      throw authError || new Error("Falha ao criar usu\xE1rio no Supabase Auth.");
+    }
+    const { data, error } = await supabaseAdmin.from("users").insert([
       {
+        id: authData.user.id,
         email: cleanEmail,
         name: safeName || cleanEmail.split("@")[0],
         role: "student",
@@ -959,7 +1029,10 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
         created_at: (/* @__PURE__ */ new Date()).toISOString()
       }
     ]).select().single();
-    if (error) throw error;
+    if (error) {
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => void 0);
+      throw error;
+    }
     const userObj = {
       ...data,
       id: data.id,
@@ -970,10 +1043,15 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
       showInLeaderboard: data.show_in_leaderboard !== false,
       languagePreference: data.language_preference || "ingles"
     };
-    res.cookie("session_token", `${userObj.id}:${cleanEmail}:student:${Date.now() + 864e5}:placeholder`, {
+    const loginResult = await authenticateUser(cleanEmail, password);
+    if (loginResult.error || !loginResult.session?.access_token) {
+      throw new Error("Conta criada, mas n\xE3o foi poss\xEDvel iniciar a sess\xE3o.");
+    }
+    res.cookie("sb_session_token", loginResult.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
+      path: "/",
       maxAge: 24 * 60 * 60 * 1e3
     });
     res.status(201).json({ success: true, user: userObj });
@@ -983,16 +1061,46 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
     res.status(500).json({ error: "Erro ao criar conta." });
   }
 });
+router.post("/forgot-password", rateLimiter(3, 6e4), async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "E-mail \xE9 obrigat\xF3rio." });
+    return;
+  }
+  const cleanEmail = normalizeEmail(email);
+  try {
+    const { getSupabaseAnonClient: getSupabaseAnonClient2 } = await Promise.resolve().then(() => (init_dbQueryBuilder(), dbQueryBuilder_exports));
+    const appUrl = process.env.APP_URL || "https://neva.pro";
+    const { error } = await getSupabaseAnonClient2().auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${appUrl}/reset-password`
+    });
+    if (error) {
+      log.error("[Forgot Password] Supabase error:", error.message);
+    }
+    res.json({
+      success: true,
+      message: "Se o e-mail estiver cadastrado, voc\xEA receber\xE1 um link de recupera\xE7\xE3o em instantes."
+    });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error("[Forgot Password] Error:", errorMessage);
+    res.status(500).json({ error: "Erro ao solicitar recupera\xE7\xE3o de senha." });
+  }
+});
 router.post("/logout", async (req, res) => {
+  try {
+    const sbToken = req.cookies?.sb_session_token;
+    if (sbToken) {
+      const { getSupabaseAnonClient: getSupabaseAnonClient2 } = await Promise.resolve().then(() => (init_dbQueryBuilder(), dbQueryBuilder_exports));
+      await getSupabaseAnonClient2().auth.signOut();
+    }
+  } catch {
+  }
   res.clearCookie("sb_session_token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict"
-  });
-  res.clearCookie("session_token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict"
+    sameSite: "strict",
+    path: "/"
   });
   res.json({ success: true });
 });
@@ -1028,13 +1136,6 @@ router.post(
         await supabase.auth.admin.updateUserById(targetAuthUserId, {
           password: newPassword
         });
-      }
-      const isAdmin = !!adminRow;
-      if (!isAdmin) {
-        const bcrypt = await import("bcryptjs");
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
-        await supabase.from("users").update({ password_hash: hashedPassword }).eq("email", cleanEmail);
       }
       res.json({ success: true, message: "Senha atualizada com sucesso." });
     } catch (err) {
@@ -1440,15 +1541,90 @@ var addNotification = async (title, message, type) => {
   try {
     await query(
       `INSERT INTO public.notifications (id, user_id, title, content, type, is_read, created_at)
-       SELECT gen_random_uuid(), id, $1, $2, $3, false, NOW()
-       FROM public.users`,
+       VALUES (gen_random_uuid(), NULL, $1, $2, $3, false, NOW())`,
       [title, message, type.toLowerCase()]
     );
-    log.info(`[addNotification] Notification sent to all users: "${title}"`);
+    log.info(`[addNotification] Global notification sent: "${title}"`);
   } catch (e) {
     log.error("[addNotification] Failed to save notification:", e);
   }
 };
+
+// server/utils/validation.ts
+var objectBody = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+function readText(value, field, limit, required = false) {
+  if (value === void 0 || value === null || value === "") {
+    return required ? { error: `O campo ${field} \xE9 obrigat\xF3rio.` } : { data: void 0 };
+  }
+  if (typeof value !== "string") return { error: `O campo ${field} deve ser um texto.` };
+  const data = value.trim();
+  if (required && !data) return { error: `O campo ${field} \xE9 obrigat\xF3rio.` };
+  if (data.length > limit) return { error: `O campo ${field} deve ter no m\xE1ximo ${limit} caracteres.` };
+  return { data };
+}
+function readInteger(value, field, max) {
+  if (value === void 0 || value === null || value === "") return { data: void 0 };
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > max) {
+    return { error: `O campo ${field} deve ser um n\xFAmero inteiro entre 0 e ${max}.` };
+  }
+  return { data: value };
+}
+function readFields(body, specs) {
+  const data = {};
+  for (const [field, limit, required] of specs) {
+    const result = readText(body[field], field, limit, required);
+    if ("error" in result) return result;
+    if (result.data !== void 0) data[field] = result.data;
+  }
+  return { data };
+}
+function validateMaterialInput(body, partial = false) {
+  if (!objectBody(body)) return { error: "Corpo da requisi\xE7\xE3o inv\xE1lido." };
+  const result = readFields(body, [
+    ["title", 255, !partial],
+    ["type", 50, !partial],
+    ["subject", 255, false],
+    ["foco", 255, false],
+    ["url", 2048, !partial],
+    ["description", 5e3, false]
+  ]);
+  if ("error" in result) return result;
+  if (partial && Object.keys(result.data).length === 0) return { error: "Nenhum campo v\xE1lido foi informado." };
+  return result;
+}
+function validateEventInput(body, partial = false) {
+  if (!objectBody(body)) return { error: "Corpo da requisi\xE7\xE3o inv\xE1lido." };
+  const result = readFields(body, [
+    ["title", 255, !partial],
+    ["description", 5e3, false],
+    ["date", 50, false],
+    ["time", 50, false],
+    ["type", 50, false],
+    ["category", 100, false],
+    ["observation", 5e3, false]
+  ]);
+  if ("error" in result) return result;
+  for (const [field, max] of [["questionsCount", 1e4], ["xpReward", 1e6]]) {
+    const number = readInteger(body[field], field, max);
+    if ("error" in number) return number;
+    if (number.data !== void 0) result.data[field] = number.data;
+  }
+  if (partial && Object.keys(result.data).length === 0) return { error: "Nenhum campo v\xE1lido foi informado." };
+  return result;
+}
+function validateMuralInput(body, partial = false) {
+  if (!objectBody(body)) return { error: "Corpo da requisi\xE7\xE3o inv\xE1lido." };
+  const result = readFields(body, [
+    ["title", 255, !partial],
+    ["content", 1e4, !partial],
+    ["type", 50, false],
+    ["category", 50, false],
+    ["tag", 100, false]
+  ]);
+  if ("error" in result) return result;
+  if (partial && Object.keys(result.data).length === 0) return { error: "Nenhum campo v\xE1lido foi informado." };
+  return result;
+}
 
 // server/routes/materials.ts
 var router4 = Router4();
@@ -1480,7 +1656,12 @@ router4.get("/", async (req, res) => {
 });
 router4.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
-    const { title, type, subject, foco, url, description } = req.body;
+    const validation = validateMaterialInput(req.body);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { title, type, subject, foco, url, description } = validation.data;
     const { data, error } = await getSupabaseAdminClient().from("materials").insert([
       {
         title,
@@ -1516,8 +1697,12 @@ router4.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
 router4.put("/:id", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    updates.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+    const validation = validateMaterialInput(req.body, true);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const updates = { ...validation.data, updated_at: (/* @__PURE__ */ new Date()).toISOString() };
     const { data, error } = await getSupabaseAdminClient().from("materials").update(updates).eq("id", id).select().single();
     if (error) throw error;
     await cacheInvalidate(CACHE_KEYS.MATERIALS);
@@ -1590,7 +1775,12 @@ router5.get("/", async (req, res) => {
 });
 router5.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
-    const { title, description, date, time, type, category, questionsCount, xpReward, observation } = req.body;
+    const validation = validateEventInput(req.body);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { title, description, date, time, type, category, questionsCount, xpReward, observation } = validation.data;
     const { data: result, error } = await getSupabaseAdminClient().from("events").insert([
       {
         title,
@@ -1630,8 +1820,18 @@ router5.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
 router5.put("/:id", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    updates.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+    const validation = validateEventInput(req.body, true);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { questionsCount, xpReward, ...fields } = validation.data;
+    const updates = {
+      ...fields,
+      ...questionsCount !== void 0 ? { questions_count: questionsCount } : {},
+      ...xpReward !== void 0 ? { xp_reward: xpReward } : {},
+      updated_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
     const { data, error } = await getSupabaseAdminClient().from("events").update(updates).eq("id", id).select().single();
     if (error) throw error;
     await cacheInvalidate(CACHE_KEYS.EVENTOS);
@@ -1701,12 +1901,17 @@ router6.get("/", async (req, res) => {
 });
 router6.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
-    const { title, content, type, tag } = req.body;
+    const validation = validateMuralInput(req.body);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { title, content, type, category, tag } = validation.data;
     const { data: result, error } = await getSupabaseAdminClient().from("mural").insert([
       {
         title,
         content,
-        type: type || "GERAL",
+        type: type || category || "GERAL",
         tag,
         created_at: (/* @__PURE__ */ new Date()).toISOString()
       }
@@ -1732,7 +1937,13 @@ router6.post("/", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
 router6.put("/:id", rateLimiter(10, 6e4), requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const validation = validateMuralInput(req.body, true);
+    if ("error" in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { category, ...fields } = validation.data;
+    const updates = { ...fields, ...category !== void 0 ? { type: category } : {} };
     const { data, error } = await getSupabaseAdminClient().from("mural").update(updates).eq("id", id).select().single();
     if (error) throw error;
     await cacheInvalidate(CACHE_KEYS.RECADOS);
@@ -1759,7 +1970,20 @@ var mural_default = router6;
 // server/routes/notifications.ts
 import { Router as Router7 } from "express";
 init_dbQueryBuilder();
+init_db();
 var router7 = Router7();
+async function getUserIdByEmail(email) {
+  const { rows } = await query("SELECT id FROM public.users WHERE email = $1 LIMIT 1", [email]);
+  return rows.length > 0 ? rows[0].id : null;
+}
+async function markGlobalNotificationAsRead(notificationId, userId) {
+  await query(
+    `INSERT INTO public.notification_reads (id, user_id, notification_id, read_at)
+     VALUES (gen_random_uuid(), $1, $2, NOW())
+     ON CONFLICT (user_id, notification_id) DO NOTHING`,
+    [userId, notificationId]
+  );
+}
 router7.get("/", requireAuth, async (req, res) => {
   const email = (req.query.email || req.user?.email || "").toLowerCase().trim();
   if (req.user?.role !== "admin" && req.user?.email !== email) {
@@ -1767,32 +1991,28 @@ router7.get("/", requireAuth, async (req, res) => {
     return;
   }
   try {
-    const { data: user } = await getSupabaseAdminClient().from("users").select("id").eq("email", email).maybeSingle();
-    if (!user) {
+    const userId = await getUserIdByEmail(email);
+    if (!userId) {
       res.json([]);
       return;
     }
-    const { data, error } = await getSupabaseAdminClient().from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    const { data: notifications, error } = await getSupabaseAdminClient().from("notifications").select("*").or(`user_id.eq.${userId},user_id.is.null`).order("created_at", { ascending: false });
     if (error) throw error;
-    const mapped = (data || []).map((n) => ({
-      id: n.id,
-      user_id: n.user_id,
-      title: n.title,
-      message: n.content || "",
-      type: n.type,
-      read: n.is_read || false,
-      createdAt: n.created_at || (/* @__PURE__ */ new Date()).toISOString()
-    }));
-    const seen = /* @__PURE__ */ new Set();
-    const uniqueMapped = [];
-    for (const n of mapped) {
-      const key = `${n.title}-${n.message}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueMapped.push(n);
-      }
-    }
-    res.json(uniqueMapped);
+    const { data: reads } = await getSupabaseAdminClient().from("notification_reads").select("notification_id").eq("user_id", userId);
+    const readGlobalIds = new Set((reads || []).map((r) => r.notification_id));
+    const mapped = (notifications || []).map((n) => {
+      const isGlobal = n.user_id === null;
+      return {
+        id: n.id,
+        user_id: n.user_id,
+        title: n.title,
+        message: n.content || "",
+        type: n.type,
+        read: isGlobal ? readGlobalIds.has(n.id) : !!n.is_read,
+        createdAt: n.created_at || (/* @__PURE__ */ new Date()).toISOString()
+      };
+    });
+    res.json(mapped);
   } catch (err) {
     log.error("[Notifications] Error:", err);
     res.json([]);
@@ -1805,13 +2025,21 @@ router7.post("/read-all", requireAuth, async (req, res) => {
     return;
   }
   try {
-    const { data: user } = await getSupabaseAdminClient().from("users").select("id").eq("email", email).maybeSingle();
-    if (!user) {
+    const userId = await getUserIdByEmail(email);
+    if (!userId) {
       res.json({ success: false, error: "User not found" });
       return;
     }
-    const { error } = await getSupabaseAdminClient().from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false);
-    if (error) throw error;
+    await getSupabaseAdminClient().from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false);
+    await query(
+      `INSERT INTO public.notification_reads (user_id, notification_id)
+       SELECT $1, id FROM public.notifications
+       WHERE user_id IS NULL
+         AND id <> ALL (
+           SELECT notification_id FROM public.notification_reads WHERE user_id = $1
+         )`,
+      [userId]
+    );
     res.json({ success: true });
   } catch (err) {
     log.error("[Notifications ReadAll] Error:", err);
@@ -1826,13 +2054,17 @@ router7.post("/:id/read", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Notifica\xE7\xE3o n\xE3o encontrada" });
       return;
     }
-    const { data: user } = await getSupabaseAdminClient().from("users").select("id").eq("email", req.user?.email || "").maybeSingle();
-    if (req.user?.role !== "admin" && user && notif.user_id !== user.id) {
+    const userId = await getUserIdByEmail(req.user?.email || "");
+    if (req.user?.role !== "admin" && userId && notif.user_id && notif.user_id !== userId) {
       res.status(403).json({ error: "Acesso negado" });
       return;
     }
-    const { error } = await getSupabaseAdminClient().from("notifications").update({ is_read: true }).eq("id", id);
-    if (error) throw error;
+    if (notif.user_id === null && userId) {
+      await markGlobalNotificationAsRead(id, userId);
+    } else {
+      const { error } = await getSupabaseAdminClient().from("notifications").update({ is_read: true }).eq("id", id);
+      if (error) throw error;
+    }
     res.json({ success: true });
   } catch (err) {
     log.error("[Notification Read] Error:", err);
@@ -1852,19 +2084,15 @@ router8.get("/", async (req, res) => {
       res.json(cached);
       return;
     }
-    const { data, error } = await getSupabaseAdminClient().from("users").select("name, email, city, xp, level, role, show_in_leaderboard, avatar_url");
+    const { data, error } = await getSupabaseAdminClient().from("users").select("name, city, xp, level, avatar_url").not("role", "is", null).neq("role", "admin").eq("show_in_leaderboard", true).order("xp", { ascending: false }).limit(20);
     if (error) throw error;
-    const filteredLeaderboard = (data || []).filter((u) => {
-      if (u.role === "admin") return false;
-      if (u.show_in_leaderboard === false) return false;
-      return true;
-    }).map((u) => ({
+    const filteredLeaderboard = (data || []).map((u) => ({
       name: u.name,
       city: u.city,
       xp: u.xp || 0,
       level: u.level || 1,
       avatarUrl: u.avatar_url || ""
-    })).sort((a, b) => b.xp - a.xp).slice(0, 20);
+    }));
     await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);
     res.json(filteredLeaderboard);
   } catch (err) {
@@ -1917,6 +2145,7 @@ var health_default = router10;
 
 // server/index.ts
 dotenv3.config();
+validateEnv();
 var app = express();
 app.set("trust proxy", 1);
 app.disable("etag");
@@ -2114,26 +2343,37 @@ app.get("/api/user/errors", requireAuth, async (req, res) => {
       ORDER BY la.created_at DESC`;
     const errorsRes = await query(errorsQuery, [userId]);
     const result = [];
-    for (const errRow of errorsRes.rows) {
+    if (errorsRes.rows.length > 0) {
+      const questionIds = errorsRes.rows.map((r) => r.question_id);
       const optsRes = await query(
-        "SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC",
-        [errRow.question_id]
+        `SELECT question_id, text, image_url, letter FROM public.question_options WHERE question_id = ANY($1::varchar[]) ORDER BY letter ASC`,
+        [questionIds]
       );
-      result.push({
-        id: errRow.question_id,
-        subject: errRow.subject,
-        text: errRow.question_text,
-        imageUrl: errRow.image_url,
-        correctOptionIndex: errRow.correct_option_index,
-        explanation: errRow.explanation,
-        difficulty: errRow.difficulty,
-        year: errRow.year,
-        index: errRow.index,
-        selectedOptionIndex: errRow.selected_option_index,
-        answeredAt: errRow.answered_at,
-        options: optsRes.rows.map((o) => o.text),
-        optionImages: optsRes.rows.map((o) => o.image_url)
-      });
+      const optionsByQuestion = /* @__PURE__ */ new Map();
+      for (const opt of optsRes.rows) {
+        if (!optionsByQuestion.has(opt.question_id)) {
+          optionsByQuestion.set(opt.question_id, []);
+        }
+        optionsByQuestion.get(opt.question_id).push(opt);
+      }
+      for (const errRow of errorsRes.rows) {
+        const opts = optionsByQuestion.get(errRow.question_id) || [];
+        result.push({
+          id: errRow.question_id,
+          subject: errRow.subject,
+          text: errRow.question_text,
+          imageUrl: errRow.image_url,
+          correctOptionIndex: errRow.correct_option_index,
+          explanation: errRow.explanation,
+          difficulty: errRow.difficulty,
+          year: errRow.year,
+          index: errRow.index,
+          selectedOptionIndex: errRow.selected_option_index,
+          answeredAt: errRow.answered_at,
+          options: opts.map((o) => o.text),
+          optionImages: opts.map((o) => o.image_url)
+        });
+      }
     }
     res.json(result);
   } catch (err) {
@@ -2141,9 +2381,25 @@ app.get("/api/user/errors", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Erro ao buscar caderno de erros." });
   }
 });
-app.post("/api/lgpd/consent-log", (req, res) => {
-  log.info("[LGPD] Consent preferences received:", req.body);
-  res.json({ success: true });
+app.post("/api/lgpd/consent-log", async (req, res) => {
+  const { preferences, userAgent } = req.body;
+  if (!preferences) {
+    res.status(400).json({ error: "Prefer\xEAncias de consentimento s\xE3o obrigat\xF3rias." });
+    return;
+  }
+  try {
+    const consentTypes = Object.entries(preferences).filter(([, v]) => v === true).map(([k]) => k).join(",").substring(0, 100);
+    await query(
+      `INSERT INTO public.consent_logs (id, consent_type, ip_address, user_agent, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
+      [consentTypes || "necessary_only", req.ip || req.socket?.remoteAddress || "unknown", userAgent || req.headers["user-agent"] || ""]
+    );
+    log.info("[LGPD] Consent preferences saved:", consentTypes);
+    res.json({ success: true });
+  } catch (err) {
+    log.error("[LGPD] Failed to save consent:", err);
+    res.status(500).json({ error: "Erro ao registrar consentimento." });
+  }
 });
 var upload = multer({
   storage: multer.memoryStorage(),
