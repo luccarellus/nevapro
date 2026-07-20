@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Lock, Loader2, Check, AlertCircle, ArrowLeft } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 import Logo from './Logo';
+import { executeRecaptcha } from '../lib/recaptcha';
 
 interface ResetPasswordProps {
   onBack: () => void;
@@ -16,12 +16,16 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
 
-  const supabase = useMemo(() => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-    if (!supabaseUrl || !anonKey) return null;
-    return createClient(supabaseUrl, anonKey);
-  }, []);
+  // Extrai access_token e refresh_token do hash da URL
+  const getTokensFromHash = (): { access_token?: string; refresh_token?: string } => {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash) return {};
+    const params = new URLSearchParams(hash);
+    return {
+      access_token: params.get('access_token') || undefined,
+      refresh_token: params.get('refresh_token') || undefined,
+    };
+  };
 
   useEffect(() => {
     // Check if we have a recovery token in the URL hash
@@ -47,21 +51,36 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
       return;
     }
 
-    if (!supabase) {
-      setError('Configuração do Supabase não encontrada no ambiente.');
+    const { access_token, refresh_token } = getTokensFromHash();
+    if (!access_token) {
+      setError('Token de recuperação ausente. O link pode ter expirado.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // The Supabase client automatically reads the recovery token from the URL hash
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
+      // Obtém token reCAPTCHA (fallback silencioso se não configurado)
+      const recaptcha_token = await executeRecaptcha('reset_password').catch(() => '');
+
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({
+          password,
+          access_token,
+          refresh_token,
+          recaptcha_token,
+        }),
       });
 
-      if (updateError) {
-        throw new Error(updateError.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao redefinir senha.');
       }
 
       setSuccess(true);

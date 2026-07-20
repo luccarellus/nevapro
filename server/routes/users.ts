@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
+import { verifyRecaptcha } from '../middleware/recaptcha';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
@@ -68,6 +69,7 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
 router.post(
   '/profile',
   rateLimiter(10, 60_000),
+  verifyRecaptcha(),
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     const updateData = req.body;
@@ -218,7 +220,7 @@ router.post(
 );
 
 // ============= DELETE PROFILE =============
-router.delete('/profile', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const email = normalizeEmail(((req.query.email as string) || req.body?.email || ''));
   if (!email) {
     res.status(400).json({ error: 'E-mail é obrigatório.' });

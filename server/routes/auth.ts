@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, authenticateUser } from '../middleware/auth';
+import { verifyRecaptcha } from '../middleware/recaptcha';
 import { query } from '../../src/lib/db';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
@@ -12,7 +13,7 @@ import { resolveStoredFileUrl } from '../utils/storageUrl';
 const router = Router();
 
 // ============= LOGIN =============
-router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -99,7 +100,7 @@ router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, 
 });
 
 // ============= REGISTER =============
-router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -210,7 +211,7 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
 });
 
 // ============= FORGOT PASSWORD (solicitar link de recuperação) =============
-router.post('/forgot-password', rateLimiter(3, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'E-mail é obrigatório.' });
@@ -242,6 +243,59 @@ router.post('/forgot-password', rateLimiter(3, 60_000), async (req: Authenticate
   }
 });
 
+// ============= RESET PASSWORD (via recovery token) =============
+router.post(
+  '/reset-password',
+  rateLimiter(3, 60_000),
+  verifyRecaptcha(),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { password, access_token } = req.body;
+
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
+      return;
+    }
+
+    if (!access_token) {
+      res.status(400).json({ error: 'Token de recuperação ausente. O link pode ter expirado.' });
+      return;
+    }
+
+    try {
+      const supabase = getSupabaseAdminClient();
+
+      // Verifica se o access_token é válido e extrai o userId
+      const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
+
+      if (userError || !userData?.user) {
+        log.warn('[Reset Password] Token inválido ou expirado:', userError?.message);
+        res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
+        return;
+      }
+
+      const userId = userData.user.id;
+
+      // Atualiza a senha via Admin API (não precisa de sessão do cliente)
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+        password,
+      });
+
+      if (updateError) {
+        log.error('[Reset Password] Erro ao atualizar senha:', updateError.message);
+        res.status(400).json({ error: updateError.message || 'Erro ao redefinir senha.' });
+        return;
+      }
+
+      log.info('[Reset Password] Senha redefinida com sucesso para usuário:', userId);
+      res.json({ success: true, message: 'Senha redefinida com sucesso.' });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log.error('[Reset Password] Error:', errorMessage);
+      res.status(500).json({ error: 'Erro interno ao redefinir senha.' });
+    }
+  },
+);
+
 // ============= LOGOUT =============
 router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
   // Revoke Supabase session
@@ -269,6 +323,7 @@ router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
 router.post(
   '/change-password',
   rateLimiter(3, 60_000),
+  verifyRecaptcha(),
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     const { email, currentPassword, newPassword } = req.body;

@@ -13,6 +13,7 @@ import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
 import { csrfProtection } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
+import { verifyRecaptcha } from './middleware/recaptcha';
 import { requireAuth } from './middleware/auth';
 import pool from '../src/lib/db';
 import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
@@ -78,8 +79,9 @@ app.use(
         ? {
             directives: {
               defaultSrc: ["'self'"],
-              scriptSrc: ["'self'", "'unsafe-inline'"],
+              scriptSrc: ["'self'", "'unsafe-inline'", 'https://www.google.com/recaptcha/', 'https://recaptcha.google.com/recaptcha/'],
               styleSrc: ["'self'", "'unsafe-inline'"],
+              frameSrc: ["'self'", 'https://www.google.com/recaptcha/', 'https://recaptcha.google.com/'],
               imgSrc: ["'self'", 'data:', 'https://api.enem.dev', 'https://enem.dev'],
               connectSrc: ["'self'", 'https://api.enem.dev'],
               fontSrc: ["'self'", 'data:'],
@@ -327,7 +329,7 @@ app.post('/api/lgpd/consent-log', async (req, res) => {
   }
 });
 
-// ===== Upload (Avatar) =====
+// ===== Upload (Avatar) — definições multer =====
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -365,7 +367,7 @@ const receiveUpload = (req: any, res: any, next: any) => {
   });
 };
 
-app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, async (req: any, res: any) => {
+app.post('/api/upload', rateLimiter(5, 60_000), verifyRecaptcha(), requireAuth, receiveUpload, async (req: any, res: any) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Nenhum arquivo enviado.' });

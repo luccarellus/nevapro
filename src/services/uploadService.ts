@@ -17,8 +17,16 @@ export const uploadService = {
     if (kind === 'avatar' && file.size > 2 * 1024 * 1024) {
       throw new Error('A foto de perfil deve ter no máximo 2 MB.');
     }
+
+    // Obtém token reCAPTCHA antes de montar o FormData
+    const { executeRecaptcha } = await import('../lib/recaptcha');
+    const recaptcha_token = await executeRecaptcha('upload').catch(() => '');
+
     const formData = new FormData();
     formData.append('file', file);
+    if (recaptcha_token) {
+      formData.append('recaptcha_token', recaptcha_token);
+    }
 
     const response = await fetch(`/api/upload?kind=${kind}`, {
       method: 'POST',
