@@ -7,6 +7,7 @@ import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { cacheInvalidate } from '../services/cache';
 import { CACHE_KEYS } from '../types';
+import { resolveStoredFileUrl } from '../utils/storageUrl';
 
 const router = Router();
 
@@ -339,7 +340,7 @@ function formatUserProfile(data: Record<string, unknown>, role: 'admin' | 'stude
     role,
     answeredQuestions: (data as any).answered_questions || (data as any).answeredQuestions || 0,
     correctAnswers: (data as any).correct_answers || (data as any).correctAnswers || 0,
-    avatarUrl: (data as any).avatar_url || (data as any).avatarUrl || (data as any).avatar || '',
+    avatarUrl: resolveStoredFileUrl((data as any).avatar_url || (data as any).avatarUrl || (data as any).avatar),
     showInLeaderboard: (data as any).show_in_leaderboard !== false,
     languagePreference: (data as any).language_preference || 'ingles',
     flashQuizCompleted: !!(data as any).flash_quiz_completed,

@@ -14,6 +14,9 @@ export const uploadService = {
     useServerError = true,
     kind: 'avatar' | 'material' = 'avatar'
   ): Promise<string> {
+    if (kind === 'avatar' && file.size > 2 * 1024 * 1024) {
+      throw new Error('A foto de perfil deve ter no máximo 2 MB.');
+    }
     const formData = new FormData();
     formData.append('file', file);
 

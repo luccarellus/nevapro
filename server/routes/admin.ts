@@ -7,6 +7,7 @@ import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { cacheGet, cacheSet } from '../services/cache';
 import { CACHE_KEYS } from '../types';
+import { resolveStoredFileUrl } from '../utils/storageUrl';
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res: Respon
         ...u,
         answeredQuestions: (u as any).answered_questions || (u as any).answeredQuestions || 0,
         correctAnswers: (u as any).correct_answers || (u as any).correctAnswers || 0,
-        avatarUrl: (u as any).avatar_url || (u as any).avatarUrl || (u as any).avatar || '',
+        avatarUrl: resolveStoredFileUrl((u as any).avatar_url || (u as any).avatarUrl || (u as any).avatar),
       }));
 
     await cacheSet(CACHE_KEYS.ADMIN_USERS, regularStudents);

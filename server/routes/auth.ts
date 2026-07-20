@@ -7,6 +7,7 @@ import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
+import { resolveStoredFileUrl } from '../utils/storageUrl';
 
 const router = Router();
 
@@ -183,7 +184,7 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
       role: 'student' as const,
       answeredQuestions: data.answered_questions || 0,
       correctAnswers: data.correct_answers || 0,
-      avatarUrl: data.avatar_url || '',
+      avatarUrl: resolveStoredFileUrl(data.avatar_url),
       showInLeaderboard: data.show_in_leaderboard !== false,
       languagePreference: data.language_preference || 'ingles',
     };

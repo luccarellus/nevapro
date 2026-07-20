@@ -704,6 +704,25 @@ var rateLimiter = (limit, windowMs) => {
 // server/middleware/auth.ts
 init_dbQueryBuilder();
 init_db();
+
+// server/utils/storageUrl.ts
+function resolveStoredFileUrl(value) {
+  if (typeof value !== "string" || !value.trim()) return "";
+  const storedValue = value.trim();
+  if (storedValue.startsWith("/api/storage/object?file=")) return storedValue;
+  let objectKey = storedValue.match(/^(avatars|materials)\/.+$/)?.[0];
+  if (!objectKey) {
+    try {
+      const pathname = decodeURIComponent(new URL(storedValue).pathname);
+      objectKey = pathname.match(/\/(avatars|materials)\/(.+)$/)?.[0]?.slice(1);
+    } catch {
+      return storedValue;
+    }
+  }
+  return objectKey ? `/api/storage/object?file=${encodeURIComponent(objectKey)}` : storedValue;
+}
+
+// server/middleware/auth.ts
 var verifySupabaseSession = async (token) => {
   try {
     const { data: userData, error } = await getSupabaseAdminClient().auth.getUser(token);
@@ -855,7 +874,7 @@ var authenticateUser = async (email, password) => {
         role: "admin",
         answeredQuestions: adminRow.answered_questions || 0,
         correctAnswers: adminRow.correct_answers || 0,
-        avatarUrl: adminRow.avatar_url || ""
+        avatarUrl: resolveStoredFileUrl(adminRow.avatar_url)
       },
       session: authData.session
     };
@@ -869,7 +888,7 @@ var authenticateUser = async (email, password) => {
         role: "student",
         answeredQuestions: studentRow.answered_questions || studentRow.answeredQuestions || 0,
         correctAnswers: studentRow.correct_answers || studentRow.correctAnswers || 0,
-        avatarUrl: studentRow.avatar_url || studentRow.avatarUrl || studentRow.avatar || "",
+        avatarUrl: resolveStoredFileUrl(studentRow.avatar_url || studentRow.avatarUrl || studentRow.avatar),
         showInLeaderboard: studentRow.show_in_leaderboard !== false,
         languagePreference: studentRow.language_preference || "ingles",
         flashQuizCompleted: !!studentRow.flash_quiz_completed
@@ -1039,7 +1058,7 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
       role: "student",
       answeredQuestions: data.answered_questions || 0,
       correctAnswers: data.correct_answers || 0,
-      avatarUrl: data.avatar_url || "",
+      avatarUrl: resolveStoredFileUrl(data.avatar_url),
       showInLeaderboard: data.show_in_leaderboard !== false,
       languagePreference: data.language_preference || "ingles"
     };
@@ -1371,7 +1390,7 @@ function formatUserProfile(data, role) {
     role,
     answeredQuestions: data.answered_questions || data.answeredQuestions || 0,
     correctAnswers: data.correct_answers || data.correctAnswers || 0,
-    avatarUrl: data.avatar_url || data.avatarUrl || data.avatar || "",
+    avatarUrl: resolveStoredFileUrl(data.avatar_url || data.avatarUrl || data.avatar),
     showInLeaderboard: data.show_in_leaderboard !== false,
     languagePreference: data.language_preference || "ingles",
     flashQuizCompleted: !!data.flash_quiz_completed
@@ -1397,7 +1416,7 @@ router3.get("/users", requireAdmin, async (req, res) => {
       ...u,
       answeredQuestions: u.answered_questions || u.answeredQuestions || 0,
       correctAnswers: u.correct_answers || u.correctAnswers || 0,
-      avatarUrl: u.avatar_url || u.avatarUrl || u.avatar || ""
+      avatarUrl: resolveStoredFileUrl(u.avatar_url || u.avatarUrl || u.avatar)
     }));
     await cacheSet(CACHE_KEYS.ADMIN_USERS, regularStudents);
     res.json(regularStudents);
@@ -2091,7 +2110,7 @@ router8.get("/", async (req, res) => {
       city: u.city,
       xp: u.xp || 0,
       level: u.level || 1,
-      avatarUrl: u.avatar_url || ""
+      avatarUrl: resolveStoredFileUrl(u.avatar_url)
     }));
     await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);
     res.json(filteredLeaderboard);
@@ -2252,7 +2271,7 @@ app.get("/api/storage/object", requireAuth, async (req, res) => {
     return;
   }
   try {
-    const bucketName = process.env.B2_BUCKET_NAME || "materials";
+    const bucketName = process.env.B2_BUCKET_NAME || "neva-avatars";
     const { data, error } = await dbAdmin.storage.from(bucketName).getObject(filePath);
     if (error || !data) {
       log.error("[Storage] GetObject error:", error);
@@ -2444,6 +2463,10 @@ app.post("/api/upload", rateLimiter(5, 6e4), requireAuth, receiveUpload, async (
       res.status(400).json({ error: "Nenhum arquivo enviado." });
       return;
     }
+    if (req.query.kind !== "material" && req.file.size > 2 * 1024 * 1024) {
+      res.status(400).json({ error: "A foto de perfil deve ter no m\xE1ximo 2 MB." });
+      return;
+    }
     const bucketName = process.env.B2_BUCKET_NAME || "neva-avatars";
     const fileExt = req.file.originalname.split(".").pop() || "jpg";
     const prefix = req.query.kind === "material" ? "materials" : "avatars";
@@ -2452,9 +2475,7 @@ app.post("/api/upload", rateLimiter(5, 6e4), requireAuth, receiveUpload, async (
       contentType: req.file.mimetype
     });
     if (error) throw error;
-    const endpoint = (process.env.B2_ENDPOINT || "").replace(/^https?:\/\//, "");
-    const publicUrl = `https://${bucketName}.${endpoint}/${fileName}`;
-    res.json({ url: publicUrl });
+    res.json({ url: `/api/storage/object?file=${encodeURIComponent(fileName)}` });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Upload failed";
     log.error("[Upload] Error:", msg);

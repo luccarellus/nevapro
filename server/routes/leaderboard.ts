@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { log } from '../utils/logger';
 import { cacheGet, cacheSet } from '../services/cache';
 import { CACHE_KEYS } from '../types';
@@ -31,7 +32,7 @@ router.get('/', async (req, res: Response) => {
       city: u.city,
       xp: (u as any).xp || 0,
       level: (u as any).level || 1,
-      avatarUrl: (u as any).avatar_url || '',
+      avatarUrl: resolveStoredFileUrl((u as any).avatar_url),
     }));
 
     await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);

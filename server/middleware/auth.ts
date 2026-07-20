@@ -3,6 +3,7 @@ import { AuthenticatedRequest, AuthenticatedUser } from '../types';
 import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
+import { resolveStoredFileUrl } from '../utils/storageUrl';
 
 // Extend Express Request globally
 declare global {
@@ -240,7 +241,7 @@ export const authenticateUser = async (email: string, password: string) => {
         role: 'admin',
         answeredQuestions: adminRow.answered_questions || 0,
         correctAnswers: adminRow.correct_answers || 0,
-        avatarUrl: adminRow.avatar_url || '',
+        avatarUrl: resolveStoredFileUrl(adminRow.avatar_url),
       },
       session: authData.session,
     };
@@ -261,7 +262,7 @@ export const authenticateUser = async (email: string, password: string) => {
         role: 'student',
         answeredQuestions: studentRow.answered_questions || studentRow.answeredQuestions || 0,
         correctAnswers: studentRow.correct_answers || studentRow.correctAnswers || 0,
-        avatarUrl: studentRow.avatar_url || studentRow.avatarUrl || studentRow.avatar || '',
+        avatarUrl: resolveStoredFileUrl(studentRow.avatar_url || studentRow.avatarUrl || studentRow.avatar),
         showInLeaderboard: studentRow.show_in_leaderboard !== false,
         languagePreference: studentRow.language_preference || 'ingles',
         flashQuizCompleted: !!studentRow.flash_quiz_completed,
