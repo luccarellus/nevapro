@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, AuthenticatedUser } from '../types';
-import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../../src/lib/dbQueryBuilder';
+import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 
@@ -88,21 +88,6 @@ export const requireAuth = async (
     }
 
     if (!token) {
-      // Fallback: check for legacy session_token (for backward compatibility)
-      token = req.cookies?.session_token;
-      if (token) {
-        // Legacy token — try to get user info from DB
-        try {
-          const parts = token.split(':');
-          if (parts.length === 5) {
-            const [userId, email, role] = parts;
-            req.user = { userId, email, role: role as 'admin' | 'student' };
-            return next();
-          }
-        } catch {
-          // Invalid legacy token — continue to error
-        }
-      }
       res.status(401).json({ error: 'Sessão inválida ou expirada. Por favor, faça login novamente.' });
       return;
     }

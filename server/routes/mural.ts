@@ -1,11 +1,12 @@
 import { Router, Response } from 'express';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAdmin } from '../middleware/auth';
-import { getSupabaseAdminClient } from '../../src/lib/dbQueryBuilder';
+import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { cacheInvalidate, cacheGet, cacheSet } from '../services/cache';
 import { addNotification } from '../services/notification';
 import { CACHE_KEYS } from '../types';
+import { validateMuralInput } from '../utils/validation';
 
 const router = Router();
 
@@ -46,14 +47,19 @@ router.get('/', async (req, res: Response) => {
 // ============= CREATE =============
 router.post('/', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
   try {
-    const { title, content, type, tag } = req.body;
+    const validation = validateMuralInput(req.body);
+    if ('error' in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { title, content, type, category, tag } = validation.data;
     const { data: result, error } = await getSupabaseAdminClient()
       .from('mural')
       .insert([
         {
           title,
           content,
-          type: type || 'GERAL',
+          type: type || category || 'GERAL',
           tag,
           created_at: new Date().toISOString(),
         },
@@ -84,7 +90,13 @@ router.post('/', rateLimiter(10, 60_000), requireAdmin, async (req, res: Respons
 router.put('/:id', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
+    const validation = validateMuralInput(req.body, true);
+    if ('error' in validation) {
+      res.status(400).json({ error: validation.error });
+      return;
+    }
+    const { category, ...fields } = validation.data;
+    const updates = { ...fields, ...(category !== undefined ? { type: category } : {}) };
 
     const { data, error } = await getSupabaseAdminClient()
       .from('mural')

@@ -62,7 +62,8 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
 
     try {
       if (isResettingPassword) {
-        setSuccessMessage("Funcionalidade em desenvolvimento! Em breve você poderá redefinir sua senha. Por enquanto, contate a administração pelo suporte.");
+        const res = await userService.forgotPassword(email);
+        setSuccessMessage(res.message || 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.');
         setIsLoading(false);
         return;
       } else if (isRegistering) {

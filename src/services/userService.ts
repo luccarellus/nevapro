@@ -80,6 +80,26 @@ export const userService = {
     }
   },
 
+  async forgotPassword(email: string): Promise<{ success: boolean; message?: string }> {
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+      let errorMsg = 'Erro ao solicitar recuperação';
+      try {
+        const error = await response.json();
+        errorMsg = error.error || errorMsg;
+      } catch {}
+      throw new Error(errorMsg);
+    }
+    return response.json();
+  },
+
   async changePassword(data: { email: string; currentPassword?: string; newPassword?: string }): Promise<{ success: boolean; message?: string }> {
     const response = await fetch('/api/auth/change-password', {
       method: 'POST',

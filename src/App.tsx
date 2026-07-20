@@ -30,6 +30,7 @@ const ErrorsBook = lazy(() => import('./components/ErrorsBook'));
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
 const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
 const ComingSoon = lazy(() => import('./components/ComingSoon'));
+const ResetPassword = lazy(() => import('./components/ResetPassword'));
 
 const PageLoading = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -55,6 +56,7 @@ export default function App() {
   });
   const [isSimulationActive, setIsSimulationActive] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const handleTabChange = (newTab: string) => {
     if (user.role === 'admin') {
@@ -72,6 +74,11 @@ export default function App() {
 
   useEffect(() => {
     initConsentMode();
+
+    // Check if user is returning from password reset email
+    if (window.location.hash?.includes('type=recovery')) {
+      setIsResettingPassword(true);
+    }
     
     // Recovery session for students
     const savedUser = localStorage.getItem('neva_student_session');
@@ -240,6 +247,10 @@ export default function App() {
     if (activeTab === 'privacidade') return <PrivacyPolicy onBack={() => handleTabChange(user.role === 'admin' ? 'admin' : 'dashboard')} />;
     if (activeTab === 'cookies') return <CookiePolicy onBack={() => handleTabChange(user.role === 'admin' ? 'admin' : 'dashboard')} />;
 
+    if (isResettingPassword) {
+      return <ResetPassword onBack={() => { setIsResettingPassword(false); window.location.hash = ''; }} />;
+    }
+
     if (!isLoggedIn) {
       return <Login onLogin={handleLogin} onTabChange={handleTabChange} />;
     }
@@ -317,9 +328,9 @@ export default function App() {
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
 
-  const IS_UNDER_MAINTENANCE = false;
+  const isUnderMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
-  if (IS_UNDER_MAINTENANCE) {
+  if (isUnderMaintenance) {
     return <Maintenance />;
   }
 

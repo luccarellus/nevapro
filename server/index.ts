@@ -9,13 +9,15 @@ import multer from 'multer';
 
 dotenv.config();
 
+import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
 import { csrfProtection } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
 import { requireAuth } from './middleware/auth';
 import pool from '../src/lib/db';
-import { getSupabaseAdminClient, dbAdmin } from '../src/lib/dbQueryBuilder';
+import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
+import { sanitizeInput } from './utils/sanitize';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -28,6 +30,9 @@ import notificationRoutes from './routes/notifications';
 import leaderboardRoutes from './routes/leaderboard';
 import questionRoutes from './routes/questions';
 import healthRoutes from './routes/health';
+
+// Validate critical environment variables before starting
+validateEnv();
 
 export const app = express();
 
@@ -247,18 +252,29 @@ app.get('/api/user/errors', requireAuth, async (req, res) => {
       ORDER BY la.created_at DESC`;
     const errorsRes = await query(errorsQuery, [userId]);
     const result = [];
-    for (const errRow of errorsRes.rows) {
+    if (errorsRes.rows.length > 0) {
+      const questionIds = errorsRes.rows.map(r => r.question_id);
       const optsRes = await query(
-        'SELECT text, image_url, letter, is_correct FROM public.question_options WHERE question_id = $1 ORDER BY letter ASC',
-        [errRow.question_id],
+        `SELECT question_id, text, image_url, letter FROM public.question_options WHERE question_id = ANY($1::varchar[]) ORDER BY letter ASC`,
+        [questionIds],
       );
-      result.push({
-        id: errRow.question_id, subject: errRow.subject, text: errRow.question_text,
-        imageUrl: errRow.image_url, correctOptionIndex: errRow.correct_option_index,
-        explanation: errRow.explanation, difficulty: errRow.difficulty, year: errRow.year, index: errRow.index,
-        selectedOptionIndex: errRow.selected_option_index, answeredAt: errRow.answered_at,
-        options: optsRes.rows.map((o: any) => o.text), optionImages: optsRes.rows.map((o: any) => o.image_url),
-      });
+      const optionsByQuestion = new Map<string, { text: string; image_url: string | null }[]>();
+      for (const opt of optsRes.rows) {
+        if (!optionsByQuestion.has(opt.question_id)) {
+          optionsByQuestion.set(opt.question_id, []);
+        }
+        optionsByQuestion.get(opt.question_id)!.push(opt);
+      }
+      for (const errRow of errorsRes.rows) {
+        const opts = optionsByQuestion.get(errRow.question_id) || [];
+        result.push({
+          id: errRow.question_id, subject: errRow.subject, text: errRow.question_text,
+          imageUrl: errRow.image_url, correctOptionIndex: errRow.correct_option_index,
+          explanation: errRow.explanation, difficulty: errRow.difficulty, year: errRow.year, index: errRow.index,
+          selectedOptionIndex: errRow.selected_option_index, answeredAt: errRow.answered_at,
+          options: opts.map((o: any) => o.text), optionImages: opts.map((o: any) => o.image_url),
+        });
+      }
     }
     res.json(result);
   } catch (err) {
@@ -268,9 +284,30 @@ app.get('/api/user/errors', requireAuth, async (req, res) => {
 });
 
 // ===== LGPD Consent Log =====
-app.post('/api/lgpd/consent-log', (req, res) => {
-  log.info('[LGPD] Consent preferences received:', req.body);
-  res.json({ success: true });
+app.post('/api/lgpd/consent-log', async (req, res) => {
+  const { preferences, userAgent } = req.body;
+  if (!preferences) {
+    res.status(400).json({ error: 'Preferências de consentimento são obrigatórias.' });
+    return;
+  }
+  try {
+    // Armazena apenas o tipo de consentimento + metadados (a coluna consent_type é VARCHAR(100))
+    const consentTypes = Object.entries(preferences)
+      .filter(([, v]) => v === true)
+      .map(([k]) => k)
+      .join(',')
+      .substring(0, 100);
+    await query(
+      `INSERT INTO public.consent_logs (id, consent_type, ip_address, user_agent, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
+      [consentTypes || 'necessary_only', req.ip || req.socket?.remoteAddress || 'unknown', userAgent || req.headers['user-agent'] || ''],
+    );
+    log.info('[LGPD] Consent preferences saved:', consentTypes);
+    res.json({ success: true });
+  } catch (err) {
+    log.error('[LGPD] Failed to save consent:', err);
+    res.status(500).json({ error: 'Erro ao registrar consentimento.' });
+  }
 });
 
 // ===== Upload (Avatar) =====

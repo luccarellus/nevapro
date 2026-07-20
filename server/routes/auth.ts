@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, authenticateUser } from '../middleware/auth';
 import { query } from '../../src/lib/db';
-import { getSupabaseAdminClient } from '../../src/lib/dbQueryBuilder';
+import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
@@ -85,17 +85,10 @@ router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
+        path: '/',
         maxAge: 24 * 60 * 60 * 1000,
       });
     }
-
-    // Also set legacy cookie for backward compat
-    res.cookie('session_token', `${result.user.id}:${cleanEmail}:${result.user.role}:${Date.now() + 86400000}:placeholder`, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-    });
 
     res.json({ success: true, user: result.user });
   } catch (err) {
@@ -145,11 +138,26 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
       return;
     }
 
-    // Create in our database
-    const { data, error } = await getSupabaseAdminClient()
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: cleanEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { name: safeName || cleanEmail.split('@')[0], role: 'student' },
+    });
+    if (authError || !authData.user) {
+      if (authError?.message?.toLowerCase().includes('already')) {
+        res.status(400).json({ error: 'E-mail já cadastrado.' });
+        return;
+      }
+      throw authError || new Error('Falha ao criar usuário no Supabase Auth.');
+    }
+
+    const { data, error } = await supabaseAdmin
       .from('users')
       .insert([
         {
+          id: authData.user.id,
           email: cleanEmail,
           name: safeName || cleanEmail.split('@')[0],
           role: 'student',
@@ -164,7 +172,10 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => undefined);
+      throw error;
+    }
 
     const userObj = {
       ...data,
@@ -177,11 +188,15 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
       languagePreference: data.language_preference || 'ingles',
     };
 
-    // Set session cookie
-    res.cookie('session_token', `${userObj.id}:${cleanEmail}:student:${Date.now() + 86400000}:placeholder`, {
+    const loginResult = await authenticateUser(cleanEmail, password);
+    if (loginResult.error || !loginResult.session?.access_token) {
+      throw new Error('Conta criada, mas não foi possível iniciar a sessão.');
+    }
+    res.cookie('sb_session_token', loginResult.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000,
     });
 
@@ -193,18 +208,58 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
   }
 });
 
+// ============= FORGOT PASSWORD (solicitar link de recuperação) =============
+router.post('/forgot-password', rateLimiter(3, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'E-mail é obrigatório.' });
+    return;
+  }
+
+  const cleanEmail = normalizeEmail(email);
+
+  try {
+    const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
+    const appUrl = process.env.APP_URL || 'https://neva.pro';
+    const { error } = await getSupabaseAnonClient().auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: `${appUrl}/reset-password`,
+    });
+
+    if (error) {
+      log.error('[Forgot Password] Supabase error:', error.message);
+    }
+
+    // Sempre retorna sucesso para evitar enumeração de e-mails
+    res.json({
+      success: true,
+      message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
+    });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error('[Forgot Password] Error:', errorMessage);
+    res.status(500).json({ error: 'Erro ao solicitar recuperação de senha.' });
+  }
+});
+
 // ============= LOGOUT =============
 router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
-  // Clear session cookies
+  // Revoke Supabase session
+  try {
+    const sbToken = req.cookies?.sb_session_token;
+    if (sbToken) {
+      const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
+      await getSupabaseAnonClient().auth.signOut();
+    }
+  } catch {
+    // Fallback: apenas limpa o cookie mesmo se o signOut falhar
+  }
+
+  // Clear session cookie
   res.clearCookie('sb_session_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-  });
-  res.clearCookie('session_token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    path: '/',
   });
   res.json({ success: true });
 });
@@ -230,7 +285,7 @@ router.post(
 
     try {
       // Verify current password via Supabase Auth
-      const { getSupabaseAnonClient } = await import('../../src/lib/dbQueryBuilder');
+      const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
       const { error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
         email: cleanEmail,
         password: currentPassword,
@@ -254,15 +309,6 @@ router.post(
         await supabase.auth.admin.updateUserById(targetAuthUserId, {
           password: newPassword,
         });
-      }
-
-      // For students, also update the password_hash in users table
-      const isAdmin = !!adminRow;
-      if (!isAdmin) {
-        const bcrypt = await import('bcryptjs');
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(newPassword, salt);
-        await supabase.from('users').update({ password_hash: hashedPassword }).eq('email', cleanEmail);
       }
 
       res.json({ success: true, message: 'Senha atualizada com sucesso.' });

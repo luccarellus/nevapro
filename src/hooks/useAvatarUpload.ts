@@ -42,7 +42,10 @@ export function useAvatarUpload(options: UseAvatarUploadOptions = {}): UseAvatar
       // 2. Update profile with new avatar
       const profileRes = await fetch('/api/user/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
         body: JSON.stringify({ email: options.email, name: options.name, avatarUrl }),
       });
 

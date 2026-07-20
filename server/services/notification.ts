@@ -2,10 +2,12 @@ import { query } from '../../src/lib/db.js';
 import { log } from '../utils/logger';
 
 /**
- * Creates a notification for ALL users using a single efficient SQL query.
- * 
- * Before: N+1 — fetched all user IDs, then inserted N records (expensive with 10k+ users).
- * After: Single INSERT FROM SELECT query — efficient regardless of user count.
+ * Adds a global notification visible to ALL users.
+ *
+ * Uses a single notification with user_id = NULL (global) instead of
+ * inserting N rows for N users. This scales to any number of users.
+ *
+ * The client-side query fetches notifications WHERE user_id IS NULL OR user_id = $1.
  */
 export const addNotification = async (
   title: string,
@@ -15,11 +17,10 @@ export const addNotification = async (
   try {
     await query(
       `INSERT INTO public.notifications (id, user_id, title, content, type, is_read, created_at)
-       SELECT gen_random_uuid(), id, $1, $2, $3, false, NOW()
-       FROM public.users`,
+       VALUES (gen_random_uuid(), NULL, $1, $2, $3, false, NOW())`,
       [title, message, type.toLowerCase()],
     );
-    log.info(`[addNotification] Notification sent to all users: "${title}"`);
+    log.info(`[addNotification] Global notification sent: "${title}"`);
   } catch (e) {
     log.error('[addNotification] Failed to save notification:', e);
   }

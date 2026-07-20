@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
-import { getSupabaseAdminClient } from '../../src/lib/dbQueryBuilder';
+import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { cacheInvalidate } from '../services/cache';

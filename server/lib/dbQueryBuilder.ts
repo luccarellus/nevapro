@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { query } from './db.js';
+import { query } from '../../src/lib/db.js';
 
 let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
 let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
@@ -95,7 +95,7 @@ function sanitizeSelectCols(cols: string): string {
   for (let part of parts) {
     part = part.trim();
     // Cada coluna deve conter apenas caracteres alfanuméricos, sublinhados, asterisco e parênteses
-    if (!/^[a-zA-Z0-9_\*\(\)]+$/.test(part)) {
+    if (!/^[a-zA-Z0-9_*\\(\\)]+$/.test(part)) {
       throw new Error(`Coluna de select insegura detectada: ${part}`);
     }
   }

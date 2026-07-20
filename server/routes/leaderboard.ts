@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { getSupabaseAdminClient } from '../../src/lib/dbQueryBuilder';
+import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { cacheGet, cacheSet } from '../services/cache';
 import { CACHE_KEYS } from '../types';
@@ -17,25 +17,22 @@ router.get('/', async (req, res: Response) => {
 
     const { data, error } = await getSupabaseAdminClient()
       .from('users')
-      .select('name, email, city, xp, level, role, show_in_leaderboard, avatar_url');
+      .select('name, city, xp, level, avatar_url')
+      .not('role', 'is', null)
+      .neq('role', 'admin')
+      .eq('show_in_leaderboard', true)
+      .order('xp', { ascending: false })
+      .limit(20);
 
     if (error) throw error;
 
-    const filteredLeaderboard = (data || [])
-      .filter((u: Record<string, unknown>) => {
-        if (u.role === 'admin') return false;
-        if ((u as any).show_in_leaderboard === false) return false;
-        return true;
-      })
-      .map((u: Record<string, unknown>) => ({
-        name: u.name,
-        city: u.city,
-        xp: (u as any).xp || 0,
-        level: (u as any).level || 1,
-        avatarUrl: (u as any).avatar_url || '',
-      }))
-      .sort((a, b) => b.xp - a.xp)
-      .slice(0, 20);
+    const filteredLeaderboard = (data || []).map((u: Record<string, unknown>) => ({
+      name: u.name,
+      city: u.city,
+      xp: (u as any).xp || 0,
+      level: (u as any).level || 1,
+      avatarUrl: (u as any).avatar_url || '',
+    }));
 
     await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);
     res.json(filteredLeaderboard);
