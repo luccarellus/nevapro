@@ -166,13 +166,57 @@ export const ensureAdminUser = async (email: string, authUserId: string): Promis
  */
 export const authenticateUser = async (email: string, password: string) => {
   const supabase = getSupabaseAnonClient();
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (authError || !authData.user) {
-    return { error: 'E-mail ou senha inválidos.' };
+    const cleanEmail = email.toLowerCase().trim();
+    const admin = getSupabaseAdminClient();
+    const { data: legacyStudent } = await admin
+      .from('users')
+      .select('password_hash')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    const passwordHash = legacyStudent?.password_hash;
+    if (!passwordHash) return { error: 'E-mail ou senha inválidos.' };
+
+    const bcrypt = await import('bcryptjs');
+    const legacyPasswordIsValid = await bcrypt.compare(password, passwordHash).catch(() => false);
+    if (!legacyPasswordIsValid) return { error: 'E-mail ou senha inválidos.' };
+
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: cleanEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'student' },
+    });
+
+    if (createError || !created.user) {
+      let existingAuthUserId: string | undefined;
+      for (let page = 1; page <= 10 && !existingAuthUserId; page++) {
+        const { data: pageData, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 100 });
+        if (listError) break;
+        existingAuthUserId = pageData.users.find(
+          (user: { email?: string }) => user.email?.toLowerCase().trim() === cleanEmail,
+        )?.id;
+        if (pageData.users.length < 100) break;
+      }
+      if (!existingAuthUserId) return { error: 'E-mail ou senha inválidos.' };
+      const { error: updateError } = await admin.auth.admin.updateUserById(existingAuthUserId, {
+        password,
+        email_confirm: true,
+      });
+      if (updateError) return { error: 'E-mail ou senha inválidos.' };
+    }
+
+    ({ data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    }));
+    if (authError || !authData.user) return { error: 'E-mail ou senha inválidos.' };
   }
 
   const cleanEmail = email.toLowerCase().trim();
