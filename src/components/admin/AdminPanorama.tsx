@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ShieldCheck, Trophy, Crown, Library, Users, Megaphone, Calendar } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Material, Notice, StudyEvent, UserProfile } from '../../types';
 import { calculateLevelAndProgression } from '../../utils/xpUtils';
 import { toTimestamp, formatShortDate, getStudentRankInfo } from './AdminUtils';
@@ -76,6 +77,31 @@ export default function AdminPanorama({
       const lastInteraction = toTimestamp(student.updated_at || student.created_at);
       return !lastInteraction || lastInteraction < thirtyDaysAgo;
     });
+  }, [students]);
+
+  const studentGrowth = useMemo(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+      return {
+        key: `${date.getFullYear()}-${date.getMonth()}`,
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+        students: 0,
+      };
+    });
+    const monthByKey = new Map(months.map(month => [month.key, month]));
+
+    students.forEach(student => {
+      if (!student.created_at) return;
+      const createdAt = new Date(student.created_at);
+      if (Number.isNaN(createdAt.getTime())) return;
+
+      const key = `${createdAt.getFullYear()}-${createdAt.getMonth()}`;
+      const month = monthByKey.get(key);
+      if (month) month.students += 1;
+    });
+
+    return months;
   }, [students]);
 
   return (
@@ -334,33 +360,34 @@ export default function AdminPanorama({
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
           </div>
           <div className="flex-1 w-full relative min-h-[200px] mt-4 flex items-center">
-            <svg viewBox="0 0 800 200" className="w-full h-full text-text-secondary">
-              <line x1="50" y1="20" x2="800" y2="20" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
-              <line x1="50" y1="55" x2="800" y2="55" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
-              <line x1="50" y1="90" x2="800" y2="90" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
-              <line x1="50" y1="125" x2="800" y2="125" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
-              <line x1="50" y1="160" x2="800" y2="160" stroke="rgba(255,255,255,0.03)" strokeDasharray="3" />
-              <text x="25" y="24" fill="#64748b" fontSize="10" textAnchor="end">8</text>
-              <text x="25" y="59" fill="#64748b" fontSize="10" textAnchor="end">6</text>
-              <text x="25" y="94" fill="#64748b" fontSize="10" textAnchor="end">4</text>
-              <text x="25" y="129" fill="#64748b" fontSize="10" textAnchor="end">2</text>
-              <text x="25" y="164" fill="#64748b" fontSize="10" textAnchor="end">0</text>
-              <defs>
-                <linearGradient id="chartLineGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d="M 50,160 C 150,160 250,160 350,160 C 430,160 480,150 530,130 C 590,105 620,50 660,65 C 700,80 750,160 800,160 L 800,160 L 50,160 Z" fill="url(#chartLineGrad)" />
-              <path d="M 50,160 C 150,160 250,160 350,160 C 430,160 480,150 530,130 C 590,105 620,50 660,65 C 700,80 750,160 800,160" fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-              <circle cx="660" cy="65" r="4" fill="#3b82f6" stroke="#121f32" strokeWidth="2" />
-              <text x="50" y="185" fill="#64748b" fontSize="10" textAnchor="middle">fev</text>
-              <text x="200" y="185" fill="#64748b" fontSize="10" textAnchor="middle">mar</text>
-              <text x="350" y="185" fill="#64748b" fontSize="10" textAnchor="middle">abr</text>
-              <text x="500" y="185" fill="#64748b" fontSize="10" textAnchor="middle">mai</text>
-              <text x="660" y="185" fill="#3b82f6" fontSize="10" fontWeight="900" textAnchor="middle">jun</text>
-              <text x="800" y="185" fill="#64748b" fontSize="10" textAnchor="middle">jul</text>
-            </svg>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={studentGrowth} margin={{ top: 10, right: 8, left: -24, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="studentGrowthGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="rgba(100,116,139,0.12)" strokeDasharray="3 3" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
+                <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} domain={[0, 'dataMax + 1']} />
+                <Tooltip
+                  cursor={{ stroke: 'rgba(59,130,246,0.25)', strokeDasharray: '3 3' }}
+                  contentStyle={{ background: '#121f32', border: '1px solid #25334a', borderRadius: 12, fontSize: 11 }}
+                  labelStyle={{ color: '#94a3b8', textTransform: 'uppercase' }}
+                  itemStyle={{ color: '#60a5fa' }}
+                  formatter={(value) => [Number(value), 'Novos alunos']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="students"
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  fill="url(#studentGrowthGradient)"
+                  activeDot={{ r: 4, fill: '#3b82f6', stroke: '#121f32', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
