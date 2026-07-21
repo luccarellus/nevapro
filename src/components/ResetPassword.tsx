@@ -16,18 +16,16 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
 
-  // Extrai token e email da query string (?token=xxx&email=yyy)
-  const getTokenAndEmail = (): { token?: string; email?: string } => {
-    const params = new URLSearchParams(window.location.search);
+  const getTokensFromHash = (): { access_token?: string } => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     return {
-      token: params.get('token') || undefined,
-      email: params.get('email') || undefined,
+      access_token: params.get('access_token') || undefined,
     };
   };
 
   useEffect(() => {
-    const { token, email } = getTokenAndEmail();
-    if (!token || !email) {
+    const { access_token } = getTokensFromHash();
+    if (!access_token || !window.location.hash.includes('type=recovery')) {
       setIsValidSession(false);
       return;
     }
@@ -48,9 +46,9 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
       return;
     }
 
-    const { token, email } = getTokenAndEmail();
-    if (!token || !email) {
-      setError('Link de recuperação inválido. Solicite um novo.');
+    const { access_token } = getTokensFromHash();
+    if (!access_token) {
+      setError('Token de recuperação ausente. O link pode ter expirado.');
       return;
     }
 
@@ -68,8 +66,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
         },
         body: JSON.stringify({
           password,
-          token,
-          email,
+          access_token,
           recaptcha_token,
         }),
       });
@@ -84,6 +81,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
 
       // Redirect to login after 3 seconds
       setTimeout(() => {
+        window.location.hash = '';
         onBack();
       }, 3000);
     } catch (err: any) {

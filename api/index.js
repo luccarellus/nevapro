@@ -394,7 +394,8 @@ var CONDITIONAL_VARS = [
   { vars: ["B2_ENDPOINT", "B2_KEY_ID", "B2_APPLICATION_KEY", "B2_BUCKET_NAME"], purpose: "Backblaze B2 file storage" },
   { vars: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"], purpose: "Redis caching (via Upstash)" },
   { vars: ["SENTRY_DSN"], purpose: "Sentry error tracking" },
-  { vars: ["GEMINI_API_KEY"], purpose: "Gemini AI API" }
+  { vars: ["GEMINI_API_KEY"], purpose: "Gemini AI API" },
+  { vars: ["RESEND_API_KEY", "RESEND_FROM_EMAIL"], purpose: "Resend (envio de e\u2011mails de redefini\xE7\xE3o de senha)" }
 ];
 function validateEnv() {
   const missing = [];
@@ -701,6 +702,69 @@ var rateLimiter = (limit, windowMs) => {
   };
 };
 
+// server/middleware/recaptcha.ts
+var VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
+var DEFAULT_SCORE_THRESHOLD = 0.5;
+function verifyRecaptcha(threshold = DEFAULT_SCORE_THRESHOLD) {
+  return async (req, res, next) => {
+    const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+    if (!secretKey) {
+      log.warn("[reCAPTCHA] RECAPTCHA_SECRET_KEY n\xE3o configurada. Pulando verifica\xE7\xE3o.");
+      return next();
+    }
+    const token = req.body?.recaptcha_token;
+    if (!token || typeof token !== "string") {
+      log.warn("[reCAPTCHA] Token ausente na requisi\xE7\xE3o.");
+      res.status(403).json({
+        error: "Verifica\xE7\xE3o de seguran\xE7a necess\xE1ria. Recarregue a p\xE1gina e tente novamente."
+      });
+      return;
+    }
+    try {
+      const params = new URLSearchParams({
+        secret: secretKey,
+        response: token
+      });
+      const response = await fetch(VERIFY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+      });
+      if (!response.ok) {
+        log.error("[reCAPTCHA] Erro HTTP na verifica\xE7\xE3o:", response.status);
+        res.status(500).json({ error: "Erro ao verificar reCAPTCHA. Tente novamente." });
+        return;
+      }
+      const data = await response.json();
+      if (!data.success) {
+        const errorCodes = data["error-codes"]?.join(", ") || "desconhecido";
+        log.warn(`[reCAPTCHA] Falha na verifica\xE7\xE3o: ${errorCodes}`);
+        res.status(403).json({
+          error: "Verifica\xE7\xE3o de seguran\xE7a falhou. Tente novamente."
+        });
+        return;
+      }
+      if (typeof data.score === "number" && data.score < threshold) {
+        log.warn(
+          `[reCAPTCHA] Score baixo: ${data.score} (limiar: ${threshold}, a\xE7\xE3o: ${data.action || "N/A"})`
+        );
+        res.status(403).json({
+          error: "Nossa verifica\xE7\xE3o de seguran\xE7a identificou atividade suspeita. Tente novamente mais tarde."
+        });
+        return;
+      }
+      log.info(
+        `[reCAPTCHA] OK \u2014 a\xE7\xE3o: ${data.action || "N/A"}, score: ${data.score ?? "N/A"}`
+      );
+      next();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log.error("[reCAPTCHA] Erro na verifica\xE7\xE3o:", errorMessage);
+      res.status(500).json({ error: "Erro interno ao verificar reCAPTCHA." });
+    }
+  };
+}
+
 // server/middleware/auth.ts
 init_dbQueryBuilder();
 init_db();
@@ -951,9 +1015,108 @@ var normalizeEmail = (email) => {
   return email.toLowerCase().trim();
 };
 
+// server/services/email.ts
+import { Resend } from "resend";
+var resendClient = null;
+function getClient2() {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY n\xE3o configurada. Defina no .env");
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
+async function sendPasswordResetEmail(to, userName, resetLink) {
+  const from = process.env.RESEND_FROM_EMAIL || "naoresponda@olharjovem.org";
+  const senderName = process.env.RESEND_SENDER_NAME || "Olhar Jovem";
+  const { error } = await getClient2().emails.send({
+    from: `${senderName} <${from}>`,
+    to,
+    subject: "Redefini\xE7\xE3o de senha \u2014 Neva Pro",
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+          <!-- Logo -->
+          <tr>
+            <td style="padding-bottom:24px;text-align:center;">
+              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Olhar Jovem</span>
+            </td>
+          </tr>
+          <!-- Card -->
+          <tr>
+            <td style="background:#ffffff;border-radius:24px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;">
+                Redefini\xE7\xE3o de senha
+              </h1>
+              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;">
+                Ol\xE1, <strong>${userName}</strong>!
+              </p>
+              <p style="margin:0 0 24px;font-size:15px;color:#64748b;line-height:1.6;">
+                Recebemos uma solicita\xE7\xE3o de redefini\xE7\xE3o de senha para sua conta no
+                <strong>Olhar Jovem</strong>. Clique no bot\xE3o abaixo para criar uma nova senha:
+              </p>
+              <!-- CTA -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${resetLink}"
+                       style="display:inline-block;padding:16px 40px;background:#6C5CE7;color:#ffffff;
+                              text-decoration:none;border-radius:40px;font-size:14px;font-weight:700;
+                              letter-spacing:0.5px;">
+                      Redefinir senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <!-- Fallback link -->
+              <p style="margin:0 0 24px;font-size:13px;color:#94a3b8;word-break:break-all;">
+                Ou copie o link:<br />
+                <a href="${resetLink}" style="color:#6C5CE7;">${resetLink}</a>
+              </p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                Este link expira em <strong>1 hora</strong>.<br />
+                Se voc\xEA n\xE3o solicitou esta redefini\xE7\xE3o, ignore este e-mail.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 32px 0;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;">
+                Olhar Jovem<br />
+                Se tiver d\xFAvidas, entre em contato pelo nosso suporte.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim()
+  });
+  if (error) {
+    log.error("[Email] Erro ao enviar e-mail de reset:", error);
+    throw error;
+  }
+  log.info(`[Email] E-mail de redefini\xE7\xE3o enviado para ${to}`);
+}
+
 // server/routes/auth.ts
 var router = Router();
-router.post("/login", rateLimiter(5, 6e4), async (req, res) => {
+router.post("/login", rateLimiter(5, 6e4), verifyRecaptcha(), async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: "E-mail e senha s\xE3o obrigat\xF3rios." });
@@ -1024,7 +1187,7 @@ router.post("/login", rateLimiter(5, 6e4), async (req, res) => {
     res.status(500).json({ error: "Falha na autentica\xE7\xE3o." });
   }
 });
-router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
+router.post("/register", rateLimiter(5, 6e4), verifyRecaptcha(), async (req, res) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: "E-mail e senha s\xE3o obrigat\xF3rios." });
@@ -1113,7 +1276,7 @@ router.post("/register", rateLimiter(5, 6e4), async (req, res) => {
     res.status(500).json({ error: "Erro ao criar conta." });
   }
 });
-router.post("/forgot-password", rateLimiter(3, 6e4), async (req, res) => {
+router.post("/forgot-password", rateLimiter(3, 6e4), verifyRecaptcha(), async (req, res) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: "E-mail \xE9 obrigat\xF3rio." });
@@ -1121,13 +1284,18 @@ router.post("/forgot-password", rateLimiter(3, 6e4), async (req, res) => {
   }
   const cleanEmail = normalizeEmail(email);
   try {
-    const { getSupabaseAnonClient: getSupabaseAnonClient2 } = await Promise.resolve().then(() => (init_dbQueryBuilder(), dbQueryBuilder_exports));
     const appUrl = process.env.APP_URL || "https://neva.pro";
-    const { error } = await getSupabaseAnonClient2().auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${appUrl}/reset-password`
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: "recovery",
+      email: cleanEmail,
+      options: { redirectTo: `${appUrl}/reset-password` }
     });
     if (error) {
-      log.error("[Forgot Password] Supabase error:", error.message);
+      log.warn("[Forgot Password] Supabase n\xE3o gerou o link de recupera\xE7\xE3o:", error.message);
+    } else if (data?.properties?.action_link) {
+      const userName = data.user?.user_metadata?.name || data.user?.user_metadata?.full_name || cleanEmail.split("@")[0];
+      await sendPasswordResetEmail(cleanEmail, userName, data.properties.action_link);
     }
     res.json({
       success: true,
@@ -1139,6 +1307,45 @@ router.post("/forgot-password", rateLimiter(3, 6e4), async (req, res) => {
     res.status(500).json({ error: "Erro ao solicitar recupera\xE7\xE3o de senha." });
   }
 });
+router.post(
+  "/reset-password",
+  rateLimiter(3, 6e4),
+  verifyRecaptcha(),
+  async (req, res) => {
+    const { password, access_token } = req.body;
+    if (!password || password.length < 6) {
+      res.status(400).json({ error: "A senha deve conter no m\xEDnimo 6 caracteres." });
+      return;
+    }
+    if (!access_token) {
+      res.status(400).json({ error: "Token de recupera\xE7\xE3o ausente. O link pode ter expirado." });
+      return;
+    }
+    try {
+      const supabase = getSupabaseAdminClient();
+      const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
+      if (userError || !userData?.user) {
+        log.warn("[Reset Password] Token inv\xE1lido ou expirado:", userError?.message);
+        res.status(401).json({ error: "Link de recupera\xE7\xE3o inv\xE1lido ou expirado. Solicite um novo." });
+        return;
+      }
+      const { error: updateError } = await supabase.auth.admin.updateUserById(userData.user.id, {
+        password
+      });
+      if (updateError) {
+        log.error("[Reset Password] Erro ao atualizar senha:", updateError.message);
+        res.status(400).json({ error: updateError.message || "Erro ao redefinir senha." });
+        return;
+      }
+      log.info("[Reset Password] Senha redefinida com sucesso");
+      res.json({ success: true, message: "Senha redefinida com sucesso." });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log.error("[Reset Password] Error:", errorMessage);
+      res.status(500).json({ error: "Erro interno ao redefinir senha." });
+    }
+  }
+);
 router.post("/logout", async (req, res) => {
   try {
     const sbToken = req.cookies?.sb_session_token;
@@ -1159,6 +1366,7 @@ router.post("/logout", async (req, res) => {
 router.post(
   "/change-password",
   rateLimiter(3, 6e4),
+  verifyRecaptcha(),
   requireAuth,
   async (req, res) => {
     const { email, currentPassword, newPassword } = req.body;
@@ -1240,6 +1448,7 @@ router2.get("/profile", requireAuth, async (req, res) => {
 router2.post(
   "/profile",
   rateLimiter(10, 6e4),
+  verifyRecaptcha(),
   requireAuth,
   async (req, res) => {
     const updateData = req.body;
@@ -1337,7 +1546,7 @@ router2.post(
     }
   }
 );
-router2.delete("/profile", requireAuth, async (req, res) => {
+router2.delete("/profile", verifyRecaptcha(), requireAuth, async (req, res) => {
   const email = normalizeEmail(req.query.email || req.body?.email || "");
   if (!email) {
     res.status(400).json({ error: "E-mail \xE9 obrigat\xF3rio." });
@@ -2424,8 +2633,9 @@ app.use(
     contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://www.google.com/recaptcha/", "https://recaptcha.google.com/recaptcha/"],
         styleSrc: ["'self'", "'unsafe-inline'"],
+        frameSrc: ["'self'", "https://www.google.com/recaptcha/", "https://recaptcha.google.com/"],
         imgSrc: ["'self'", "data:", "https://api.enem.dev", "https://enem.dev"],
         connectSrc: ["'self'", "https://api.enem.dev"],
         fontSrc: ["'self'", "data:"],
@@ -2700,7 +2910,7 @@ var receiveUpload = (req, res, next) => {
     next();
   });
 };
-app.post("/api/upload", rateLimiter(5, 6e4), requireAuth, receiveUpload, async (req, res) => {
+app.post("/api/upload", rateLimiter(5, 6e4), verifyRecaptcha(), requireAuth, receiveUpload, async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: "Nenhum arquivo enviado." });

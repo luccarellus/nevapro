@@ -78,7 +78,10 @@ export default function App() {
 
     // Check if user is returning from password reset email (via query params)
     const params = new URLSearchParams(window.location.search);
-    if (params.get('token') && params.get('email')) {
+    if (
+      (params.get('token') && params.get('email'))
+      || window.location.hash.includes('type=recovery')
+    ) {
       setIsResettingPassword(true);
     }
     
@@ -258,6 +261,7 @@ export default function App() {
         // Limpa os query params da URL
         const url = new URL(window.location.href);
         url.search = '';
+        url.hash = '';
         window.history.replaceState({}, '', url.toString());
       }} />;
     }
