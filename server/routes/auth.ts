@@ -87,7 +87,7 @@ router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: Aut
       res.cookie('sb_session_token', result.session.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/',
         maxAge: 24 * 60 * 60 * 1000,
       });
@@ -198,7 +198,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
     res.cookie('sb_session_token', loginResult.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
       maxAge: 24 * 60 * 60 * 1000,
     });
@@ -318,7 +318,7 @@ router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
   res.clearCookie('sb_session_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: '/',
   });
   res.json({ success: true });

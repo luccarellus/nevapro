@@ -11,7 +11,7 @@ dotenv.config();
 
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
-import { csrfProtection } from './middleware/csrf';
+import { csrfProtection, isAllowedOrigin } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
 import { verifyRecaptcha } from './middleware/recaptcha';
 import { requireAuth } from './middleware/auth';
@@ -40,21 +40,21 @@ validateEnv();
 
 export const app = express();
 
-// Trust proxy (for rate limiting behind nginx)
+// Trust proxy (for rate limiting behind nginx / Vercel)
 app.set('trust proxy', 1);
 app.disable('etag');
 
 // ===== CORS =====
-const ALLOWED_ORIGIN = (() => {
-  try {
-    return new URL(process.env.FRONTEND_URL || 'https://neva.pro').origin;
-  } catch {
-    return process.env.FRONTEND_URL || 'https://neva.pro';
-  }
-})();
-
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  const requestOrigin = req.headers.origin;
+  const defaultOrigin = process.env.FRONTEND_URL?.split(',')[0] || 'https://neva.pro';
+  let allowedOrigin = defaultOrigin;
+
+  if (requestOrigin && isAllowedOrigin(req, requestOrigin)) {
+    allowedOrigin = requestOrigin;
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token');
