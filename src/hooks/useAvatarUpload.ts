@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { uploadService } from '../services/uploadService';
+import { userService } from '../services/userService';
 
 interface UseAvatarUploadOptions {
   email?: string;
@@ -39,19 +40,12 @@ export function useAvatarUpload(options: UseAvatarUploadOptions = {}): UseAvatar
       // 1. Upload file
       const avatarUrl = await uploadService.uploadFile(file, 'Falha ao enviar foto.');
 
-      // 2. Update profile with new avatar
-      const profileRes = await fetch('/api/user/profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email: options.email, name: options.name, avatarUrl }),
+      // 2. Update profile with new avatar (usa userService que já inclui recaptcha_token)
+      const profileData = await userService.updateProfile({
+        email: options.email,
+        name: options.name,
+        avatarUrl,
       });
-
-      if (!profileRes.ok) throw new Error('Falha ao salvar foto no perfil.');
-
-      const profileData = await profileRes.json();
 
       // 3. Update local session
       const stored = localStorage.getItem('neva_student_session');
