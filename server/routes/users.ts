@@ -110,11 +110,11 @@ router.post(
       answeredQuestions: 'answered_questions',
       correctAnswers: 'correct_answers',
       streak: 'streak',
+      xp: 'xp',
+      level: 'level',
     };
 
     if (req.user?.role === 'admin') {
-      fieldMapping.xp = 'xp';
-      fieldMapping.level = 'level';
       fieldMapping.role = 'role';
     }
 
@@ -132,16 +132,18 @@ router.post(
     let xpDiff = 0;
     let userId: string | null = null;
     let oldXp = 0;
+    let oldLevel = 1;
 
     try {
       const { data: oldUser } = await getSupabaseAdminClient()
         .from(targetTable)
-        .select('id, xp')
+        .select('id, xp, level')
         .eq('email', email)
         .maybeSingle();
       if (oldUser) {
         userId = oldUser.id;
         oldXp = oldUser.xp || 0;
+        oldLevel = oldUser.level || 1;
         if (typeof dbUpdate.xp === 'number' && dbUpdate.xp > oldXp) {
           xpDiff = dbUpdate.xp - oldXp;
         }
@@ -166,6 +168,7 @@ router.post(
         if (Date.now() - new Date(lastQuiz.created_at).getTime() < sixHours) {
           log.info(`[Flash Quiz] Blocked duplicate XP for ${email}`);
           dbUpdate.xp = oldXp;
+          dbUpdate.level = oldLevel;
           xpDiff = 0;
         } else {
           dbUpdate.flash_quiz_completed = true;

@@ -186,11 +186,8 @@ export default function Simulados({
     setScore(correctOnes);
     if (selectedSim) {
       const totalQ = questions.length || selectedSim.totalQuestions || 90;
-      // Se finalizou por completo, ganha o xpReward total do simulado.
-      // Se saiu antes, ganha XP proporcional aos acertos em relação ao total de questões.
-      const xpEarned = isCompleted
-        ? selectedSim.xpReward
-        : Math.round((correctOnes / totalQ) * selectedSim.xpReward);
+      // Ganha XP proporcional aos acertos em relação ao total de questões do simulado.
+      const xpEarned = Math.round((correctOnes / totalQ) * selectedSim.xpReward);
 
       onEarnXp(xpEarned, correctOnes, totalQ, false, `Simulado: ${selectedSim.title}`);
       const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;

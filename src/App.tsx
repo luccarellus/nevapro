@@ -242,10 +242,17 @@ export default function App() {
 
     // Update locally
     setUser(updatedUser);
+    localStorage.setItem('neva_student_session', JSON.stringify(updatedUser));
 
     // Persist to server
     try {
-      await userService.updateProfile(updatedUser);
+      const res = await userService.updateProfile(updatedUser);
+      if (res && res.user) {
+        const { nextLevelXp: syncNext, currentLevelMinXp: syncMin } = calculateLevelAndProgression(res.user.xp || 0);
+        const syncedUser = { ...res.user, nextLevelXp: syncNext, currentLevelMinXp: syncMin };
+        setUser(prev => ({ ...prev, ...syncedUser }));
+        localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+      }
     } catch (error) {
       console.error('Failed to sync XP with server:', error);
     }
