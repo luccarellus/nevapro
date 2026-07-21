@@ -17,6 +17,7 @@ const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
   { vars: ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'], purpose: 'Redis caching (via Upstash)' },
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },
   { vars: ['GEMINI_API_KEY'], purpose: 'Gemini AI API' },
+  { vars: ['RESEND_API_KEY', 'RESEND_FROM_EMAIL'], purpose: 'Resend (envio de e‑mails de redefinição de senha)' },
 ];
 
 /**
