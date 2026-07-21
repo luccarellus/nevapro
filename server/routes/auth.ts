@@ -9,6 +9,7 @@ import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
+import { sendPasswordResetEmail } from '../services/email';
 
 const router = Router();
 
@@ -221,14 +222,38 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
   const cleanEmail = normalizeEmail(email);
 
   try {
-    const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
-    const appUrl = process.env.APP_URL || 'https://neva.pro';
-    const { error } = await getSupabaseAnonClient().auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: `${appUrl}/reset-password`,
-    });
+    // Busca o usuário no banco interno
+    const { rows } = await query(
+      'SELECT id, name FROM public.users WHERE email = $1 LIMIT 1',
+      [cleanEmail],
+    );
 
-    if (error) {
-      log.error('[Forgot Password] Supabase error:', error.message);
+    if (rows.length > 0) {
+      const user = rows[0];
+
+      // Gera token criptográfico de uso único
+      const crypto = await import('crypto');
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+      // Invalida tokens anteriores do mesmo usuário
+      await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [user.id]);
+
+      // Salva o novo token
+      await query(
+        'INSERT INTO public.password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+        [user.id, token, expiresAt.toISOString()],
+      );
+
+      const appUrl = process.env.APP_URL || 'https://neva.pro';
+      const resetLink = `${appUrl}/reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
+
+      // Envia e-mail via Resend
+      await sendPasswordResetEmail(
+        cleanEmail,
+        user.name || cleanEmail.split('@')[0],
+        resetLink,
+      );
     }
 
     // Sempre retorna sucesso para evitar enumeração de e-mails
@@ -243,40 +268,45 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
   }
 });
 
-// ============= RESET PASSWORD (via recovery token) =============
+// ============= RESET PASSWORD (via token próprio + Resend) =============
 router.post(
   '/reset-password',
   rateLimiter(3, 60_000),
   verifyRecaptcha(),
   async (req: AuthenticatedRequest, res: Response) => {
-    const { password, access_token } = req.body;
+    const { password, token, email } = req.body;
 
     if (!password || password.length < 6) {
       res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
       return;
     }
 
-    if (!access_token) {
-      res.status(400).json({ error: 'Token de recuperação ausente. O link pode ter expirado.' });
+    if (!token || !email) {
+      res.status(400).json({ error: 'Link de recuperação inválido. Solicite um novo.' });
       return;
     }
 
     try {
-      const supabase = getSupabaseAdminClient();
+      // Verifica o token no banco (válido e não expirado)
+      const { rows } = await query(
+        `SELECT prt.user_id, u.email
+         FROM public.password_reset_tokens prt
+         JOIN public.users u ON u.id = prt.user_id
+         WHERE prt.token = $1 AND u.email = $2 AND prt.expires_at > NOW()`,
+        [token, normalizeEmail(email)],
+      );
 
-      // Verifica se o access_token é válido e extrai o userId
-      const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
-
-      if (userError || !userData?.user) {
-        log.warn('[Reset Password] Token inválido ou expirado:', userError?.message);
+      if (rows.length === 0) {
+        log.warn('[Reset Password] Token inválido ou expirado');
         res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
         return;
       }
 
-      const userId = userData.user.id;
+      const { user_id } = rows[0];
 
-      // Atualiza a senha via Admin API (não precisa de sessão do cliente)
-      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+      // Atualiza a senha via Supabase Admin API
+      const supabase = getSupabaseAdminClient();
+      const { error: updateError } = await supabase.auth.admin.updateUserById(user_id, {
         password,
       });
 
@@ -286,7 +316,10 @@ router.post(
         return;
       }
 
-      log.info('[Reset Password] Senha redefinida com sucesso para usuário:', userId);
+      // Remove o token usado (consumo único)
+      await query('DELETE FROM public.password_reset_tokens WHERE token = $1', [token]);
+
+      log.info('[Reset Password] Senha redefinida com sucesso');
       res.json({ success: true, message: 'Senha redefinida com sucesso.' });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);

@@ -76,8 +76,9 @@ export default function App() {
   useEffect(() => {
     initConsentMode();
 
-    // Check if user is returning from password reset email
-    if (window.location.hash?.includes('type=recovery')) {
+    // Check if user is returning from password reset email (via query params)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token') && params.get('email')) {
       setIsResettingPassword(true);
     }
     
@@ -252,7 +253,13 @@ export default function App() {
     if (activeTab === 'cookies') return <CookiePolicy onBack={() => handleTabChange(user.role === 'admin' ? 'admin' : 'dashboard')} />;
 
     if (isResettingPassword) {
-      return <ResetPassword onBack={() => { setIsResettingPassword(false); window.location.hash = ''; }} />;
+      return <ResetPassword onBack={() => {
+        setIsResettingPassword(false);
+        // Limpa os query params da URL
+        const url = new URL(window.location.href);
+        url.search = '';
+        window.history.replaceState({}, '', url.toString());
+      }} />;
     }
 
     if (!isLoggedIn) {

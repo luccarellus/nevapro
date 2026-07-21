@@ -43,6 +43,7 @@
     "recharts": "^3.8.1",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
+    "resend": "^6.17.2",
     "vite": "^6.2.3"
   },
   "devDependencies": {

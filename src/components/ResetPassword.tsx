@@ -16,21 +16,18 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
 
-  // Extrai access_token e refresh_token do hash da URL
-  const getTokensFromHash = (): { access_token?: string; refresh_token?: string } => {
-    const hash = window.location.hash.replace(/^#/, '');
-    if (!hash) return {};
-    const params = new URLSearchParams(hash);
+  // Extrai token e email da query string (?token=xxx&email=yyy)
+  const getTokenAndEmail = (): { token?: string; email?: string } => {
+    const params = new URLSearchParams(window.location.search);
     return {
-      access_token: params.get('access_token') || undefined,
-      refresh_token: params.get('refresh_token') || undefined,
+      token: params.get('token') || undefined,
+      email: params.get('email') || undefined,
     };
   };
 
   useEffect(() => {
-    // Check if we have a recovery token in the URL hash
-    const hash = window.location.hash;
-    if (!hash || !hash.includes('type=recovery')) {
+    const { token, email } = getTokenAndEmail();
+    if (!token || !email) {
       setIsValidSession(false);
       return;
     }
@@ -51,9 +48,9 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
       return;
     }
 
-    const { access_token, refresh_token } = getTokensFromHash();
-    if (!access_token) {
-      setError('Token de recuperação ausente. O link pode ter expirado.');
+    const { token, email } = getTokenAndEmail();
+    if (!token || !email) {
+      setError('Link de recuperação inválido. Solicite um novo.');
       return;
     }
 
@@ -71,8 +68,8 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
         },
         body: JSON.stringify({
           password,
-          access_token,
-          refresh_token,
+          token,
+          email,
           recaptcha_token,
         }),
       });
@@ -87,7 +84,6 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
 
       // Redirect to login after 3 seconds
       setTimeout(() => {
-        window.location.hash = '';
         onBack();
       }, 3000);
     } catch (err: any) {
