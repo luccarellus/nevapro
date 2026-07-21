@@ -28,12 +28,12 @@ export async function sendPasswordResetEmail(
   resetLink: string,
 ): Promise<void> {
   const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
-  const senderName = process.env.RESEND_SENDER_NAME || 'Olhar Jovem';
+  const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
 
   const { error } = await getClient().emails.send({
     from: `${senderName} <${from}>`,
     to,
-    subject: 'Redefinição de senha — Neva Pro',
+    subject: 'Redefinição de senha — Neva PRO',
     html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -49,7 +49,7 @@ export async function sendPasswordResetEmail(
           <!-- Logo -->
           <tr>
             <td style="padding-bottom:24px;text-align:center;">
-              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Olhar Jovem</span>
+              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Neva PRO</span>
             </td>
           </tr>
           <!-- Card -->
@@ -63,7 +63,7 @@ export async function sendPasswordResetEmail(
               </p>
               <p style="margin:0 0 24px;font-size:15px;color:#64748b;line-height:1.6;">
                 Recebemos uma solicitação de redefinição de senha para sua conta no
-                <strong>Olhar Jovem</strong>. Clique no botão abaixo para criar uma nova senha:
+                <strong>Neva PRO</strong>. Clique no botão abaixo para criar uma nova senha:
               </p>
               <!-- CTA -->
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
@@ -94,7 +94,7 @@ export async function sendPasswordResetEmail(
           <tr>
             <td style="padding:24px 32px 0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                Olhar Jovem<br />
+                Neva PRO<br />
                 Se tiver dúvidas, entre em contato pelo nosso suporte.
               </p>
             </td>
