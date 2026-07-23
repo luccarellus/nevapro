@@ -33,3 +33,29 @@ CREATE INDEX IF NOT EXISTS idx_user_tri_scores_user ON public.user_tri_scores(us
 
 -- 3. Adicionar campo de Meta TRI do Aluno na tabela de usuários
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tri_target_score INTEGER DEFAULT 750;
+
+-- 4. Habilitar RLS (Row Level Security) para segurança das novas tabelas
+ALTER TABLE public.user_study_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_tri_scores ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS para user_study_tasks
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_role_all_user_study_tasks') THEN
+        CREATE POLICY service_role_all_user_study_tasks ON public.user_study_tasks FOR ALL TO service_role USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'authenticated_read_user_study_tasks') THEN
+        CREATE POLICY authenticated_read_user_study_tasks ON public.user_study_tasks FOR SELECT TO authenticated USING (user_id IN (SELECT id FROM public.users WHERE lower(email) = public.jwt_email()));
+    END IF;
+END $$;
+
+-- Políticas de RLS para user_tri_scores
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'service_role_all_user_tri_scores') THEN
+        CREATE POLICY service_role_all_user_tri_scores ON public.user_tri_scores FOR ALL TO service_role USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'authenticated_read_user_tri_scores') THEN
+        CREATE POLICY authenticated_read_user_tri_scores ON public.user_tri_scores FOR SELECT TO authenticated USING (user_id IN (SELECT id FROM public.users WHERE lower(email) = public.jwt_email()));
+    END IF;
+END $$;
