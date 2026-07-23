@@ -42,6 +42,25 @@ export interface SubjectMasteryResponse {
   evolution: MasteryEvolution[];
 }
 
+export interface TriCalculationResponse {
+  calculated: boolean;
+  reason?: string;
+  overall: {
+    id: string;
+    estimated_score: number;
+    theta: number;
+    responses_used: number;
+    calculated_at: string;
+  } | null;
+  by_subject: {
+    math_score: number | null;
+    nature_score: number | null;
+    humanities_score: number | null;
+    languages_score: number | null;
+  } | null;
+  responses_total: number;
+}
+
 export const performanceService = {
   /**
    * Get TRI score history and stats for the current user.
@@ -55,5 +74,15 @@ export const performanceService = {
    */
   async getSubjectMastery(): Promise<SubjectMasteryResponse> {
     return request<SubjectMasteryResponse>('/api/performance/subject-mastery');
+  },
+
+  /**
+   * Calculate and persist TRI score using IRT (3PL model).
+   */
+  async calculateTri(): Promise<TriCalculationResponse> {
+    return request<TriCalculationResponse>('/api/performance/calculate-tri', {
+      method: 'POST',
+      body: {},
+    });
   },
 };

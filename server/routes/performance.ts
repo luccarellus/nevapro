@@ -1,10 +1,12 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { rateLimiter } from '../middleware/rateLimiter';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { normalizeEmail } from '../utils/sanitize';
 import { query } from '../../src/lib/db';
+import { calculateFullTri } from '../utils/triCalculator';
 
 const router = Router();
 
@@ -177,20 +179,127 @@ router.get('/subject-mastery', requireAuth, async (req: AuthenticatedRequest, re
       day: row.day,
     }));
 
-    // If we have fewer than 2 points, add some synthetic starting points
-    if (evolution.length < 2) {
-      const hitRate = evolution.length === 1 ? evolution[0].precision : 50;
-      evolution.unshift({
-        label: 'Início',
-        precision: Math.max(30, hitRate - 15),
-        day: null,
-      });
-    }
+    // No synthetic data — chart will show empty or single point as-is
 
     res.json({ subjects, evolution });
   } catch (err) {
     log.error('[Performance] Error fetching subject mastery:', err);
     res.status(500).json({ error: 'Erro ao buscar domínio por assunto.' });
+  }
+});
+
+// ============= CALCULATE TRI SCORE =============
+router.post('/calculate-tri', rateLimiter(5, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
+
+  if (req.user?.role !== 'admin' && req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado.' });
+      return;
+    }
+
+    // Fetch user's latest answer per question (to get current state, not history)
+    const answersQuery = `
+      WITH latest_answers AS (
+        SELECT DISTINCT ON (a.question_id) a.question_id, a.is_correct, a.created_at
+        FROM public.answers a
+        WHERE a.user_id = $1
+        ORDER BY a.question_id, a.created_at DESC
+      )
+      SELECT
+        la.is_correct,
+        la.created_at,
+        q.difficulty,
+        q.subject
+      FROM latest_answers la
+      JOIN public.questions q ON la.question_id = q.id
+      ORDER BY la.created_at DESC
+    `;
+
+    const answersRes = await query(answersQuery, [user.id]);
+
+    if (answersRes.rows.length < 3) {
+      res.json({
+        calculated: false,
+        reason: 'Poucas questões respondidas. Responda pelo menos 3 para gerar uma estimativa TRI.',
+        overall: null,
+        by_subject: null,
+        responses_total: answersRes.rows.length,
+      });
+      return;
+    }
+
+    // Map to the format expected by triCalculator
+    const items = answersRes.rows.map((row: any) => ({
+      isCorrect: Boolean(row.is_correct),
+      difficulty: row.difficulty || 'médio',
+      subject: row.subject || 'Geral',
+    }));
+
+    // Calculate TRI using IRT 3PL
+    const result = calculateFullTri(items);
+
+    // Map per-subject scores to ENEM area names
+    const subjectNameMap: Record<string, string> = {
+      mathematics: 'math_score',
+      nature: 'nature_score',
+      humanities: 'humanities_score',
+      languages: 'languages_score',
+    };
+
+    const dbInsert: Record<string, any> = {
+      user_id: user.id,
+      estimated_score: result.overall.estimated_score,
+      calculated_at: new Date().toISOString(),
+    };
+
+    for (const [key, dbCol] of Object.entries(subjectNameMap)) {
+      if (result.by_subject[key]) {
+        dbInsert[dbCol] = result.by_subject[key].estimated_score;
+      }
+    }
+
+    // Persist to user_tri_scores
+    const { data: inserted, error: insertError } = await supabase
+      .from('user_tri_scores')
+      .insert([dbInsert])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    res.json({
+      calculated: true,
+      overall: {
+        id: inserted.id,
+        estimated_score: inserted.estimated_score,
+        theta: result.overall.theta,
+        responses_used: result.overall.responses_used,
+        calculated_at: inserted.calculated_at,
+      },
+      by_subject: {
+        math_score: inserted.math_score,
+        nature_score: inserted.nature_score,
+        humanities_score: inserted.humanities_score,
+        languages_score: inserted.languages_score,
+      },
+      responses_total: result.overall.responses_used,
+    });
+  } catch (err) {
+    log.error('[Performance] Error calculating TRI:', err);
+    res.status(500).json({ error: 'Erro ao calcular nota TRI.' });
   }
 });
 

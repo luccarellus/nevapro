@@ -102,15 +102,13 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
   };
 
-  const weeklyDays = [
-    { day: 'Segunda', subject: 'Matemática & Física', topics: 'Funções & Cinemática', status: 'completed' },
-    { day: 'Terça', subject: 'Química & Biologia', topics: 'Estequiometria & Ecologia', status: 'completed' },
-    { day: 'Quarta', subject: 'História & Geografia', topics: 'Brasil Colônia & Geopolítica', status: 'active' },
-    { day: 'Quinta', subject: 'Linguagens & Filosofia', topics: 'Interpretação & Ética', status: 'pending' },
-    { day: 'Sexta', subject: 'Matemática & Redação', topics: 'Geometria Espacial & Tese', status: 'pending' },
-    { day: 'Sábado', subject: 'Simulado ENEM Dia 1', topics: 'Humanas e Linguagens', status: 'pending' },
-    { day: 'Domingo', subject: 'Revisão de Erros', topics: 'Análise de Desempenho', status: 'pending' }
-  ];
+  // Weekly schedule derived from current day — no fabricated data
+  const weekDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const todayIndex = new Date().getDay();
+  const weeklyDays = weekDayNames.map((day, i) => ({
+    day,
+    status: i < todayIndex ? 'past' as const : i === todayIndex ? 'today' as const : 'upcoming' as const,
+  }));
 
   const questionsAnswered = user.answeredQuestions || 0;
 
@@ -303,39 +301,37 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 <div 
                   key={i}
                   className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    item.status === 'completed'
+                    item.status === 'past'
                       ? 'bg-brand-primary/5 border-brand-primary/20'
-                      : item.status === 'active'
+                      : item.status === 'today'
                       ? 'bg-cyan-500/10 border-cyan-500/40 ring-1 ring-cyan-500/30'
                       : 'bg-bg-main/30 border-border-color/30 opacity-75'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                      item.status === 'completed'
+                      item.status === 'past'
                         ? 'bg-brand-primary/20 text-brand-primary'
-                        : item.status === 'active'
+                        : item.status === 'today'
                         ? 'bg-cyan-500 text-black font-black'
                         : 'bg-text-main/5 text-text-secondary'
                     }`}>
-                      {item.status === 'completed' ? <CheckCircle2 size={16} /> : i + 1}
+                      {item.status === 'past' ? <CheckCircle2 size={16} /> : i + 1}
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-text-main flex items-center gap-2">
                         {item.day}
-                        {item.status === 'active' && (
+                        {item.status === 'today' && (
                           <span className="text-[9px] uppercase font-black bg-cyan-400 text-black px-2 py-0.5 rounded-full">
                             Hoje
                           </span>
                         )}
                       </h4>
-                      <p className="text-xs font-medium text-text-secondary opacity-70">{item.subject}</p>
+                      <p className="text-xs font-medium text-text-secondary opacity-70">
+                        {item.status === 'past' ? 'Dia concluído' : item.status === 'today' ? 'Estudos de hoje' : 'Aguardando'}
+                      </p>
                     </div>
                   </div>
-
-                  <span className="text-xs font-semibold text-text-secondary opacity-60 bg-text-main/5 px-3 py-1 rounded-xl self-start sm:self-auto">
-                    {item.topics}
-                  </span>
                 </div>
               ))}
             </div>

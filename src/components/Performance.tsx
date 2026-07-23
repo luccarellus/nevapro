@@ -20,6 +20,8 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   const [subjectsMastery, setSubjectsMastery] = useState<SubjectMastery[]>([]);
   const [evolution, setEvolution] = useState<MasteryEvolution[]>([]);
   const [loading, setLoading] = useState(true);
+  const [calculatingTri, setCalculatingTri] = useState(false);
+  const [triCalculationMessage, setTriCalculationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,6 +40,30 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
         setStats(triData.stats);
         setSubjectsMastery(masteryData.subjects);
         setEvolution(masteryData.evolution);
+
+        // Auto-trigger TRI calculation based on latest answers
+        setCalculatingTri(true);
+        try {
+          const triResult = await performanceService.calculateTri();
+          if (triResult.calculated && triResult.overall) {
+            setLatestTriScore({
+              id: triResult.overall.id,
+              estimated_score: triResult.overall.estimated_score,
+              math_score: triResult.by_subject?.math_score || null,
+              nature_score: triResult.by_subject?.nature_score || null,
+              humanities_score: triResult.by_subject?.humanities_score || null,
+              languages_score: triResult.by_subject?.languages_score || null,
+              calculated_at: triResult.overall.calculated_at,
+            });
+          } else if (triResult.reason) {
+            setTriCalculationMessage(triResult.reason);
+          }
+        } catch (calcErr) {
+          console.error('[Performance] Erro no cálculo TRI:', calcErr);
+          // Non-critical — keep showing existing tri data
+        } finally {
+          setCalculatingTri(false);
+        }
       } catch (err) {
         console.error('[Performance] Erro ao carregar dados:', err);
         setError('Não foi possível carregar seus dados de desempenho.');
@@ -52,13 +78,10 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   const triGoal = triTarget || 750;
   const triProgress = triGoal > 0 ? Math.min(100, Math.round((estimatedTri / triGoal) * 100)) : 0;
 
-  // Build evolution chart data
+  // Build evolution chart data — always from real data only
   const evolutionData = evolution.length > 0
     ? evolution
-    : [
-        { label: 'Início', precision: 50, day: null },
-        { label: 'Hoje', precision: stats.hit_rate || 50, day: null },
-      ];
+    : [];
 
   // Group subjects by category for the heatmap
   const groupedSubjects = subjectsMastery.reduce<Record<string, SubjectMastery[]>>((acc, subject) => {
@@ -159,13 +182,25 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
 
                   <div className="mb-8">
                     <p className="text-6xl md:text-7xl font-black text-text-main tracking-tighter leading-none mb-2">
-                      {estimatedTri > 0 ? estimatedTri : '---'}
+                      {calculatingTri ? (
+                        <span className="inline-flex items-center gap-3">
+                          <span className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
+                          <span className="text-sm font-bold text-text-secondary">Calculando...</span>
+                        </span>
+                      ) : estimatedTri > 0 ? estimatedTri : '---'}
                     </p>
-                    <p className="text-xs font-semibold text-text-secondary opacity-70">
-                      {estimatedTri > 0
-                        ? 'Calculada com base na coerência pedagógica dos seus simulados e questões.'
-                        : 'Responda questões para gerar sua estimativa TRI.'}
-                    </p>
+                    {triCalculationMessage && estimatedTri === 0 && (
+                      <p className="text-xs font-medium text-amber-400 mt-2">
+                        {triCalculationMessage}
+                      </p>
+                    )}
+                    {!triCalculationMessage && (
+                      <p className="text-xs font-semibold text-text-secondary opacity-70">
+                        {estimatedTri > 0
+                          ? 'Calculada com base na coerência pedagógica dos seus simulados e questões (modelo TRI 3PL).'
+                          : 'Responda questões para gerar sua estimativa TRI.'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -204,45 +239,53 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     </div>
                   </div>
 
-                  {/* Chart */}
-                  <div className="h-52 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={evolutionData}>
-                        <defs>
-                          <linearGradient id="colorPrec" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
-                        <XAxis 
-                          dataKey="label" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 'bold'}}
-                        />
-                        <YAxis hide domain={[30, 100]} />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'var(--bg-sidebar)', 
-                            border: '1px solid var(--border-color)', 
-                            borderRadius: '16px',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                            color: 'var(--text-main)'
-                          }}
-                          itemStyle={{ color: '#34d399', fontWeight: '900', fontSize: '14px' }}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="precision" 
-                          stroke="#34d399" 
-                          strokeWidth={3} 
-                          fillOpacity={1} 
-                          fill="url(#colorPrec)" 
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {/* Chart — only render when there are data points */}
+                  {evolutionData.length > 0 ? (
+                    <div className="h-52 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={evolutionData}>
+                          <defs>
+                            <linearGradient id="colorPrec" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
+                          <XAxis 
+                            dataKey="label" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 'bold'}}
+                          />
+                          <YAxis hide domain={[30, 100]} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'var(--bg-sidebar)', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '16px',
+                              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                              color: 'var(--text-main)'
+                            }}
+                            itemStyle={{ color: '#34d399', fontWeight: '900', fontSize: '14px' }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="precision" 
+                            stroke="#34d399" 
+                            strokeWidth={3} 
+                            fillOpacity={1} 
+                            fill="url(#colorPrec)" 
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-52 w-full flex items-center justify-center bg-bg-main/20 rounded-2xl border border-dashed border-border-color/50">
+                      <p className="text-xs font-medium text-text-secondary opacity-50">
+                        {stats.answered > 0 ? 'Acumulando dados para o gráfico de evolução...' : 'Responda questões para gerar o gráfico de evolução.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border-color/30">
