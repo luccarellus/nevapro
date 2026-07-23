@@ -28,6 +28,8 @@ const Materiais = lazy(() => import('./components/Materiais'));
 const Mural = lazy(() => import('./components/Mural'));
 const Settings = lazy(() => import('./components/Settings'));
 const ErrorsBook = lazy(() => import('./components/ErrorsBook'));
+const StudyPlan = lazy(() => import('./components/StudyPlan'));
+const Performance = lazy(() => import('./components/Performance'));
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
 const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
 const ComingSoon = lazy(() => import('./components/ComingSoon'));
@@ -295,6 +297,10 @@ export default function App() {
         );
       case 'errors':
         return <ErrorsBook user={user} onEarnXp={handleEarnXp} />;
+      case 'plano_estudos':
+        return <StudyPlan user={user} onTabChange={handleTabChange} onEarnXp={handleEarnXp} />;
+      case 'desempenho':
+        return <Performance user={user} onTabChange={handleTabChange} />;
       case 'ranking':
         return <Leaderboard user={user} />;
       case 'materiais':

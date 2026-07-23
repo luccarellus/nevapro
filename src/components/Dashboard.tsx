@@ -180,15 +180,27 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
               </div>
             </div>
           </motion.div>
-          <motion.button 
-            variants={itemVariants}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowDetails(true)}
-            className="apple-button-secondary py-3 px-8 text-xs font-bold w-full sm:w-auto"
-          >
-            Métricas de evolução <TrendingUp size={14} />
-          </motion.button>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <motion.button 
+              variants={itemVariants}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onTabChange?.('plano_estudos')}
+              className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 py-3 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
+            >
+              Plano de Estudos ⭐
+            </motion.button>
+
+            <motion.button 
+              variants={itemVariants}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onTabChange?.('desempenho')}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-3 px-6 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
+            >
+              Ver Desempenho <TrendingUp size={14} />
+            </motion.button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-12">
