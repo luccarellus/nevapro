@@ -34,6 +34,8 @@ import questionRoutes from './routes/questions';
 import healthRoutes from './routes/health';
 import answerRoutes from './routes/answers';
 import bootstrapRoutes from './routes/bootstrap';
+import studyPlanRoutes from './routes/studyPlan';
+import performanceRoutes from './routes/performance';
 
 // Validate critical environment variables before starting
 validateEnv();
@@ -122,6 +124,8 @@ app.use('/api/questoes', questionRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/answers', answerRoutes);
 app.use('/api/bootstrap', bootstrapRoutes);
+app.use('/api/study-plans', studyPlanRoutes);
+app.use('/api/performance', performanceRoutes);
 
 // ===== Image Proxy =====
 app.get('/api/imagem', async (req, res) => {

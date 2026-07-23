@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { UserProfile } from '../types';
 import { 
@@ -6,6 +6,7 @@ import {
   Calendar, Award, BookOpen, RotateCcw, Flame, Check, ChevronRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { studyPlanService, StudyTask } from '../services/studyPlanService';
 
 interface StudyPlanProps {
   user: UserProfile;
@@ -14,39 +15,79 @@ interface StudyPlanProps {
 }
 
 export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProps) {
-  const [dailyTasks, setDailyTasks] = useState([
-    { id: 'math', title: 'Matemática - 15 questões de Geometria e PA', time: '45 min', done: false, targetTab: 'questions' },
-    { id: 'errors', title: 'Revisar 8 erros pendentes no Caderno', time: '20 min', done: false, targetTab: 'errors' },
-    { id: 'essay', title: 'Praticar Redação: Eixo Temático Meio Ambiente', time: '30 min', done: false, targetTab: 'redacao' }
-  ]);
+  const [tasks, setTasks] = useState<StudyTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [syncingTaskId, setSyncingTaskId] = useState<string | null>(null);
 
-  const [weeklyGoal] = useState({
-    questions: { current: 182, target: 250 },
-    essays: { current: 2, target: 2 },
-    simulations: { current: 1, target: 1 }
-  });
-
-  const toggleTask = (id: string) => {
-    setDailyTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        const nextState = !t.done;
-        if (nextState && onEarnXp) {
-          onEarnXp(25, 1, 1, false, `Missão diária: ${t.title.split('-')[0]}`);
-          confetti({
-            particleCount: 40,
-            spread: 50,
-            origin: { y: 0.7 },
-            colors: ['#00b094', '#22d3ee', '#ffffff']
-          });
-        }
-        return { ...t, done: nextState };
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!user.email) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await studyPlanService.getTasks();
+        setTasks(data.tasks || []);
+      } catch (err) {
+        console.error('[StudyPlan] Erro ao carregar tarefas:', err);
+        setError('Não foi possível carregar seu plano de estudos.');
+      } finally {
+        setLoading(false);
       }
-      return t;
-    }));
+    };
+    fetchTasks();
+  }, [user.email]);
+
+  const toggleTask = async (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const nextDone = !task.done;
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: nextDone } : t));
+    setSyncingTaskId(id);
+
+    try {
+      const { xpEarned } = await studyPlanService.toggleTask(id, nextDone);
+
+      if (nextDone && xpEarned > 0 && onEarnXp) {
+        onEarnXp(xpEarned, 1, 1, false, `Missão diária: ${task.title.split('-')[0]}`);
+        confetti({
+          particleCount: 40,
+          spread: 50,
+          origin: { y: 0.7 },
+          colors: ['#00b094', '#22d3ee', '#ffffff'],
+        });
+      }
+    } catch (err) {
+      console.error('[StudyPlan] Erro ao atualizar tarefa:', err);
+      // Rollback optimistic update
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !nextDone } : t));
+    } finally {
+      setSyncingTaskId(null);
+    }
   };
 
-  const completedCount = dailyTasks.filter(t => t.done).length;
-  const progressPercent = Math.round((completedCount / dailyTasks.length) * 100);
+  const completedCount = tasks.filter(t => t.done).length;
+  const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
+  // Calculate total estimated time from tasks
+  const totalTimeFormatted = useMemo(() => {
+    if (tasks.length === 0) return '0 min';
+    const totalMinutes = tasks.reduce((sum, task) => {
+      const timeStr = task.estimated_time || '30 min';
+      const match = timeStr.match(/(\d+)/);
+      return sum + (match ? parseInt(match[1], 10) : 30);
+    }, 0);
+
+    if (totalMinutes >= 60) {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return `${h}h ${m} min`;
+    }
+    return `${totalMinutes} min`;
+  }, [tasks]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -70,6 +111,8 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
     { day: 'Sábado', subject: 'Simulado ENEM Dia 1', topics: 'Humanas e Linguagens', status: 'pending' },
     { day: 'Domingo', subject: 'Revisão de Erros', topics: 'Análise de Desempenho', status: 'pending' }
   ];
+
+  const questionsAnswered = user.answeredQuestions || 0;
 
   return (
     <div className="max-w-6xl mx-auto pt-24 pb-32 px-4 md:px-8">
@@ -98,7 +141,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             </div>
             <div>
               <p className="text-[10px] font-bold text-text-secondary opacity-60 uppercase">Tempo Estimado Hoje</p>
-              <p className="text-xl font-black text-text-main">1h 35 min</p>
+              <p className="text-xl font-black text-text-main">{totalTimeFormatted}</p>
             </div>
           </motion.div>
         </header>
@@ -112,7 +155,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
                 <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full text-cyan-400 text-[11px] font-black w-fit mb-3">
-                  <Sparkles size={12} /> Missão de Hoje • {completedCount}/{dailyTasks.length} Concluídas
+                  <Sparkles size={12} /> Missão de Hoje • {completedCount}/{tasks.length} Concluídas
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight">🎯 Continue seus estudos</h2>
               </div>
@@ -134,73 +177,108 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
               </div>
             </div>
 
-            {/* Daily Task Checklist */}
-            <div className="space-y-4 mb-8">
-              {dailyTasks.map((task) => (
-                <motion.div 
-                  key={task.id}
-                  whileHover={{ scale: 1.01 }}
-                  className={`p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between gap-4 cursor-pointer ${
-                    task.done 
-                      ? 'bg-cyan-500/10 border-cyan-500/30 text-text-secondary' 
-                      : 'bg-bg-main/40 border-border-color/60 hover:border-cyan-500/50 text-text-main'
-                  }`}
-                  onClick={() => toggleTask(task.id)}
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <button 
-                      className={`w-6 h-6 rounded-xl flex items-center justify-center transition-all ${
-                        task.done 
-                          ? 'bg-cyan-400 text-black shadow-[0_0_10px_rgba(34,211,238,0.5)]' 
-                          : 'border-2 border-text-secondary/40 hover:border-cyan-400'
-                      }`}
-                    >
-                      {task.done && <Check size={14} strokeWidth={3} />}
-                    </button>
-                    <span className={`text-sm md:text-base font-bold truncate ${task.done ? 'line-through opacity-60' : ''}`}>
-                      {task.title}
-                    </span>
-                  </div>
+            {/* Loading State */}
+            {loading && (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400" />
+              </div>
+            )}
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs font-semibold opacity-60 text-text-secondary bg-text-main/5 px-3 py-1 rounded-xl">
-                      {task.time}
-                    </span>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onTabChange?.(task.targetTab);
-                      }}
-                      className="p-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition-colors"
-                      title="Ir para atividade"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            {/* Error State */}
+            {error && !loading && (
+              <div className="text-center py-12 bg-rose-500/5 border border-rose-500/20 rounded-3xl">
+                <p className="text-rose-400 font-bold text-sm">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!loading && !error && tasks.length === 0 && (
+              <div className="text-center py-12 bg-bg-main/30 border border-dashed border-border-color rounded-3xl">
+                <p className="text-text-secondary font-bold text-sm">Nenhuma tarefa para hoje 🎉</p>
+                <p className="text-text-secondary text-xs mt-2 opacity-60">Aproveite para revisar matérias pendentes.</p>
+              </div>
+            )}
+
+            {/* Daily Task Checklist */}
+            {!loading && !error && tasks.length > 0 && (
+              <div className="space-y-4 mb-8">
+                {tasks.map((task) => (
+                  <motion.div 
+                    key={task.id}
+                    whileHover={{ scale: 1.01 }}
+                    className={`p-4 md:p-5 rounded-2xl border transition-all flex items-center justify-between gap-4 cursor-pointer ${
+                      task.done 
+                        ? 'bg-cyan-500/10 border-cyan-500/30 text-text-secondary' 
+                        : 'bg-bg-main/40 border-border-color/60 hover:border-cyan-500/50 text-text-main'
+                    }`}
+                    onClick={() => toggleTask(task.id)}
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <button 
+                        className={`w-6 h-6 rounded-xl flex items-center justify-center transition-all ${
+                          task.done 
+                            ? 'bg-cyan-400 text-black shadow-[0_0_10px_rgba(34,211,238,0.5)]' 
+                            : 'border-2 border-text-secondary/40 hover:border-cyan-400'
+                        }`}
+                      >
+                        {task.done && <Check size={14} strokeWidth={3} />}
+                      </button>
+                      <span className={`text-sm md:text-base font-bold truncate ${task.done ? 'line-through opacity-60' : ''}`}>
+                        {task.title}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {syncingTaskId === task.id && (
+                        <div className="animate-spin w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full" />
+                      )}
+                      <span className="text-xs font-semibold opacity-60 text-text-secondary bg-text-main/5 px-3 py-1 rounded-xl">
+                        {task.estimated_time || '30 min'}
+                      </span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTabChange?.(task.target_tab);
+                        }}
+                        className="p-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition-colors"
+                        title="Ir para atividade"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
 
             {/* Primary Action CTA */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border-color/40">
-              <p className="text-xs font-medium text-text-secondary opacity-70">
-                Concluir tarefas gera <span className="text-brand-primary font-bold">+25 XP cada</span>
-              </p>
+            {!loading && tasks.length > 0 && (
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border-color/40">
+                <p className="text-xs font-medium text-text-secondary opacity-70">
+                  Concluir tarefas gera <span className="text-brand-primary font-bold">+25 XP cada</span>
+                </p>
 
-              <button 
-                onClick={() => {
-                  const firstPending = dailyTasks.find(t => !t.done);
-                  if (firstPending) {
-                    onTabChange?.(firstPending.targetTab);
-                  } else {
-                    onTabChange?.('questions');
-                  }
-                }}
-                className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-brand-primary hover:from-cyan-400 hover:to-brand-primary text-black font-black text-sm px-8 py-4 rounded-2xl transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-3"
-              >
-                Continuar missão do dia <ArrowRight size={18} />
-              </button>
-            </div>
+                <button 
+                  onClick={() => {
+                    const firstPending = tasks.find(t => !t.done);
+                    if (firstPending) {
+                      onTabChange?.(firstPending.target_tab);
+                    } else {
+                      onTabChange?.('questions');
+                    }
+                  }}
+                  className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-brand-primary hover:from-cyan-400 hover:to-brand-primary text-black font-black text-sm px-8 py-4 rounded-2xl transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-3"
+                >
+                  Continuar missão do dia <ArrowRight size={18} />
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -282,16 +360,16 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
 
               <div className="space-y-3 mb-6 text-xs font-bold text-text-secondary">
                 <div className="flex justify-between items-center p-3 rounded-xl bg-bg-main/40 border border-border-color/30">
-                  <span className="flex items-center gap-2"><BookOpen size={14} className="text-cyan-400" /> 250 Questões</span>
-                  <span className="text-text-main">{weeklyGoal.questions.current}/{weeklyGoal.questions.target}</span>
+                  <span className="flex items-center gap-2"><BookOpen size={14} className="text-cyan-400" /> Questões</span>
+                  <span className="text-text-main">{questionsAnswered}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl bg-bg-main/40 border border-border-color/30">
-                  <span className="flex items-center gap-2"><RotateCcw size={14} className="text-rose-400" /> 2 Redações</span>
-                  <span className="text-text-main">{weeklyGoal.essays.current}/{weeklyGoal.essays.target}</span>
+                  <span className="flex items-center gap-2"><RotateCcw size={14} className="text-rose-400" /> Redações</span>
+                  <span className="text-text-main">0</span>
                 </div>
                 <div className="flex justify-between items-center p-3 rounded-xl bg-bg-main/40 border border-border-color/30">
-                  <span className="flex items-center gap-2"><Flame size={14} className="text-amber-400" /> 1 Simulado</span>
-                  <span className="text-text-main">{weeklyGoal.simulations.current}/{weeklyGoal.simulations.target}</span>
+                  <span className="flex items-center gap-2"><Flame size={14} className="text-amber-400" /> Dias de Streak</span>
+                  <span className="text-text-main">{user.streak || 0}</span>
                 </div>
               </div>
 
@@ -301,7 +379,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                   <p className="text-sm font-black text-text-main">+500 XP • Medalha Ouro</p>
                 </div>
                 <span className="text-xs font-black bg-amber-400 text-black px-3 py-1.5 rounded-xl">
-                  73%
+                  {Math.min(100, Math.round((questionsAnswered / 250) * 100))}%
                 </span>
               </div>
             </motion.div>
@@ -316,13 +394,13 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 <h4 className="text-sm font-black uppercase tracking-wider">Ajuste Inteligente da IA</h4>
               </div>
               <p className="text-xs font-medium text-text-secondary leading-relaxed mb-4">
-                "Percebi que seu tempo de resposta em Geometria Espacial caiu 20%. Ajustei seu plano para priorizar 15 exercícios com gabarito comentado nesta sexta-feira."
+                Percebi que você tem {questionsAnswered > 0 ? `${questionsAnswered} questões respondidas` : 'iniciado sua jornada'}. Continue assim! Mantenha uma rotina consistente de estudos para alcançar seus objetivos no ENEM.
               </p>
               <button 
                 onClick={() => onTabChange?.('questions')}
                 className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-bold text-xs py-3 rounded-xl border border-indigo-500/30 transition-colors flex items-center justify-center gap-2"
               >
-                Praticar sugestão <ArrowRight size={14} />
+                Praticar agora <ArrowRight size={14} />
               </button>
             </motion.div>
           </div>
