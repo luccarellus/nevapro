@@ -22,7 +22,7 @@ router.get('/', async (req, res: Response) => {
       res.json(cached);
       return;
     }
-    const apiUrl = `${BASE_URL}/questions/${year}?limit=${limit || 50}&offset=${offset || 0}`;
+    const apiUrl = `${BASE_URL}/exams/${year}/questions?limit=${limit || 50}&offset=${offset || 0}`;
     const response = await fetch(apiUrl, {
       headers: { 'Content-Type': 'application/json' },
     });

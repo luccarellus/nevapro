@@ -444,7 +444,7 @@ export const startServer = () => {
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     log.info(`[Server] Running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    log.info(`[Server] Frontend: ${ALLOWED_ORIGIN}`);
+    log.info(`[Server] Frontend: ${process.env.FRONTEND_URL || 'https://neva.pro'}`);
   });
 
   // Graceful shutdown
