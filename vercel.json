@@ -2,6 +2,12 @@
   "version": 2,
   "buildCommand": "npm run build:api && vite build",
   "outputDirectory": "dist",
+  "crons": [
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

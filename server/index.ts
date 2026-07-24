@@ -36,6 +36,7 @@ import answerRoutes from './routes/answers';
 import bootstrapRoutes from './routes/bootstrap';
 import studyPlanRoutes from './routes/studyPlan';
 import performanceRoutes from './routes/performance';
+import cronRoutes from './routes/cron';
 
 // Validate critical environment variables before starting
 validateEnv();
@@ -126,6 +127,7 @@ app.use('/api/answers', answerRoutes);
 app.use('/api/bootstrap', bootstrapRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/performance', performanceRoutes);
+app.use('/api/cron', cronRoutes);
 
 // ===== Image Proxy =====
 app.get('/api/imagem', async (req, res) => {
