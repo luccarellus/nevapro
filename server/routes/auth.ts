@@ -142,27 +142,18 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
     }
 
     const supabaseAdmin = getSupabaseAdminClient();
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: cleanEmail,
-      password,
-      email_confirm: true,
-      user_metadata: { name: safeName || cleanEmail.split('@')[0], role: 'student' },
-    });
-    if (authError || !authData.user) {
-      if (authError?.message?.toLowerCase().includes('already')) {
-        res.status(400).json({ error: 'E-mail já cadastrado.' });
-        return;
-      }
-      throw authError || new Error('Falha ao criar usuário no Supabase Auth.');
-    }
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newStudentId = crypto.randomUUID();
 
     const { data, error } = await supabaseAdmin
       .from('users')
       .insert([
         {
-          id: authData.user.id,
+          id: newStudentId,
           email: cleanEmail,
           name: safeName || cleanEmail.split('@')[0],
+          password_hash: passwordHash,
           role: 'student',
           city: safeCity,
           school: safeSchool,
@@ -175,10 +166,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
       .select()
       .single();
 
-    if (error) {
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => undefined);
-      throw error;
-    }
+    if (error) throw error;
 
     const userObj = {
       ...data,
@@ -224,24 +212,55 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
   try {
     const appUrl = process.env.APP_URL || 'https://neva.pro';
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase.auth.admin.generateLink({
-      type: 'recovery',
-      email: cleanEmail,
-      options: { redirectTo: `${appUrl}/reset-password` },
-    });
 
-    if (error) {
-      // Mantém a resposta genérica para não revelar se a conta existe.
-      log.warn('[Forgot Password] Supabase não gerou o link de recuperação:', error.message);
-    } else if (data?.properties?.action_link) {
-      const userName = data.user?.user_metadata?.name
-        || data.user?.user_metadata?.full_name
-        || cleanEmail.split('@')[0];
+    // Check if Admin
+    const { data: adminRow } = await supabase
+      .from('admin_users')
+      .select('name')
+      .eq('email', cleanEmail)
+      .maybeSingle();
 
-      await sendPasswordResetEmail(cleanEmail, userName, data.properties.action_link);
+    if (adminRow) {
+      const { data, error } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: cleanEmail,
+        options: { redirectTo: `${appUrl}/reset-password` },
+      });
+
+      if (data?.properties?.action_link) {
+        await sendPasswordResetEmail(cleanEmail, adminRow.name || cleanEmail.split('@')[0], data.properties.action_link);
+      }
+      res.json({
+        success: true,
+        message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
+      });
+      return;
     }
 
-    // Sempre retorna sucesso para evitar enumeração de e-mails
+    // Check Student
+    const { data: studentRow } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (studentRow) {
+      const resetToken = crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+      await supabase.from('password_reset_tokens').delete().eq('user_id', studentRow.id);
+      await supabase.from('password_reset_tokens').insert([{
+        user_id: studentRow.id,
+        token: resetToken,
+        expires_at: expiresAt,
+        created_at: new Date().toISOString(),
+      }]);
+
+      const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
+      await sendPasswordResetEmail(cleanEmail, studentRow.name || cleanEmail.split('@')[0], resetLink);
+    }
+
+    // Generic response
     res.json({
       success: true,
       message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
@@ -253,46 +272,73 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
   }
 });
 
-// ============= RESET PASSWORD (via token de recuperação do Supabase) =============
+// ============= RESET PASSWORD =============
 router.post(
   '/reset-password',
   rateLimiter(3, 60_000),
   verifyRecaptcha(),
   async (req: AuthenticatedRequest, res: Response) => {
-    const { password, access_token } = req.body;
+    const { password, access_token, token, email } = req.body;
 
     if (!password || password.length < 6) {
       res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
       return;
     }
 
-    if (!access_token) {
-      res.status(400).json({ error: 'Token de recuperação ausente. O link pode ter expirado.' });
-      return;
-    }
-
     try {
       const supabase = getSupabaseAdminClient();
-      const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
 
-      if (userError || !userData?.user) {
-        log.warn('[Reset Password] Token inválido ou expirado:', userError?.message);
-        res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
+      // Admin via Supabase Auth access_token
+      if (access_token) {
+        const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
+        if (userError || !userData?.user) {
+          res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
+          return;
+        }
+
+        const { error: updateError } = await supabase.auth.admin.updateUserById(userData.user.id, {
+          password,
+        });
+
+        if (updateError) {
+          res.status(400).json({ error: updateError.message || 'Erro ao redefinir senha.' });
+          return;
+        }
+
+        res.json({ success: true, message: 'Senha redefinida com sucesso.' });
         return;
       }
 
-      const { error: updateError } = await supabase.auth.admin.updateUserById(userData.user.id, {
-        password,
-      });
+      // Student via DB token
+      if (token) {
+        const { data: tokenRow } = await supabase
+          .from('password_reset_tokens')
+          .select('user_id, expires_at')
+          .eq('token', token)
+          .maybeSingle();
 
-      if (updateError) {
-        log.error('[Reset Password] Erro ao atualizar senha:', updateError.message);
-        res.status(400).json({ error: updateError.message || 'Erro ao redefinir senha.' });
+        if (!tokenRow || new Date(tokenRow.expires_at).getTime() < Date.now()) {
+          res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
+          return;
+        }
+
+        const bcrypt = await import('bcryptjs');
+        const newHash = await bcrypt.hash(password, 10);
+
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({ password_hash: newHash, updated_at: new Date().toISOString() })
+          .eq('id', tokenRow.user_id);
+
+        if (updateErr) throw updateErr;
+
+        await supabase.from('password_reset_tokens').delete().eq('user_id', tokenRow.user_id);
+
+        res.json({ success: true, message: 'Senha redefinida com sucesso.' });
         return;
       }
 
-      log.info('[Reset Password] Senha redefinida com sucesso');
-      res.json({ success: true, message: 'Senha redefinida com sucesso.' });
+      res.status(400).json({ error: 'Token de recuperação ausente. O link pode ter expirado.' });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       log.error('[Reset Password] Error:', errorMessage);
@@ -345,32 +391,64 @@ router.post(
     }
 
     try {
-      // Verify current password via Supabase Auth
-      const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
-      const { error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
-        email: cleanEmail,
-        password: currentPassword,
-      });
-
-      if (authError) {
-        res.status(401).json({ error: 'Senha atual incorreta.' });
-        return;
-      }
-
-      // Update password via Supabase Auth admin API
       const supabase = getSupabaseAdminClient();
+      const bcrypt = await import('bcryptjs');
+
+      // 1. Check Admin user
       const { data: adminRow } = await supabase
         .from('admin_users')
         .select('auth_user_id')
         .eq('email', cleanEmail)
         .maybeSingle();
 
-      const targetAuthUserId = adminRow?.auth_user_id || req.user?.authUserId;
-      if (targetAuthUserId) {
-        await supabase.auth.admin.updateUserById(targetAuthUserId, {
-          password: newPassword,
+      if (adminRow) {
+        const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
+        const { error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
+          email: cleanEmail,
+          password: currentPassword,
         });
+
+        if (authError) {
+          res.status(401).json({ error: 'Senha atual incorreta.' });
+          return;
+        }
+
+        const targetAuthUserId = adminRow?.auth_user_id || req.user?.authUserId;
+        if (targetAuthUserId) {
+          await supabase.auth.admin.updateUserById(targetAuthUserId, {
+            password: newPassword,
+          });
+        }
+
+        res.json({ success: true, message: 'Senha atualizada com sucesso.' });
+        return;
       }
+
+      // 2. Check Student user
+      const { data: studentRow } = await supabase
+        .from('users')
+        .select('id, password_hash')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (!studentRow || !studentRow.password_hash) {
+        res.status(404).json({ error: 'Usuário não encontrado.' });
+        return;
+      }
+
+      const isValidCurrent = await bcrypt.compare(currentPassword, studentRow.password_hash).catch(() => false);
+      if (!isValidCurrent) {
+        res.status(401).json({ error: 'Senha atual incorreta.' });
+        return;
+      }
+
+      const newHash = await bcrypt.hash(newPassword, 10);
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({ password_hash: newHash, updated_at: new Date().toISOString() })
+        .eq('email', cleanEmail);
+
+      if (updateErr) throw updateErr;
 
       res.json({ success: true, message: 'Senha atualizada com sucesso.' });
     } catch (err: unknown) {

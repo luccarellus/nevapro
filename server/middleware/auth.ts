@@ -7,6 +7,8 @@ import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { createHash } from 'node:crypto';
 import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 
+import bcrypt from 'bcryptjs';
+
 // Extend Express Request globally
 declare global {
   namespace Express {
@@ -17,8 +19,7 @@ declare global {
 }
 
 /**
- * Verifies a Supabase session token and returns the authenticated user.
- * Uses Supabase Auth's built-in JWT verification via getUser().
+ * Verifies a session token (Supabase Auth for admin, cached session for student).
  */
 const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser | null> => {
   try {
@@ -26,67 +27,37 @@ const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser |
     const cachedUser = await getUserCache<AuthenticatedUser>(userCacheKeys.auth(tokenHash));
     if (cachedUser) return cachedUser;
 
-    const { data: userData, error } = await getSupabaseAdminClient().auth.getUser(token);
-    if (error || !userData?.user) return null;
+    // Check if token is a Supabase Auth token (for Admin)
+    const { data: userData } = await getSupabaseAdminClient().auth.getUser(token).catch(() => ({ data: null }));
+    if (userData?.user?.email) {
+      const email = userData.user.email.toLowerCase().trim();
+      const { data: adminRow } = await getSupabaseAdminClient()
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
 
-    const supabaseUser = userData.user;
-    const email = supabaseUser.email?.toLowerCase().trim();
-    if (!email) return null;
-
-    // Check if user is an admin (via admin_users table)
-    const { data: adminRow } = await getSupabaseAdminClient()
-      .from('admin_users')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (adminRow) {
-      const authenticatedUser: AuthenticatedUser = {
-        userId: supabaseUser.id,
-        email,
-        role: 'admin',
-        authUserId: supabaseUser.id,
-      };
-      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
-      return authenticatedUser;
+      if (adminRow) {
+        const authenticatedUser: AuthenticatedUser = {
+          userId: adminRow.id,
+          email,
+          role: 'admin',
+          authUserId: userData.user.id,
+        };
+        await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+        return authenticatedUser;
+      }
     }
 
-    // Check if user is a student (via users table)
-    const { data: studentRow } = await getSupabaseAdminClient()
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (studentRow) {
-      const authenticatedUser: AuthenticatedUser = {
-        userId: studentRow.id,
-        email,
-        role: 'student',
-        authUserId: supabaseUser.id,
-      };
-      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
-      return authenticatedUser;
-    }
-
-    // Authenticated via Supabase but not in our DB — treat as student
-    const authenticatedUser: AuthenticatedUser = {
-      userId: supabaseUser.id,
-      email,
-      role: 'student',
-      authUserId: supabaseUser.id,
-    };
-    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
-    return authenticatedUser;
+    return null;
   } catch (err) {
-    log.error('[Auth] Error verifying Supabase session:', err);
+    log.error('[Auth] Error verifying session:', err);
     return null;
   }
 };
 
 /**
- * Middleware: Requires valid Supabase Auth session (via Cookie or Bearer Token).
- * Fetches the user profile from Supabase Auth + admin_users/users tables.
+ * Middleware: Requires valid Auth session (via Cookie or Bearer Token).
  */
 export const requireAuth = async (
   req: AuthenticatedRequest,
@@ -174,68 +145,14 @@ export const ensureAdminUser = async (email: string, authUserId: string): Promis
 };
 
 /**
- * Unified login: authenticates via Supabase Auth,
- * then returns the user profile from admin_users or users table.
+ * Unified login:
+ * - Admin users: Authenticate via Supabase Auth (auth.users + admin_users).
+ * - Students: Authenticate via DB public.users password_hash (bcrypt). NEVER registered in Supabase Auth!
  */
 export const authenticateUser = async (email: string, password: string) => {
-  const supabase = getSupabaseAnonClient();
-  let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (authError || !authData.user) {
-    const cleanEmail = email.toLowerCase().trim();
-    const admin = getSupabaseAdminClient();
-    const { data: legacyStudent } = await admin
-      .from('users')
-      .select('password_hash')
-      .eq('email', cleanEmail)
-      .maybeSingle();
-
-    const passwordHash = legacyStudent?.password_hash;
-    if (!passwordHash) return { error: 'E-mail ou senha inválidos.' };
-
-    const bcrypt = await import('bcryptjs');
-    const legacyPasswordIsValid = await bcrypt.compare(password, passwordHash).catch(() => false);
-    if (!legacyPasswordIsValid) return { error: 'E-mail ou senha inválidos.' };
-
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email: cleanEmail,
-      password,
-      email_confirm: true,
-      user_metadata: { role: 'student' },
-    });
-
-    if (createError || !created.user) {
-      let existingAuthUserId: string | undefined;
-      for (let page = 1; page <= 10 && !existingAuthUserId; page++) {
-        const { data: pageData, error: listError } = await admin.auth.admin.listUsers({ page, perPage: 100 });
-        if (listError) break;
-        existingAuthUserId = pageData.users.find(
-          (user: { email?: string }) => user.email?.toLowerCase().trim() === cleanEmail,
-        )?.id;
-        if (pageData.users.length < 100) break;
-      }
-      if (!existingAuthUserId) return { error: 'E-mail ou senha inválidos.' };
-      const { error: updateError } = await admin.auth.admin.updateUserById(existingAuthUserId, {
-        password,
-        email_confirm: true,
-      });
-      if (updateError) return { error: 'E-mail ou senha inválidos.' };
-    }
-
-    ({ data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    }));
-    if (authError || !authData.user) return { error: 'E-mail ou senha inválidos.' };
-  }
-
   const cleanEmail = email.toLowerCase().trim();
-  const authUserId = authData.user.id;
 
-  // Check admin_users
+  // 1. Check if user is an Admin
   const { data: adminRow } = await getSupabaseAdminClient()
     .from('admin_users')
     .select('*')
@@ -243,9 +160,21 @@ export const authenticateUser = async (email: string, password: string) => {
     .maybeSingle();
 
   if (adminRow) {
+    const supabase = getSupabaseAnonClient();
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password,
+    });
+
+    if (authError || !authData.user || !authData.session) {
+      return { error: 'E-mail ou senha inválidos.' };
+    }
+
+    const authUserId = authData.user.id;
     if (adminRow.auth_user_id !== authUserId) {
       await ensureAdminUser(cleanEmail, authUserId);
     }
+
     return {
       user: {
         ...adminRow,
@@ -259,7 +188,7 @@ export const authenticateUser = async (email: string, password: string) => {
     };
   }
 
-  // Check students
+  // 2. Check if user is a Student (public.users)
   const { data: studentRow } = await getSupabaseAdminClient()
     .from('users')
     .select('*')
@@ -267,6 +196,28 @@ export const authenticateUser = async (email: string, password: string) => {
     .maybeSingle();
 
   if (studentRow) {
+    if (!studentRow.password_hash) {
+      return { error: 'E-mail ou senha inválidos.' };
+    }
+
+    const passwordIsValid = await bcrypt.compare(password, studentRow.password_hash).catch(() => false);
+    if (!passwordIsValid) {
+      return { error: 'E-mail ou senha inválidos.' };
+    }
+
+    // Generate student session token & cache it
+    const sessionToken = `st_${studentRow.id}_${crypto.randomUUID().replace(/-/g, '')}`;
+    const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
+
+    const authenticatedUser: AuthenticatedUser = {
+      userId: studentRow.id,
+      email: cleanEmail,
+      role: 'student',
+    };
+
+    // Cache student session for 24 hours
+    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 24 * 60 * 60);
+
     return {
       user: {
         ...studentRow,
@@ -279,9 +230,12 @@ export const authenticateUser = async (email: string, password: string) => {
         languagePreference: studentRow.language_preference || 'ingles',
         flashQuizCompleted: !!studentRow.flash_quiz_completed,
       },
-      session: authData.session,
+      session: {
+        access_token: sessionToken,
+      },
     };
   }
 
-  return { error: 'Usuário não encontrado no sistema.' };
+  return { error: 'E-mail ou senha inválidos.' };
 };
+
