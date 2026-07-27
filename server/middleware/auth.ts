@@ -4,10 +4,67 @@ import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../lib/d
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 
 import bcrypt from 'bcryptjs';
+
+const STUDENT_SESSION_TTL_SECONDS = 24 * 60 * 60;
+
+const getStudentSessionSecret = (): string | null =>
+  process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || null;
+
+const createStudentSessionToken = (user: AuthenticatedUser): string => {
+  const secret = getStudentSessionSecret();
+  if (!secret) {
+    throw new Error('JWT_SECRET ou SUPABASE_SERVICE_ROLE_KEY é obrigatório para sessões de alunos.');
+  }
+
+  const payload = Buffer.from(JSON.stringify({
+    userId: user.userId,
+    email: user.email,
+    role: 'student',
+    exp: Math.floor(Date.now() / 1000) + STUDENT_SESSION_TTL_SECONDS,
+  })).toString('base64url');
+  const signature = createHmac('sha256', secret).update(payload).digest('base64url');
+  return `st.${payload}.${signature}`;
+};
+
+const verifyStudentSessionToken = (token: string): AuthenticatedUser | null => {
+  if (!token.startsWith('st.')) return null;
+
+  const secret = getStudentSessionSecret();
+  const [, payload, signature] = token.split('.');
+  if (!secret || !payload || !signature) return null;
+
+  const expected = createHmac('sha256', secret).update(payload).digest();
+  const received = Buffer.from(signature, 'base64url');
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) return null;
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      userId?: string;
+      email?: string;
+      role?: string;
+      exp?: number;
+    };
+    if (
+      !decoded.userId ||
+      !decoded.email ||
+      decoded.role !== 'student' ||
+      !decoded.exp ||
+      decoded.exp <= Math.floor(Date.now() / 1000)
+    ) return null;
+
+    return {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: 'student',
+    };
+  } catch {
+    return null;
+  }
+};
 
 // Extend Express Request globally
 declare global {
@@ -26,6 +83,12 @@ const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser |
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const cachedUser = await getUserCache<AuthenticatedUser>(userCacheKeys.auth(tokenHash));
     if (cachedUser) return cachedUser;
+
+    const studentUser = verifyStudentSessionToken(token);
+    if (studentUser) {
+      await setUserCache(userCacheKeys.auth(tokenHash), studentUser, STUDENT_SESSION_TTL_SECONDS);
+      return studentUser;
+    }
 
     // Check if token is a Supabase Auth token (for Admin)
     const { data: userData } = await getSupabaseAdminClient().auth.getUser(token).catch(() => ({ data: null }));
@@ -205,18 +268,18 @@ export const authenticateUser = async (email: string, password: string) => {
       return { error: 'E-mail ou senha inválidos.' };
     }
 
-    // Generate student session token & cache it
-    const sessionToken = `st_${studentRow.id}_${crypto.randomUUID().replace(/-/g, '')}`;
-    const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
-
     const authenticatedUser: AuthenticatedUser = {
       userId: studentRow.id,
       email: cleanEmail,
       role: 'student',
     };
 
+    // Generate student session token & cache it
+    const sessionToken = createStudentSessionToken(authenticatedUser);
+    const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
+
     // Cache student session for 24 hours
-    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 24 * 60 * 60);
+    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, STUDENT_SESSION_TTL_SECONDS);
 
     return {
       user: {
@@ -238,4 +301,3 @@ export const authenticateUser = async (email: string, password: string) => {
 
   return { error: 'E-mail ou senha inválidos.' };
 };
-
