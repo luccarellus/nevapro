@@ -47,9 +47,32 @@ router.get('/tri-scores', requireAuth, async (req: AuthenticatedRequest, res: Re
 
     const latestScore = scores && scores.length > 0 ? scores[0] : null;
 
-    // Calculate hit rate from user stats
-    const answered = user.answered_questions || 0;
-    const correct = user.correct_answers || 0;
+    // Calculate hit rate directly from question answers table for absolute accuracy
+    let answered = user.answered_questions || 0;
+    let correct = user.correct_answers || 0;
+
+    try {
+      const answerStatsRes = await query(
+        `WITH latest_answers AS (
+           SELECT DISTINCT ON (a.question_id) a.question_id, a.is_correct
+           FROM public.answers a
+           WHERE a.user_id = $1
+           ORDER BY a.question_id, a.created_at DESC
+         )
+         SELECT 
+           COUNT(*) as answered,
+           SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) as correct
+         FROM latest_answers`,
+        [user.id]
+      );
+      if (answerStatsRes.rows.length > 0 && parseInt(answerStatsRes.rows[0].answered, 10) > 0) {
+        answered = parseInt(answerStatsRes.rows[0].answered, 10);
+        correct = parseInt(answerStatsRes.rows[0].correct, 10);
+      }
+    } catch (dbErr) {
+      log.warn('[Performance] Fallback to user stats:', dbErr);
+    }
+
     const hitRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
 
     res.json({

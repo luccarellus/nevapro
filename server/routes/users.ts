@@ -152,7 +152,7 @@ router.post(
       log.error('[Profile Update] Error fetching old user:', e);
     }
 
-    // Flash quiz protection
+    // Flash quiz protection - only allow answering ONCE per user
     if (isFlashQuizUpdate && userId) {
       const { data: lastQuiz } = await getSupabaseAdminClient()
         .from('xp_logs')
@@ -164,15 +164,11 @@ router.post(
         .maybeSingle();
 
       if (lastQuiz) {
-        const sixHours = 6 * 60 * 60 * 1000;
-        if (Date.now() - new Date(lastQuiz.created_at).getTime() < sixHours) {
-          log.info(`[Flash Quiz] Blocked duplicate XP for ${email}`);
-          dbUpdate.xp = oldXp;
-          dbUpdate.level = oldLevel;
-          xpDiff = 0;
-        } else {
-          dbUpdate.flash_quiz_completed = true;
-        }
+        log.info(`[Flash Quiz] Permanently blocked duplicate XP for ${email}`);
+        dbUpdate.xp = oldXp;
+        dbUpdate.level = oldLevel;
+        xpDiff = 0;
+        dbUpdate.flash_quiz_completed = true;
       } else {
         dbUpdate.flash_quiz_completed = true;
       }
@@ -340,12 +336,8 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
     let secondsRemaining = 0;
 
     if (lastQuizLog) {
-      const lastQuizTime = new Date(lastQuizLog.created_at).getTime();
-      const sixHours = 6 * 60 * 60 * 1000;
-      if (Date.now() - lastQuizTime < sixHours) {
-        quizDone = true;
-        secondsRemaining = Math.max(0, Math.ceil((lastQuizTime + sixHours - Date.now()) / 1000));
-      }
+      quizDone = true;
+      secondsRemaining = 0;
     }
 
     const stats = { weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining };

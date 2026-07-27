@@ -4,16 +4,17 @@ export const calculateLevelAndProgression = (totalXp: number): {
   nextLevelXp: number; 
 } => {
   let level = 1;
-  let xpNeededForNext = 500;
-  let accumulatedXpThreshold = 500;
+  let xpNeededForNext = 300;
+  let accumulatedXpThreshold = 300;
   let currentLevelMinXp = 0;
 
   while (totalXp >= accumulatedXpThreshold) {
     level++;
     currentLevelMinXp = accumulatedXpThreshold;
-    xpNeededForNext = Math.floor(xpNeededForNext * 1.5);
+    xpNeededForNext = Math.floor(xpNeededForNext * 1.35);
     accumulatedXpThreshold += xpNeededForNext;
   }
 
   return { level, currentLevelMinXp, nextLevelXp: accumulatedXpThreshold };
 };
+

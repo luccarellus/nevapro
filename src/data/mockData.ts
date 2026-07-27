@@ -8,7 +8,7 @@ export const MOCK_SIMULADOS: Simulado[] = [
     year: 2023,
     totalQuestions: 90,
     durationMinutes: 330, // 5h 30min
-    xpReward: 500
+    xpReward: 150
   },
   {
     id: 's2',
@@ -17,7 +17,7 @@ export const MOCK_SIMULADOS: Simulado[] = [
     year: 2023,
     totalQuestions: 90,
     durationMinutes: 300, // 5h 00min
-    xpReward: 500
+    xpReward: 150
   }
 ];
 

@@ -20,6 +20,8 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
   const [error, setError] = useState<string | null>(null);
   const [syncingTaskId, setSyncingTaskId] = useState<string | null>(null);
 
+  const [claimedTaskIds, setClaimedTaskIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     const fetchTasks = async () => {
       if (!user.email) return;
@@ -27,7 +29,11 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
       setError(null);
       try {
         const data = await studyPlanService.getTasks();
-        setTasks(data.tasks || []);
+        const loadedTasks = data.tasks || [];
+        setTasks(loadedTasks);
+        // Mark initially done tasks as already claimed
+        const initialClaimed = new Set(loadedTasks.filter(t => t.done).map(t => t.id));
+        setClaimedTaskIds(initialClaimed);
       } catch (err) {
         console.error('[StudyPlan] Erro ao carregar tarefas:', err);
         setError('Não foi possível carregar seu plano de estudos.');
@@ -43,6 +49,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
     if (!task) return;
 
     const nextDone = !task.done;
+    const isAlreadyClaimed = claimedTaskIds.has(id);
 
     // Optimistic update
     setTasks(prev => prev.map(t => t.id === id ? { ...t, done: nextDone } : t));
@@ -51,8 +58,10 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
     try {
       const { xpEarned } = await studyPlanService.toggleTask(id, nextDone);
 
-      if (nextDone && xpEarned > 0 && onEarnXp) {
-        onEarnXp(xpEarned, 1, 1, false, `Missão diária: ${task.title.split('-')[0]}`);
+      if (nextDone && xpEarned > 0 && !isAlreadyClaimed && onEarnXp) {
+        setClaimedTaskIds(prev => new Set(prev).add(id));
+        // Pass 0, 0 for correct/answered increments so study tasks do NOT pollute question statistics
+        onEarnXp(xpEarned, 0, 0, false, `Missão diária: ${task.title.split('-')[0]}`);
         confetti({
           particleCount: 40,
           spread: 50,
@@ -259,7 +268,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             {!loading && tasks.length > 0 && (
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border-color/40">
                 <p className="text-xs font-medium text-text-secondary opacity-70">
-                  Concluir tarefas gera <span className="text-brand-primary font-bold">+25 XP cada</span>
+                  Concluir tarefas gera <span className="text-brand-primary font-bold">+15 XP cada</span>
                 </p>
 
                 <button 

@@ -226,9 +226,9 @@ export default function App() {
     // Dynamically calculate level and cumulative XP limit
     const { level, nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(newXp);
     
-    // Use explicit increments or default gracefully
-    const corrInc = correctIncrement !== undefined ? correctIncrement : (amount > 0 ? 1 : 0);
-    const ansInc = answeredIncrement !== undefined ? answeredIncrement : (amount > 0 ? 1 : 0);
+    // Use explicit increments or default to 0 to avoid contaminating question stats
+    const corrInc = correctIncrement !== undefined ? correctIncrement : 0;
+    const ansInc = answeredIncrement !== undefined ? answeredIncrement : 0;
 
     const updatedUser = {
       ...user,

@@ -24,7 +24,6 @@ interface AdminAlunosProps {
   cidadeOptions: string[];
   escolaOptions: string[];
   gremioOptions: string[];
-  onGiveXp: (student: UserProfile, amount: number) => Promise<void>;
   onUpdateAccuracy: (student: UserProfile, answeredQuestions: number, correctAnswers: number) => Promise<void>;
   onDeleteStudent: (student: UserProfile) => Promise<void>;
 }
@@ -45,15 +44,12 @@ export default function AdminAlunos({
   cidadeOptions,
   escolaOptions,
   gremioOptions,
-  onGiveXp,
   onUpdateAccuracy,
   onDeleteStudent,
 }: AdminAlunosProps) {
   const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
-  const [customXpAmount, setCustomXpAmount] = useState('');
   const [answeredQuestionsInput, setAnsweredQuestionsInput] = useState('');
   const [correctAnswersInput, setCorrectAnswersInput] = useState('');
-  const [isGivingXp, setIsGivingXp] = useState(false);
   const [isUpdatingAccuracy, setIsUpdatingAccuracy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -89,24 +85,8 @@ export default function AdminAlunos({
     };
   }, [students]);
 
-  const handleGiveXp = async (amount: number) => {
-    if (!currentSelectedStudent) return;
-    setIsGivingXp(true);
-    setDrawerAlert(null);
-    try {
-      await onGiveXp(currentSelectedStudent, amount);
-      setCustomXpAmount('');
-      setDrawerAlert({ type: 'success', message: `${amount} XP concedidos com sucesso!` });
-    } catch (error: any) {
-      setDrawerAlert({ type: 'error', message: error.message || 'Erro ao conceder XP' });
-    } finally {
-      setIsGivingXp(false);
-    }
-  };
-
   const openStudentDrawer = (student: UserProfile) => {
     setSelectedStudent(student);
-    setCustomXpAmount('');
     setAnsweredQuestionsInput(String(student.answeredQuestions || 0));
     setCorrectAnswersInput(String(student.correctAnswers || 0));
     setDrawerAlert(null);
@@ -555,41 +535,6 @@ export default function AdminAlunos({
                     {isUpdatingAccuracy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                     Salvar precisao
                   </button>
-                </div>
-
-                {/* XP Management */}
-                <div className="border-t border-border-color pt-6 mb-6">
-                  <h4 className="text-sm font-black text-text-main mb-4">Gerenciar XP</h4>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {[50, 100, 500].map(amount => (
-                      <button key={amount}
-                        onClick={() => handleGiveXp(amount)}
-                        disabled={isGivingXp}
-                        className="flex-1 min-w-[80px] bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/20 text-brand-primary py-3 rounded-xl font-black text-[10px] tracking-wider transition-all disabled:opacity-50 cursor-pointer"
-                      >
-                        +{amount} XP
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={customXpAmount}
-                      onChange={(e) => setCustomXpAmount(e.target.value)}
-                      placeholder="Personalizado"
-                      className="flex-1 bg-bg-main/40 border border-border-color rounded-xl px-4 py-3 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all"
-                    />
-                    <button onClick={() => {
-                      const val = parseInt(customXpAmount);
-                      if (val > 0) handleGiveXp(val);
-                    }}
-                      disabled={isGivingXp || !customXpAmount}
-                      className="bg-brand-primary hover:bg-brand-secondary text-white px-5 py-3 rounded-xl font-black text-[10px] tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
-                    >
-                      {isGivingXp ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                      Enviar
-                    </button>
-                  </div>
                 </div>
 
                 {/* Alert */}

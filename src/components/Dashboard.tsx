@@ -127,7 +127,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     setSecondsLeft(6 * 60 * 60);
     setShowQuiz(false);
     if (onEarnXp) {
-      onEarnXp(50, 1, 1, true, 'Flash Quiz: Maranhão');
+      onEarnXp(50, 0, 0, true, 'Flash Quiz: Maranhão');
     }
   };
 
@@ -380,7 +380,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                     disabled
                     className="mt-8 bg-text-main/5 text-text-secondary font-bold text-[10px] px-8 py-4 rounded-2xl cursor-not-allowed"
                   >
-                    {secondsLeft > 0 ? formatCountdown(secondsLeft) : "Próximo em 6h : 00m : 00s"}
+                    Desafio concluído
                   </button>
                 </div>
               )}

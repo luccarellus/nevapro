@@ -115,7 +115,7 @@ export const enemService = {
           correctOptionIndex: (q.alternatives || []).findIndex(opt => opt.letter === q.correctAlternative),
           explanation: 'Resolução baseada nos critérios oficiais do ENEM.',
           difficulty: 'médio',
-          xpReward: 50
+          xpReward: 15
         };
       });
     } catch (error) {

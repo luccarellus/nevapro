@@ -218,13 +218,7 @@ export default function AdminDashboard({
     } catch (error) { console.error('Failed to delete ' + type + ':', error); }
   };
 
-  const handleGiveXp = async (student: UserProfile, amount: number): Promise<void> => {
-    const newXp = (student.xp || 0) + amount;
-    const { level: newLevel } = calculateLevelAndProgression(newXp);
-    const response = await userService.updateProfile({ email: student.email, xp: newXp, level: newLevel });
-    if (response.success) { setStudents(prev => prev.map(s => s.id === student.id ? { ...s, xp: newXp, level: newLevel } : s)); }
-    else { throw new Error('Falha ao atualizar XP'); }
-  };
+
 
   const handleUpdateAccuracy = async (student: UserProfile, answeredQuestions: number, correctAnswers: number): Promise<void> => {
     const response = await userService.updateProfile({
@@ -297,7 +291,7 @@ export default function AdminDashboard({
                   filterGremio={filterGremio} onFilterGremioChange={setFilterGremio}
                   filterType={filterType} onFilterTypeChange={setFilterType}
                   cidadeOptions={citiesMA} escolaOptions={schoolsMA} gremioOptions={gremiosMA}
-                  onGiveXp={handleGiveXp} onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
+                  onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
                 />
               )}
             </div>

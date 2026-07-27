@@ -69,10 +69,10 @@ export const studyPlanService = {
 
   /**
    * Toggle a task's done status and return the new state.
-   * Also returns the XP earned (25 XP) if it was just completed.
+   * Also returns the XP earned (15 XP) if it was just completed.
    */
   async toggleTask(id: string, done: boolean): Promise<{ task: StudyTask; xpEarned: number }> {
     const task = await this.updateTask(id, { done } as Partial<StudyTask>);
-    return { task, xpEarned: done ? 25 : 0 };
+    return { task, xpEarned: done ? 15 : 0 };
   },
 };
