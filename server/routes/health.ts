@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { log } from '../utils/logger';
+import { isB2LogStorageConfigured } from '../services/b2LogStorage';
 
 const router = Router();
 
@@ -10,6 +11,9 @@ router.get('/', (req, res: Response) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
+    dependencies: {
+      backblazeConfigured: isB2LogStorageConfigured(),
+    },
   });
 });
 

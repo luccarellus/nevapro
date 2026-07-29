@@ -11,7 +11,7 @@ dotenv.config({ quiet: true });
 
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
-import { storeB2Log } from './services/b2LogStorage';
+import { isB2LogStorageConfigured, storeB2Log } from './services/b2LogStorage';
 import { flushLogContext, runWithLogContext } from './services/logContext';
 import { csrfProtection, isAllowedOrigin } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
@@ -415,6 +415,13 @@ const receiveUpload = (req: any, res: any, next: any) => {
 
 app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, verifyRecaptcha(), async (req: any, res: any) => {
   try {
+    if (!isB2LogStorageConfigured()) {
+      log.error('[Upload] Backblaze B2 não configurada no ambiente de execução.');
+      res.status(503).json({
+        error: 'Armazenamento de arquivos indisponível. Verifique a configuração da Backblaze.',
+      });
+      return;
+    }
     if (!req.file) {
       res.status(400).json({ error: 'Nenhum arquivo enviado.' });
       return;
