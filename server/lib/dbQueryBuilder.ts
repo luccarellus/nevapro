@@ -26,7 +26,7 @@ function getB2Client() {
 
   s3Client = new S3Client({
     endpoint: endpoint,
-    region: endpoint.split('.')[1] || 'us-east-005',
+    region: process.env.B2_REGION || endpoint.match(/s3\.([^.]+)\./)?.[1] || 'us-east-005',
     credentials: {
       accessKeyId,
       secretAccessKey,

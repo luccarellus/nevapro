@@ -442,7 +442,7 @@ app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, veri
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Upload failed';
     log.error('[Upload] Error:', msg);
-    res.status(500).json({ error: 'Falha ao enviar arquivo.' });
+    res.status(500).json({ error: `Falha ao enviar arquivo: ${msg}` });
   }
 });
 
