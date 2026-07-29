@@ -226,7 +226,7 @@ export async function runDatabaseBackup(): Promise<{
   const timestampStr = now.toISOString().replace(/[:.]/g, '-');
   const shortId = randomUUID().substring(0, 8);
 
-  const objectKey = `${config.backupPrefix}/db/${year}/${month}/${day}/nevapro_db_${timestampStr}_${shortId}.sql.gz`;
+  const objectKey = `${config.backupPrefix}/db/nevapro_db_${timestampStr}_${shortId}.sql.gz`;
 
   // 4. Faz Upload para o Backblaze B2
   const s3 = getClient(config);
@@ -303,4 +303,25 @@ export async function verifyB2BackupStorage(): Promise<{ bucket: string; testKey
     testKey,
     retentionDays: config.retentionDays,
   };
+}
+
+/**
+ * Lista os objetos armazenados na pasta de backups do Backblaze B2.
+ */
+export async function listB2Backups(): Promise<Array<{ key: string; sizeBytes: number; lastModified: Date }>> {
+  const config = getConfig();
+  if (!config) return [];
+  const s3 = getClient(config);
+  const prefix = `${config.backupPrefix}/db/`;
+  const listRes = await s3.send(
+    new ListObjectsV2Command({
+      Bucket: config.bucket,
+      Prefix: prefix,
+    }),
+  );
+  return (listRes.Contents || []).map((item) => ({
+    key: item.Key || '',
+    sizeBytes: item.Size || 0,
+    lastModified: item.LastModified || new Date(),
+  }));
 }

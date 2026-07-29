@@ -62,7 +62,7 @@ DISABLE_DB_SSL="false"
   - **Manual via CLI:** Execute `npm run backup:db` na VPS ou ambiente local.
   - **Validação de Conexão:** Execute `npm run test:backblaze-backup` para testar escrita e leitura no bucket de backup.
   - **Retenção Automática:** Arquivos com mais de `B2_BACKUP_RETENTION_DAYS` (padrão: 30 dias) são expurgados automaticamente do bucket.
-  - **Localização dos arquivos:** `backups/db/YYYY/MM/DD/nevapro_db_YYYY-MM-DD_HHmmss.sql.gz`.
+  - **Localização dos arquivos:** `backups/db/nevapro_db_YYYY-MM-DD_HHmmss.sql.gz`.
 
 ### 🔄 Como Restaurar um Backup
 
