@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navigation from './components/Navigation';
 import Header from './components/Header';
@@ -60,6 +60,17 @@ export default function App() {
   const [isSimulationActive, setIsSimulationActive] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(
+    () => Boolean(localStorage.getItem('neva_student_session')),
+  );
+  const logoutInFlight = useRef<Promise<void> | null>(null);
+
+  const clearLocalSession = () => {
+    localStorage.removeItem('neva_student_session');
+    invalidateRequestCache();
+    setIsLoggedIn(false);
+    setActiveTab('dashboard');
+  };
 
   const handleTabChange = (newTab: string) => {
     if (user.role === 'admin') {
@@ -92,39 +103,41 @@ export default function App() {
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        setIsLoggedIn(true);
-        setUser(parsedUser);
-        if (parsedUser.role === 'admin') {
-          setActiveTab('admin');
-        }
-        fetchUser(parsedUser.email);
+        void fetchUser(parsedUser.email).finally(() => setIsRestoringSession(false));
       } catch (e) {
-        localStorage.removeItem('neva_student_session');
+        clearLocalSession();
+        setIsRestoringSession(false);
       }
+    } else {
+      setIsRestoringSession(false);
     }
   }, []);
 
-  const fetchUser = async (email?: string) => {
-    if (!email) return;
+  const fetchUser = async (email?: string): Promise<boolean> => {
+    if (!email) return false;
     try {
       const profile = await userService.getProfile(email);
       if (profile) {
         const { nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(profile.xp || 0);
         const profileWithNextLevel = { ...profile, nextLevelXp, currentLevelMinXp };
         setUser(prev => ({ ...prev, ...profileWithNextLevel }));
+        setIsLoggedIn(true);
         // Atualiza a sessão no localStorage para ambos os perfis (aluno e admin) para persistir no F5
         localStorage.setItem('neva_student_session', JSON.stringify(profileWithNextLevel));
         
         if (profile.role === 'admin') {
           setActiveTab('admin');
         }
+        return true;
       }
     } catch (error: any) {
-      console.error('Failed to fetch user:', error);
       if (error.status === 401) {
-        handleLogout();
+        clearLocalSession();
+      } else {
+        console.error('Failed to fetch user:', error);
       }
     }
+    return false;
   };
 
   useEffect(() => {
@@ -177,35 +190,35 @@ export default function App() {
     }
   };
 
+  const performLogout = (): Promise<void> => {
+    if (logoutInFlight.current) return logoutInFlight.current;
+
+    logoutInFlight.current = (async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch (err) {
+        console.error('Erro ao fazer logout no servidor:', err);
+      } finally {
+        clearLocalSession();
+        logoutInFlight.current = null;
+      }
+    })();
+    return logoutInFlight.current;
+  };
+
   async function handleLogout() {
     if (isSimulationActive) {
       setPendingTab('logout');
       return;
     }
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-    } catch (err) {
-      console.error('Erro ao fazer logout no servidor:', err);
-    }
-    localStorage.removeItem('neva_student_session');
-    invalidateRequestCache();
-    setIsLoggedIn(false);
-    setActiveTab('dashboard');
+    await performLogout();
   }
 
   const handleConfirmExit = async () => {
     setIsSimulationActive(false);
     if (pendingTab) {
       if (pendingTab === 'logout') {
-        try {
-          await fetch('/api/auth/logout', { method: 'POST' });
-        } catch (err) {
-          console.error('Erro ao fazer logout no servidor:', err);
-        }
-        localStorage.removeItem('neva_student_session');
-        invalidateRequestCache();
-        setIsLoggedIn(false);
-        setActiveTab('dashboard');
+        await performLogout();
       } else {
         setActiveTab(pendingTab);
       }
@@ -273,6 +286,10 @@ export default function App() {
         url.hash = '';
         window.history.replaceState({}, '', url.toString());
       }} />;
+    }
+
+    if (isRestoringSession) {
+      return <PageLoading />;
     }
 
     if (!isLoggedIn) {

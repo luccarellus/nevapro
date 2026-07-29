@@ -7,7 +7,7 @@ import path from 'path';
 import * as dotenv from 'dotenv';
 import multer from 'multer';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
@@ -413,7 +413,7 @@ const receiveUpload = (req: any, res: any, next: any) => {
   });
 };
 
-app.post('/api/upload', rateLimiter(5, 60_000), verifyRecaptcha(), requireAuth, receiveUpload, async (req: any, res: any) => {
+app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, verifyRecaptcha(), async (req: any, res: any) => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'Nenhum arquivo enviado.' });

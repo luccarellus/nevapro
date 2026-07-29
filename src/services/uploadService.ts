@@ -30,7 +30,10 @@ export const uploadService = {
 
     const response = await fetch(`/api/upload?kind=${kind}`, {
       method: 'POST',
-      body: formData
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: formData,
     });
 
     if (!response.ok) {
