@@ -11,6 +11,7 @@
 
 import * as Sentry from '@sentry/node';
 import { isB2LogStorageConfigured, storeB2Log } from '../services/b2LogStorage';
+import { enqueueLog } from '../services/logContext';
 
 export interface Logger {
   info: (...args: unknown[]) => void;
@@ -40,14 +41,36 @@ function redact(value: string): string {
     .replace(BEARER_TOKEN, 'Bearer [REDACTED]');
 }
 
+function classifyLog(level: 'info' | 'warn' | 'error', message: string): string {
+  if (message.startsWith('[Client]')) return `frontend/${level}`;
+  if (/^\[\d{4}-\d{2}-\d{2}T.*\]\s[A-Z]+\s/.test(message)) return 'backend/http';
+  if (/^\[(Auth|Auth Middleware|Auth Lock Check|ensureAdminUser|Forgot Password|Reset Password)\]/i.test(message)) {
+    return 'backend/auth';
+  }
+  if (/^\[(CSRF|reCAPTCHA|RateLimiter)\]/i.test(message)) return 'backend/security';
+  if (/^\[(PG Wrapper|Database|DB)\]/i.test(message)) return 'backend/database';
+  if (/^\[(B2 Storage|Storage|Upload|Materials)\]/i.test(message)) return 'backend/storage';
+  if (/^\[(Email|Resend)\]/i.test(message)) return 'backend/email';
+  if (/^\[(Cron)\]/i.test(message)) return 'backend/cron';
+  if (level === 'error') return 'backend/error';
+  if (level === 'warn') return 'backend/warning';
+  return 'backend/application';
+}
+
 function archive(level: 'info' | 'warn' | 'error', args: unknown[]): void {
   if (!isB2LogStorageConfigured()) return;
 
-  void storeB2Log('application', {
+  const message = redact(args.map(safeStringify).join(' '));
+  const entry = {
     level,
-    message: redact(args.map(safeStringify).join(' ')),
+    category: classifyLog(level, message),
+    message,
     environment: process.env.NODE_ENV || 'development',
-  }).catch((error) => {
+    timestamp: new Date().toISOString(),
+  };
+  if (enqueueLog(entry)) return;
+
+  void storeB2Log(entry.category, { events: [entry] }).catch((error) => {
     if (isDev) console.warn('[Logger] Falha ao arquivar log na Backblaze:', safeStringify(error));
   });
 }

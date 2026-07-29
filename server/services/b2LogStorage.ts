@@ -8,6 +8,23 @@ import { randomUUID } from 'node:crypto';
 
 let client: S3Client | null = null;
 
+const LOG_CATEGORIES = [
+  'backend/application',
+  'backend/http',
+  'backend/auth',
+  'backend/security',
+  'backend/database',
+  'backend/storage',
+  'backend/email',
+  'backend/cron',
+  'backend/error',
+  'backend/warning',
+  'frontend/info',
+  'frontend/warn',
+  'frontend/error',
+  'consent',
+] as const;
+
 function getLogPrefix() {
   return (process.env.B2_LOG_PREFIX || 'logs').replace(/^\/+|\/+$/g, '');
 }
@@ -94,6 +111,15 @@ export async function verifyB2LogStorage(): Promise<{ bucket: string; markerKey:
     ContentType: 'application/x-directory',
     Metadata: { source: 'nevapro' },
   }));
+  await Promise.all(LOG_CATEGORIES.map((category) =>
+    storage.send(new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: `${getLogPrefix()}/${category}/.keep`,
+      Body: Buffer.alloc(0),
+      ContentType: 'application/x-directory',
+      Metadata: { source: 'nevapro', category },
+    })),
+  ));
 
   const probeKey = `${getLogPrefix()}/connection-tests/${Date.now()}-${randomUUID()}.json`;
   await storage.send(new PutObjectCommand({

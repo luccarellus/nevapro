@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { query } from '../../src/lib/db.js';
+import { log } from '../utils/logger';
 
 let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
 let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
@@ -242,7 +243,7 @@ class PostgresQueryBuilder {
       const res = await query(sql, params);
       return { data: res.rows, error: null };
     } catch (e: any) {
-      console.error(`[PG Wrapper Error] ${sql}`, e);
+      log.error(`[PG Wrapper Error] ${sql}`, e);
       return { data: null, error: e };
     }
   }
@@ -311,7 +312,7 @@ export const dbAdmin = {
             await client.send(command);
             return { data: { path }, error: null };
           } catch (error: any) {
-            console.error('[B2 Storage] Upload error:', error);
+            log.error('[B2 Storage] Upload error:', error);
             return { data: null, error };
           }
         },
@@ -332,7 +333,7 @@ export const dbAdmin = {
             const contentType = response.ContentType || 'application/octet-stream';
             return { data: { stream, contentType }, error: null };
           } catch (error: any) {
-            console.error('[B2 Storage] GetObject error:', error);
+            log.error('[B2 Storage] GetObject error:', error);
             return { data: null, error };
           }
         }

@@ -47,9 +47,10 @@ export function validateEnv(): void {
     const someMissing = group.vars.some(v => !process.env[v]);
 
     if (allMissing) {
-      console.warn(`[ENV] Aviso: ${group.purpose} não configurado. Funcionalidade indisponível.`);
+      log.warn(`[ENV] Aviso: ${group.purpose} não configurado. Funcionalidade indisponível.`);
     } else if (someMissing) {
-      console.warn(`[ENV] Aviso: Configuração incompleta para ${group.purpose}. Alguns recursos podem falhar.`);
+      log.warn(`[ENV] Aviso: Configuração incompleta para ${group.purpose}. Alguns recursos podem falhar.`);
     }
   }
 }
+import { log } from './logger';

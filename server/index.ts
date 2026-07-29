@@ -12,6 +12,7 @@ dotenv.config();
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
 import { storeB2Log } from './services/b2LogStorage';
+import { flushLogContext, runWithLogContext } from './services/logContext';
 import { csrfProtection, isAllowedOrigin } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
 import { verifyRecaptcha } from './middleware/recaptcha';
@@ -38,6 +39,7 @@ import bootstrapRoutes from './routes/bootstrap';
 import studyPlanRoutes from './routes/studyPlan';
 import performanceRoutes from './routes/performance';
 import cronRoutes from './routes/cron';
+import clientLogRoutes from './routes/clientLogs';
 
 // Validate critical environment variables before starting
 validateEnv();
@@ -47,6 +49,49 @@ export const app = express();
 // Trust proxy (for rate limiting behind nginx / Vercel)
 app.set('trust proxy', 1);
 app.disable('etag');
+
+// Agrupa os logs de cada requisição e confirma a gravação antes de encerrar a resposta.
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  runWithLogContext(() => {
+    const originalEnd = res.end.bind(res);
+    let ending = false;
+
+    (res as any).end = (...args: unknown[]) => {
+      if (ending) return res;
+      ending = true;
+
+      const flush = flushLogContext({
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt,
+        userId: req.user?.userId,
+        role: req.user?.role,
+        requestId: req.headers['x-request-id'],
+      });
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, 4_000);
+      });
+
+      void Promise.race([flush, timeout])
+        .catch((error) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[Logger] Falha ao finalizar lote de logs:', error);
+          }
+        })
+        .finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+          originalEnd(...args as any[]);
+        });
+      return res;
+    };
+
+    log.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+  });
+});
 
 // ===== CORS =====
 app.use((req, res, next) => {
@@ -101,12 +146,6 @@ app.use(
 // Body parsing
 app.use(express.json({ limit: '1mb' }));
 
-// ===== Logging =====
-app.use((req, res, next) => {
-  log.info(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-
 // ===== Rate Limiting (global) =====
 app.use('/api', rateLimiter(300, 15 * 60 * 1000));
 
@@ -129,6 +168,7 @@ app.use('/api/bootstrap', bootstrapRoutes);
 app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/client-logs', rateLimiter(30, 60_000), clientLogRoutes);
 
 // ===== Image Proxy =====
 app.get('/api/imagem', async (req, res) => {
