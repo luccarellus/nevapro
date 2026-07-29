@@ -17,7 +17,9 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test:backblaze-logs": "tsx server/scripts/testBackblazeLogs.ts"
+    "test:backblaze-logs": "tsx server/scripts/testBackblazeLogs.ts",
+    "test:backblaze-backup": "tsx server/scripts/testBackblazeBackup.ts",
+    "backup:db": "tsx server/scripts/runBackup.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
+import { runDatabaseBackup } from '../services/b2BackupStorage';
 
 const router = Router();
 
@@ -54,7 +55,34 @@ const handleCleanup = async (_req: Request, res: Response) => {
   }
 };
 
+// Endpoint de backup de banco de dados no Backblaze B2 (suporta GET para Vercel Cron e POST)
+const handleBackup = async (_req: Request, res: Response) => {
+  try {
+    log.info('[Cron] Disparando backup automático do banco de dados para o Backblaze B2...');
+
+    const backupResult = await runDatabaseBackup();
+
+    log.info('[Cron] Backup do banco de dados concluído com sucesso:', JSON.stringify(backupResult));
+
+    res.json({
+      success: true,
+      message: 'Backup automático para o Backblaze B2 concluído com sucesso.',
+      result: backupResult,
+    });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log.error('[Cron] Erro ao executar backup do banco de dados para a Backblaze B2:', errorMessage);
+    res.status(500).json({
+      error: 'Erro interno ao executar o backup do banco de dados.',
+      details: errorMessage,
+    });
+  }
+};
+
 router.get('/cleanup', verifyCronSecret, handleCleanup);
 router.post('/cleanup', verifyCronSecret, handleCleanup);
+
+router.get('/backup', verifyCronSecret, handleBackup);
+router.post('/backup', verifyCronSecret, handleBackup);
 
 export default router;
