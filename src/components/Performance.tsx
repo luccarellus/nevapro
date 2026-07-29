@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { UserProfile } from '../types';
-import { 
-  TrendingUp, AlertTriangle, ArrowUpRight, Sparkles, 
+import {
+  TrendingUp, AlertTriangle, ArrowUpRight, Sparkles,
   ArrowRight, ShieldCheck, Zap
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -96,7 +96,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
       transition: { staggerChildren: 0.1 }
     }
@@ -129,7 +129,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               <TrendingUp size={16} /> Central de Desempenho & Inteligência TRI
             </div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text-main leading-tight">
-              Sua evolução em <span className="text-emerald-400">dados reais</span>
+              Sua evolução de <span className="text-emerald-400"></span>estudos
             </h1>
             <p className="text-text-secondary text-xs md:text-sm font-medium mt-2 max-w-xl">
               Análise contínua do seu desempenho no ENEM, projeção de nota TRI e diagnóstico por assuntos.
@@ -163,7 +163,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
             {/* Top Grid: TRI Score Card + 30 Days Evolution */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
               {/* Estimated TRI Score Card (5 cols) */}
-              <motion.div 
+              <motion.div
                 variants={itemVariants}
                 className="lg:col-span-5 bg-gradient-to-br from-emerald-950/40 via-bg-card/60 to-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-emerald-500/30 shadow-2xl relative overflow-hidden flex flex-col justify-between"
               >
@@ -210,7 +210,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     <span className="text-emerald-400 font-black">{triProgress}%</span>
                   </div>
                   <div className="h-2.5 bg-bg-main rounded-full overflow-hidden p-0.5">
-                    <motion.div 
+                    <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${triProgress}%` }}
                       transition={{ duration: 1.2 }}
@@ -221,7 +221,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               </motion.div>
 
               {/* 30-Day Evolution Chart (7 cols) */}
-              <motion.div 
+              <motion.div
                 variants={itemVariants}
                 className="lg:col-span-7 bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-2xl flex flex-col justify-between"
               >
@@ -246,35 +246,35 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                         <AreaChart data={evolutionData}>
                           <defs>
                             <linearGradient id="colorPrec" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#34d399" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#34d399" stopOpacity={0}/>
+                              <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
-                          <XAxis 
-                            dataKey="label" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 'bold'}}
+                          <XAxis
+                            dataKey="label"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 'bold' }}
                           />
                           <YAxis hide domain={[30, 100]} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: 'var(--bg-sidebar)', 
-                              border: '1px solid var(--border-color)', 
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'var(--bg-sidebar)',
+                              border: '1px solid var(--border-color)',
                               borderRadius: '16px',
                               boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
                               color: 'var(--text-main)'
                             }}
                             itemStyle={{ color: '#34d399', fontWeight: '900', fontSize: '14px' }}
                           />
-                          <Area 
-                            type="monotone" 
-                            dataKey="precision" 
-                            stroke="#34d399" 
-                            strokeWidth={3} 
-                            fillOpacity={1} 
-                            fill="url(#colorPrec)" 
+                          <Area
+                            type="monotone"
+                            dataKey="precision"
+                            stroke="#34d399"
+                            strokeWidth={3}
+                            fillOpacity={1}
+                            fill="url(#colorPrec)"
                           />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -308,7 +308,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
             {/* Second Row: Subject Heatmap & Spaced Repetition Warning */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
               {/* Subject Heatmap (8 cols) */}
-              <motion.div 
+              <motion.div
                 variants={itemVariants}
                 className="lg:col-span-8 bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-2xl"
               >
@@ -338,26 +338,23 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                             const isHigh = item.level === 'high';
                             const isMed = item.level === 'medium';
                             return (
-                              <div 
-                                key={i} 
-                                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-                                  isHigh 
-                                    ? 'bg-emerald-500/10 border-emerald-500/30' 
-                                    : isMed 
-                                    ? 'bg-amber-500/10 border-amber-500/30' 
-                                    : 'bg-rose-500/10 border-rose-500/30'
-                                }`}
+                              <div
+                                key={i}
+                                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isHigh
+                                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                                    : isMed
+                                      ? 'bg-amber-500/10 border-amber-500/30'
+                                      : 'bg-rose-500/10 border-rose-500/30'
+                                  }`}
                               >
                                 <div className="flex items-center gap-3">
-                                  <span className={`w-3 h-3 rounded-full ${
-                                    isHigh ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : isMed ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                                  }`} />
+                                  <span className={`w-3 h-3 rounded-full ${isHigh ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : isMed ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
+                                    }`} />
                                   <span className="text-xs font-bold text-text-main">{item.name}</span>
                                   <span className="text-[9px] font-semibold text-text-secondary opacity-40">({item.total}q)</span>
                                 </div>
-                                <span className={`text-xs font-black ${
-                                  isHigh ? 'text-emerald-400' : isMed ? 'text-amber-400' : 'text-rose-400'
-                                }`}>
+                                <span className={`text-xs font-black ${isHigh ? 'text-emerald-400' : isMed ? 'text-amber-400' : 'text-rose-400'
+                                  }`}>
                                   {item.percentage}%
                                 </span>
                               </div>
@@ -374,7 +371,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               <div className="lg:col-span-4 space-y-6">
                 {/* Spaced Repetition Warning */}
                 {criticalSubjects.length > 0 && (
-                  <motion.div 
+                  <motion.div
                     variants={itemVariants}
                     className="bg-amber-950/20 border border-amber-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
                   >
@@ -386,7 +383,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     <p className="text-xs font-medium text-text-secondary opacity-80 mb-4">
                       {criticalSubjects.map(s => s.name).join(', ')} — {totalCriticalQuestions} questões com desempenho abaixo de 50%.
                     </p>
-                    <button 
+                    <button
                       onClick={() => onTabChange?.('errors')}
                       className="w-full bg-amber-500 text-black font-black text-xs py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
                     >
@@ -397,7 +394,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
 
                 {/* Empty state when no critical subjects */}
                 {criticalSubjects.length === 0 && stats.answered > 0 && (
-                  <motion.div 
+                  <motion.div
                     variants={itemVariants}
                     className="bg-emerald-950/20 border border-emerald-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
                   >
@@ -413,7 +410,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
 
                 {/* Onboarding state for new users */}
                 {stats.answered === 0 && (
-                  <motion.div 
+                  <motion.div
                     variants={itemVariants}
                     className="bg-indigo-950/20 border border-indigo-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
                   >
@@ -424,7 +421,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     <p className="text-xs font-medium text-text-secondary leading-relaxed mb-4">
                       Responda suas primeiras questões para começarmos a analisar seu desempenho e identificar seus pontos fortes.
                     </p>
-                    <button 
+                    <button
                       onClick={() => onTabChange?.('questions')}
                       className="w-full bg-indigo-500 text-white font-black text-xs py-3.5 rounded-2xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-400 transition-all flex items-center justify-center gap-2"
                     >
@@ -434,7 +431,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                 )}
 
                 {/* AI Tutor Diagnostic Analysis */}
-                <motion.div 
+                <motion.div
                   variants={itemVariants}
                   className="bg-bg-card/40 border border-border-color rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
                 >
@@ -448,8 +445,8 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                           {stats.hit_rate >= 70
                             ? `Continue assim! Sua precisão de ${stats.hit_rate}% mostra que você está no caminho certo.`
                             : stats.hit_rate >= 50
-                            ? `Seu desempenho está evoluindo com ${stats.hit_rate}% de acertos. Foque nos assuntos com desempenho crítico para acelerar.`
-                            : `Você está no início da jornada com ${stats.hit_rate}% de acertos. O importante é manter a consistência!`}
+                              ? `Seu desempenho está evoluindo com ${stats.hit_rate}% de acertos. Foque nos assuntos com desempenho crítico para acelerar.`
+                              : `Você está no início da jornada com ${stats.hit_rate}% de acertos. O importante é manter a consistência!`}
                         </p>
                         {criticalSubjects.length > 0 && (
                           <>
@@ -469,7 +466,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     )}
                   </div>
 
-                  <button 
+                  <button
                     onClick={() => onTabChange?.('questions')}
                     className="w-full bg-text-main/5 hover:bg-text-main/10 text-text-main font-bold text-xs py-3 rounded-xl border border-border-color transition-colors flex items-center justify-center gap-2"
                   >

@@ -11,6 +11,7 @@ dotenv.config();
 
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
+import { storeB2Log } from './services/b2LogStorage';
 import { csrfProtection, isAllowedOrigin } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
 import { verifyRecaptcha } from './middleware/recaptcha';
@@ -316,17 +317,16 @@ app.post('/api/lgpd/consent-log', async (req, res) => {
     return;
   }
   try {
-    // Armazena apenas o tipo de consentimento + metadados (a coluna consent_type é VARCHAR(100))
+    // Mantém o registro de consentimento fora do banco relacional.
     const consentTypes = Object.entries(preferences)
-      .filter(([, v]) => v === true)
-      .map(([k]) => k)
-      .join(',')
-      .substring(0, 100);
-    await query(
-      `INSERT INTO public.consent_logs (id, consent_type, ip_address, user_agent, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
-      [consentTypes || 'necessary_only', req.ip || req.socket?.remoteAddress || 'unknown', userAgent || req.headers['user-agent'] || ''],
-    );
+      .filter(([, value]) => value === true)
+      .map(([key]) => key)
+      .slice(0, 20);
+    await storeB2Log('consent', {
+      consentTypes: consentTypes.length > 0 ? consentTypes : ['necessary_only'],
+      ipAddress: req.ip || req.socket?.remoteAddress || 'unknown',
+      userAgent: userAgent || req.headers['user-agent'] || '',
+    });
     log.info('[LGPD] Consent preferences saved:', consentTypes);
     res.json({ success: true });
   } catch (err) {

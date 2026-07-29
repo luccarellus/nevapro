@@ -10,6 +10,7 @@
  */
 
 import * as Sentry from '@sentry/node';
+import { isB2LogStorageConfigured, storeB2Log } from '../services/b2LogStorage';
 
 export interface Logger {
   info: (...args: unknown[]) => void;
@@ -28,6 +29,27 @@ function safeStringify(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+const SENSITIVE_VALUE = /("(?:password|token|secret|authorization|cookie|apiKey|applicationKey)"\s*:\s*)"[^"]*"/gi;
+const BEARER_TOKEN = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi;
+
+function redact(value: string): string {
+  return value
+    .replace(SENSITIVE_VALUE, '$1"[REDACTED]"')
+    .replace(BEARER_TOKEN, 'Bearer [REDACTED]');
+}
+
+function archive(level: 'info' | 'warn' | 'error', args: unknown[]): void {
+  if (!isB2LogStorageConfigured()) return;
+
+  void storeB2Log('application', {
+    level,
+    message: redact(args.map(safeStringify).join(' ')),
+    environment: process.env.NODE_ENV || 'development',
+  }).catch((error) => {
+    if (isDev) console.warn('[Logger] Falha ao arquivar log na Backblaze:', safeStringify(error));
+  });
 }
 
 /** Extract an Error from args, preferring the first Error instance found. */
@@ -64,14 +86,17 @@ function sendToSentry(...args: unknown[]): void {
 export const log: Logger = {
   info: (...args: unknown[]) => {
     if (isDev) console.log(...args);
+    archive('info', args);
   },
   warn: (...args: unknown[]) => {
     if (isDev) console.warn(...args);
+    archive('warn', args);
   },
   error: (...args: unknown[]) => {
     // Always print to console in any environment
     console.error(...args);
     // Fire-and-forget Sentry notification (synchronous)
     sendToSentry(...args);
+    archive('error', args);
   },
 };
