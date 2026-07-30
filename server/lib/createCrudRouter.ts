@@ -61,6 +61,12 @@ interface CrudRouterOptions {
    * E.g. { questions_count: 0, xp_reward: 0 }
    */
   defaults?: Record<string, unknown>;
+  /**
+   * Optional: async callback executed BEFORE deleting a row.
+   * Useful for cleaning up associated resources (e.g. deleting files from B2).
+   * Receives the id of the item being deleted.
+   */
+  onBeforeDelete?: (id: string) => Promise<void>;
 }
 
 /**
@@ -222,6 +228,12 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   router.delete('/:id', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
     try {
       const { id } = req.params;
+
+      // Run pre-delete cleanup (e.g. B2 file deletion)
+      if (options.onBeforeDelete) {
+        await options.onBeforeDelete(id);
+      }
+
       const { error } = await getSupabaseAdminClient()
         .from(options.table)
         .delete()

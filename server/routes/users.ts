@@ -3,13 +3,16 @@ import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
 import { verifyRecaptcha } from '../middleware/recaptcha';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { getSupabaseAdminClient, dbAdmin } from '../lib/dbQueryBuilder';
 import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { cacheInvalidate } from '../services/cache';
 import { CACHE_KEYS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from '../services/userCache';
+import { extractObjectKey } from '../utils/extractObjectKey';
+
+const B2_BUCKET = process.env.B2_BUCKET_NAME || 'neva-avatars';
 
 const router = Router();
 
@@ -234,10 +237,20 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
   try {
     const supabase = getSupabaseAdminClient();
 
-    // Clean up student data
-    const { data: userData } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+    // Fetch avatar before deletion to clean up B2
+    const { data: userData } = await supabase.from('users').select('id, avatar_url').eq('email', email).maybeSingle();
     if (userData?.id) {
       const userId = userData.id;
+
+      // Delete avatar from B2 if stored there
+      const avatarUrl = (userData as any).avatar_url as string | undefined;
+      if (avatarUrl) {
+        const objectKey = extractObjectKey(avatarUrl);
+        if (objectKey) {
+          await dbAdmin.storage.from(B2_BUCKET).remove(objectKey).catch(() => {});
+        }
+      }
+
       await supabase.from('xp_logs').delete().eq('user_id', userId);
       await supabase.from('answers').delete().eq('user_id', userId);
       await supabase.from('notifications').delete().eq('user_id', userId);
@@ -246,9 +259,19 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
 
     // Clean up admin data
     const { rows: adminRows } = await import('../../src/lib/db').then((m) =>
-      m.query('SELECT auth_user_id FROM public.admin_users WHERE email = $1 LIMIT 1', [email]),
+      m.query('SELECT auth_user_id, avatar_url FROM public.admin_users WHERE email = $1 LIMIT 1', [email]),
     );
     const authUserId = adminRows[0]?.auth_user_id;
+
+    // Delete admin avatar from B2 if stored there
+    const adminAvatarUrl = adminRows[0]?.avatar_url as string | undefined;
+    if (adminAvatarUrl) {
+      const objectKey = extractObjectKey(adminAvatarUrl);
+      if (objectKey) {
+        await dbAdmin.storage.from(B2_BUCKET).remove(objectKey).catch(() => {});
+      }
+    }
+
     await supabase.from('admin_users').delete().eq('email', email);
 
     // Delete from Supabase Auth

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { query } from '../../src/lib/db.js';
 import { log } from '../utils/logger';
 import { getB2Client } from '../services/b2Client';
@@ -305,6 +305,21 @@ export const dbAdmin = {
             return { data: { stream, contentType }, error: null };
           } catch (error: any) {
             log.error('[B2 Storage] GetObject error:', error);
+            return { data: null, error };
+          }
+        },
+        async remove(path: string) {
+          try {
+            const client = getB2Client();
+            const command = new DeleteObjectCommand({
+              Bucket: bucket,
+              Key: path,
+            });
+            await client.send(command);
+            log.info(`[B2 Storage] Object deleted: ${bucket}/${path}`);
+            return { data: null, error: null };
+          } catch (error: any) {
+            log.error('[B2 Storage] Delete error:', error);
             return { data: null, error };
           }
         }
