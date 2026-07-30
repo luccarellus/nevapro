@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import logoOriginal from './logo.png';
-import logoLight from './logo_light.png';
+
+const logoLight = '/logo_light.png';
 
 interface LogoProps {
   className?: string;
