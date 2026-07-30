@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger';
-import { isUpstashRedisConfigured } from '../services/cache';
+import { isUpstashRedisConfigured, runRedisPipeline } from '../services/cache';
 
 const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
 const RATE_LIMITER_MAX_ENTRIES = 10_000;
@@ -31,26 +31,7 @@ setInterval(() => {
   }
 }, RATE_LIMITER_CLEANUP_INTERVAL_MS).unref();
 
-const runUpstashPipeline = async (
-  commands: string[][],
-): Promise<Array<{ result?: unknown; error?: string }> | null> => {
-  if (!isUpstashRedisConfigured()) return null;
 
-  const response = await fetch(
-    `${process.env.UPSTASH_REDIS_REST_URL}/pipeline`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(commands),
-    },
-  );
-
-  if (!response.ok) return null;
-  return (await response.json()) as Array<{ result?: unknown; error?: string }>;
-};
 
 /**
  * Rate Limiter — hybrid Redis + in-memory fallback.
@@ -74,7 +55,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
       const ttlSeconds = Math.ceil(windowMs / 1000);
 
       try {
-        const results = await runUpstashPipeline([
+        const results = await runRedisPipeline([
           ['SET', redisKey, '0', 'EX', String(ttlSeconds), 'NX'],
           ['INCR', redisKey],
         ]);

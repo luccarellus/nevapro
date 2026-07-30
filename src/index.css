@@ -11,6 +11,8 @@
   --color-bg-sidebar: var(--bg-sidebar);
   --color-text-main: var(--text-main);
   --color-text-secondary: var(--text-secondary);
+  --color-input-bg: var(--input-bg);
+  --color-border-color: var(--border-color);
 }
 
 :root {
@@ -43,8 +45,6 @@
   --input-bg: #f8fafc;
   --card-shadow: rgba(15, 23, 42, 0.08);
 }
-
-
 
 [data-theme='cyberpunk'] {
   --bg-main: #08070d;
@@ -224,22 +224,6 @@
   --brand-secondary: #cb4b16;
   --input-bg: #fdf6e3;
   --card-shadow: rgba(181, 137, 0, 0.03);
-}
-
-
-
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  
-  --color-brand-primary: var(--brand-primary);
-  --color-brand-secondary: var(--brand-secondary);
-  --color-bg-main: var(--bg-main);
-  --color-bg-card: var(--bg-card);
-  --color-bg-sidebar: var(--bg-sidebar);
-  --color-text-main: var(--text-main);
-  --color-text-secondary: var(--text-secondary);
-  --color-input-bg: var(--input-bg);
-  --color-border-color: var(--border-color);
 }
 
 @utility no-scrollbar {

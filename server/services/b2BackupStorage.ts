@@ -3,7 +3,6 @@ import {
   HeadBucketCommand,
   ListObjectsV2Command,
   PutObjectCommand,
-  S3Client,
 } from '@aws-sdk/client-s3';
 import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -11,45 +10,22 @@ import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
+import { getB2Client, getB2Config } from './b2Client';
 
 const execAsync = promisify(exec);
-let client: S3Client | null = null;
 
 function getConfig() {
-  const endpoint = process.env.B2_ENDPOINT;
-  const accessKeyId = process.env.B2_KEY_ID;
-  const secretAccessKey = process.env.B2_APPLICATION_KEY;
-  const bucket = process.env.B2_BUCKET_NAME;
-
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) return null;
+  const config = getB2Config();
+  if (!config) return null;
 
   const retentionDays = parseInt(process.env.B2_BACKUP_RETENTION_DAYS || '30', 10);
   const backupPrefix = (process.env.B2_BACKUP_PREFIX || 'backups').replace(/^\/+|\/+$/g, '');
 
   return {
-    endpoint,
-    accessKeyId,
-    secretAccessKey,
-    bucket,
-    region: process.env.B2_REGION || endpoint.match(/s3\.([^.]+)\./)?.[1] || 'us-east-005',
+    ...config,
     retentionDays: isNaN(retentionDays) || retentionDays < 1 ? 30 : retentionDays,
     backupPrefix,
   };
-}
-
-function getClient(config: NonNullable<ReturnType<typeof getConfig>>) {
-  if (!client) {
-    client = new S3Client({
-      endpoint: config.endpoint,
-      region: config.region,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-      forcePathStyle: true,
-    });
-  }
-  return client;
 }
 
 export function isB2BackupConfigured(): boolean {
@@ -152,7 +128,7 @@ async function generateSqlDump(): Promise<{ sql: string; tableCount: number; met
  * Remove arquivos de backup do Backblaze B2 com idade superior à retenção configurada.
  */
 async function pruneOldBackups(config: NonNullable<ReturnType<typeof getConfig>>): Promise<number> {
-  const s3 = getClient(config);
+  const s3 = getB2Client();
   const prefix = `${config.backupPrefix}/db/`;
   const cutoffDate = new Date(Date.now() - config.retentionDays * 86_400_000);
 
@@ -229,7 +205,7 @@ export async function runDatabaseBackup(): Promise<{
   const objectKey = `${config.backupPrefix}/db/nevapro_db_${timestampStr}_${shortId}.sql.gz`;
 
   // 4. Faz Upload para o Backblaze B2
-  const s3 = getClient(config);
+  const s3 = getB2Client();
   await s3.send(
     new PutObjectCommand({
       Bucket: config.bucket,
@@ -282,7 +258,7 @@ export async function verifyB2BackupStorage(): Promise<{ bucket: string; testKey
     throw new Error('Defina B2_ENDPOINT, B2_KEY_ID, B2_APPLICATION_KEY e B2_BUCKET_NAME.');
   }
 
-  const storage = getClient(config);
+  const storage = getB2Client();
   await storage.send(new HeadBucketCommand({ Bucket: config.bucket }));
 
   const testKey = `${config.backupPrefix}/connection-tests/probe-${Date.now()}-${randomUUID().substring(0, 8)}.txt`;
@@ -311,7 +287,7 @@ export async function verifyB2BackupStorage(): Promise<{ bucket: string; testKey
 export async function listB2Backups(): Promise<Array<{ key: string; sizeBytes: number; lastModified: Date }>> {
   const config = getConfig();
   if (!config) return [];
-  const s3 = getClient(config);
+  const s3 = getB2Client();
   const prefix = `${config.backupPrefix}/db/`;
   const listRes = await s3.send(
     new ListObjectsV2Command({

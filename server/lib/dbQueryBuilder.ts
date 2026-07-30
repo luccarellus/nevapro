@@ -1,41 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { query } from '../../src/lib/db.js';
 import { log } from '../utils/logger';
+import { getB2Client } from '../services/b2Client';
+
 
 let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
 let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
-let s3Client: S3Client | null = null;
-
-function getB2Client() {
-  if (s3Client) return s3Client;
-
-  const endpoint = process.env.B2_ENDPOINT;
-  const accessKeyId = process.env.B2_KEY_ID;
-  const secretAccessKey = process.env.B2_APPLICATION_KEY;
-
-  const missing = [];
-  if (!endpoint) missing.push('B2_ENDPOINT');
-  if (!accessKeyId) missing.push('B2_KEY_ID');
-  if (!secretAccessKey) missing.push('B2_APPLICATION_KEY');
-
-  if (missing.length > 0) {
-    throw new Error(`Configurações do Backblaze B2 ausentes no process.env: ${missing.join(', ')}`);
-  }
-
-
-  s3Client = new S3Client({
-    endpoint: endpoint,
-    region: process.env.B2_REGION || endpoint.match(/s3\.([^.]+)\./)?.[1] || 'us-east-005',
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-    forcePathStyle: true,
-  });
-
-  return s3Client;
-}
 
 
 export function getSupabaseAdminClient(): ReturnType<typeof createClient> | any {
