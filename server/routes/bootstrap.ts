@@ -18,7 +18,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
     const { rows } = await query(
-      `WITH target AS (SELECT id FROM public.users WHERE email = $1 LIMIT 1)
+      `WITH target AS (SELECT id, flash_quiz_completed FROM public.users WHERE email = $1 LIMIT 1)
        SELECT
          COALESCE((SELECT json_agg(json_build_object(
            'id', m.id, 'title', m.title, 'subject', m.subject, 'foco', m.foco,
@@ -32,6 +32,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
            SELECT * FROM public.users WHERE role <> 'admin' AND show_in_leaderboard = true
            ORDER BY xp DESC LIMIT 20
          ) u), '[]'::json) AS leaderboard,
+         COALESCE((SELECT flash_quiz_completed FROM target), false) AS flash_quiz_completed,
          COALESCE((SELECT json_agg(json_build_object('amount', x.amount, 'createdAt', x.created_at, 'reason', x.reason))
            FROM public.xp_logs x, target t
            WHERE x.user_id = t.id AND x.created_at >= NOW() - INTERVAL '7 days'), '[]'::json) AS xp_logs`,
@@ -49,9 +50,6 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
     });
     const xps = weekly.map((entry) => entry.xp);
     const total = xps.reduce((sum, xp) => sum + xp, 0);
-    const lastQuiz = (row.xp_logs || []).filter((entry: any) => entry.reason === 'Flash Quiz: Maranhão')
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-    const elapsed = lastQuiz ? Date.now() - new Date(lastQuiz.createdAt).getTime() : Infinity;
     const payload = {
       materials: row.materials || [],
       leaderboard: (row.leaderboard || []).map((entry: any) => ({
@@ -61,9 +59,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       stats: {
         weekly,
         summary: { average: Math.round(total / 7), best: Math.max(...xps, 0), total },
-        flashQuizCompleted: elapsed < 6 * 60 * 60 * 1000,
-        quizSecondsRemaining: elapsed < 6 * 60 * 60 * 1000
-          ? Math.ceil((6 * 60 * 60 * 1000 - elapsed) / 1000) : 0,
+        flashQuizCompleted: row.flash_quiz_completed === true,
+        quizSecondsRemaining: 0,
       },
     };
     await setUserCache(cacheKey, payload, 60);

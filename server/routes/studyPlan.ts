@@ -66,9 +66,9 @@ router.get('/tasks', requireAuth, async (req: AuthenticatedRequest, res: Respons
           },
           {
             user_id: user.id,
-            title: `Praticar Redação: Eixo Temático Meio Ambiente`,
+            title: `Linguagens & Interpretação - 15 questões de Português e Literatura`,
             estimated_time: '30 min',
-            target_tab: 'redacao',
+            target_tab: 'questions',
             done: false,
             task_date: taskDate,
             created_at: new Date().toISOString(),

@@ -4,6 +4,7 @@ import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
 import { verifyRecaptcha } from '../middleware/recaptcha';
 import { getSupabaseAdminClient, dbAdmin } from '../lib/dbQueryBuilder';
+import { query } from '../../src/lib/db';
 import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { cacheInvalidate } from '../services/cache';
@@ -155,26 +156,28 @@ router.post(
       log.error('[Profile Update] Error fetching old user:', e);
     }
 
-    // Flash quiz protection - only allow answering ONCE per user
+    // Flash quiz protection - atomic guard (eliminates TOCTOU race condition)
+    // Only 1 concurrent request can set flash_quiz_completed from NULL/false to true.
+    // PostgreSQL MVCC ensures the second request affects 0 rows and is blocked.
     if (isFlashQuizUpdate && userId) {
-      const { data: lastQuiz } = await getSupabaseAdminClient()
-        .from('xp_logs')
-        .select('created_at')
-        .eq('user_id', userId)
-        .eq('reason', 'Flash Quiz: Maranhão')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { rows: locked } = await query(
+        `UPDATE ${targetTable}
+         SET flash_quiz_completed = true
+         WHERE id = $1
+           AND (flash_quiz_completed IS NULL OR flash_quiz_completed = false)
+         RETURNING id`,
+        [userId],
+      );
 
-      if (lastQuiz) {
-        log.info(`[Flash Quiz] Permanently blocked duplicate XP for ${email}`);
+      if (locked.length === 0) {
+        // Atomic lock failed → quiz was already completed by another request
+        log.info(`[Flash Quiz] Atomic guard blocked duplicate XP for ${email}`);
         dbUpdate.xp = oldXp;
         dbUpdate.level = oldLevel;
         xpDiff = 0;
-        dbUpdate.flash_quiz_completed = true;
-      } else {
-        dbUpdate.flash_quiz_completed = true;
       }
+      // flash_quiz_completed already set by the atomic UPDATE above
+      dbUpdate.flash_quiz_completed = true;
     }
 
     try {

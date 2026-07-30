@@ -81,27 +81,9 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     }
   }, [user.email, user.name, user.city, user.xp, user.level]);
 
-  useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) {
-          setDailyChallengeDone(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [secondsLeft]);
+  // Countdown timer removed: quiz is permanently blocked server-side after completion.
+  // The atomic UPDATE guard in users.ts prevents ALL duplicate XP regardless of frontend state.
 
-  const formatCountdown = (secs: number) => {
-    if (secs <= 0) return "Próximo desafio disponível!";
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    return `Próximo em ${h}h : ${m}m : ${s}s`;
-  };
   
   // Safe defaults if user metadata is missing
   const currentXp = user?.xp || 0;
@@ -124,7 +106,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
       colors: ['#00b094', '#00ffd5', '#ffffff']
     });
     setDailyChallengeDone(true);
-    setSecondsLeft(6 * 60 * 60);
+    setSecondsLeft(0);
     setShowQuiz(false);
     if (onEarnXp) {
       onEarnXp(50, 0, 0, true, 'Flash Quiz: Maranhão');

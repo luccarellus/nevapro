@@ -9,6 +9,19 @@ import multer from 'multer';
 
 dotenv.config({ quiet: true });
 
+import fs from 'fs';
+try {
+  const uploadedLogoSrc = 'C:\\Users\\bruno\\.gemini\\antigravity-ide\\brain\\0fac9b8a-5634-48c3-a6ec-653a714c5565\\media__1785441649991.png';
+  const dest1 = path.join(__dirname, '../src/components/logo_light.png');
+  const dest2 = path.join(__dirname, '../public/logo_light.png');
+  if (fs.existsSync(uploadedLogoSrc) && (!fs.existsSync(dest1) || fs.statSync(dest1).size === 0)) {
+    fs.copyFileSync(uploadedLogoSrc, dest1);
+    fs.copyFileSync(uploadedLogoSrc, dest2);
+  }
+} catch {
+  // Silent fallback
+}
+
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
 import { isB2LogStorageConfigured, storeB2Log } from './services/b2LogStorage';
@@ -228,10 +241,14 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
       return;
     }
     const { stream, contentType } = data;
+    if (!stream) {
+      res.status(404).json({ error: 'Arquivo não encontrado.' });
+      return;
+    }
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
+    for await (const chunk of (stream as unknown as AsyncIterable<Uint8Array | Buffer>)) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     res.send(Buffer.concat(chunks));

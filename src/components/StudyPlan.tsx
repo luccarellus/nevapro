@@ -4,7 +4,7 @@ import { UserProfile } from '../types';
 import { 
   Target, CheckCircle2, Clock, Sparkles, ArrowRight, 
   Calendar, Award, BookOpen, RotateCcw, Flame, Check,
-  PenTool, Calculator, Plus, Trash2, Zap, Play, RefreshCw,
+  Calculator, Plus, Trash2, Zap, Play, RefreshCw,
   Trophy, TrendingUp, Bot, Lightbulb
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -185,11 +185,11 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         reason: 'Matemática possui o maior peso TRI no ENEM.',
       };
     }
-    if (lower.includes('redação') || lower.includes('português') || lower.includes('literatura') || lower.includes('linguagens')) {
+    if (lower.includes('português') || lower.includes('literatura') || lower.includes('linguagens') || lower.includes('humanas') || lower.includes('interpretação')) {
       return {
-        icon: PenTool,
-        category: 'Redação',
-        reason: 'Manter a rotina garante pontuação 900+.',
+        icon: BookOpen,
+        category: 'Linguagens & Humanas',
+        reason: 'Consolidar interpretação de texto e repertório para a prova.',
       };
     }
     if (lower.includes('erro') || lower.includes('revisar') || lower.includes('pendência')) {

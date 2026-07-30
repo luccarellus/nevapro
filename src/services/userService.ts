@@ -11,10 +11,12 @@ export const userService = {
 
   async updateProfile(data: Partial<UserProfile>): Promise<{ success: boolean; user: UserProfile }> {
     const recaptcha_token = await executeRecaptcha('update_profile').catch(() => '');
-    return request('/api/user/profile', {
+    const result = await request<{ success: boolean; user: UserProfile }>('/api/user/profile', {
       method: 'POST',
       body: { ...data, recaptcha_token },
     });
+    invalidateRequestCache();
+    return result;
   },
 
   async deleteProfile(email?: string): Promise<{ success: boolean }> {
