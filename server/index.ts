@@ -9,25 +9,7 @@ import multer from 'multer';
 
 dotenv.config({ quiet: true });
 
-import fs from 'fs';
-// Auto-sync light mode logo from uploaded context
-try {
-  const uploadedLogoSrc = 'C:\\Users\\bruno\\.gemini\\antigravity-ide\\brain\\0fac9b8a-5634-48c3-a6ec-653a714c5565\\media__1785441649991.png';
-  const destPng = path.join(__dirname, '../src/components/logo_light.png');
-  const destPublicPng = path.join(__dirname, '../public/logo_light.png');
-  const destTs = path.join(__dirname, '../src/components/logoLightData.ts');
 
-  if (fs.existsSync(uploadedLogoSrc)) {
-    const buf = fs.readFileSync(uploadedLogoSrc);
-    fs.writeFileSync(destPng, buf);
-    fs.writeFileSync(destPublicPng, buf);
-    const base64Data = `data:image/png;base64,${buf.toString('base64')}`;
-    const tsCode = `export const LOGO_LIGHT_DATA = "${base64Data}";\n`;
-    fs.writeFileSync(destTs, tsCode, 'utf8');
-  }
-} catch {
-  // Silent fallback
-}
 
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
@@ -228,31 +210,7 @@ app.get('/api/imagem', async (req, res) => {
   }
 });
 
-// Serve Light Mode Logo Image Directly
-app.get('/logo_light.png', (_req, res) => {
-  try {
-    const uploadedLogoSrc = 'C:\\Users\\bruno\\.gemini\\antigravity-ide\\brain\\0fac9b8a-5634-48c3-a6ec-653a714c5565\\media__1785441649991.png';
-    if (fs.existsSync(uploadedLogoSrc)) {
-      const buf = fs.readFileSync(uploadedLogoSrc);
-      const destPng = path.join(__dirname, '../src/components/logo_light.png');
-      const destPublicPng = path.join(__dirname, '../public/logo_light.png');
-      const destTs = path.join(__dirname, '../src/components/logoLightData.ts');
 
-      try {
-        fs.writeFileSync(destPng, buf);
-        fs.writeFileSync(destPublicPng, buf);
-        const b64 = `data:image/png;base64,${buf.toString('base64')}`;
-        fs.writeFileSync(destTs, `export const LOGO_LIGHT_DATA = "${b64}";\n`, 'utf8');
-      } catch {}
-
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.send(buf);
-      return;
-    }
-  } catch {}
-  res.status(404).send('Logo não encontrada');
-});
 
 // ===== Storage Proxy (B2) =====
 app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
