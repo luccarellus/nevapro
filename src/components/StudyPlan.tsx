@@ -77,7 +77,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           particleCount: 40,
           spread: 50,
           origin: { y: 0.7 },
-          colors: ['#00b094', '#22d3ee', '#ffffff'],
+          colors: ['#00b094', '#10b981', '#34d399', '#ffffff'],
         });
       }
 
@@ -94,7 +94,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             particleCount: 90,
             spread: 80,
             origin: { y: 0.5 },
-            colors: ['#00b094', '#22d3ee', '#fbbf24', '#ffffff'],
+            colors: ['#00b094', '#10b981', '#fbbf24', '#ffffff'],
           });
         }, 400);
       }
@@ -145,7 +145,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         particleCount: 30,
         spread: 40,
         origin: { y: 0.6 },
-        colors: ['#22d3ee', '#ffffff'],
+        colors: ['#00b094', '#10b981', '#ffffff'],
       });
     }, 1000);
   };
@@ -236,11 +236,11 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         {/* Header */}
         <header className="mb-10 md:mb-14 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <motion.div variants={itemVariants}>
-            <div className="flex items-center gap-3 text-cyan-400 text-xs font-bold mb-3 uppercase tracking-wider">
+            <div className="flex items-center gap-3 text-brand-primary text-xs font-bold mb-3 uppercase tracking-wider">
               <Target size={16} /> Plano de Estudos Personalizado
             </div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text-main leading-tight">
-              Sua rota de aprovação no <span className="text-cyan-400">ENEM</span>
+              Sua rota de aprovação no <span className="text-brand-primary">ENEM</span>
             </h1>
             <p className="text-text-secondary text-xs md:text-sm font-medium mt-2 max-w-xl">
               Organize seus estudos diários, acompanhe metas semanais e execute o plano ajustado pelo tutor IA.
@@ -248,7 +248,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           </motion.div>
 
           <motion.div variants={itemVariants} className="flex items-center gap-3 bg-bg-card/60 backdrop-blur-xl p-4 rounded-2xl border border-border-color">
-            <div className="bg-cyan-500/10 p-3 rounded-xl text-cyan-400">
+            <div className="bg-brand-primary/10 p-3 rounded-xl text-brand-primary">
               <Clock size={24} />
             </div>
             <div>
@@ -267,7 +267,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             {/* Top Info Bar */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
-                <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1 rounded-full text-cyan-400 text-[11px] font-black w-fit mb-3">
+                <div className="flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/30 px-3 py-1 rounded-full text-brand-primary text-[11px] font-black w-fit mb-3">
                   <Sparkles size={12} /> {allCompleted ? '🎉 Dia Concluído!' : `Missão de Hoje • ${completedCount}/${tasks.length} Concluídas`}
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight">
@@ -282,14 +282,14 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
               <div className="w-full lg:w-64 bg-bg-main/50 p-4 rounded-2xl border border-border-color/40">
                 <div className="flex justify-between items-center text-xs font-bold mb-2">
                   <span className="text-text-secondary opacity-70">Progresso diário</span>
-                  <span className="text-cyan-400 font-black">{progressPercent}%</span>
+                  <span className="text-brand-primary font-black">{progressPercent}%</span>
                 </div>
                 <div className="h-2.5 bg-bg-main rounded-full overflow-hidden p-0.5">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPercent}%` }}
                     transition={{ duration: 0.8 }}
-                    className="h-full bg-gradient-to-r from-cyan-500 to-brand-primary rounded-full shadow-[0_0_12px_rgba(34,211,238,0.4)]"
+                    className="h-full bg-gradient-to-r from-brand-primary to-emerald-400 rounded-full shadow-[0_0_12px_rgba(0,176,148,0.4)]"
                   />
                 </div>
               </div>
@@ -298,7 +298,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             {/* Loading State */}
             {loading && (
               <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400" />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary" />
               </div>
             )}
 
@@ -308,7 +308,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 <p className="text-rose-400 font-bold text-sm">{error}</p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-4 text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
+                  className="mt-4 text-xs font-bold text-brand-primary hover:underline"
                 >
                   Tentar novamente
                 </button>
@@ -328,8 +328,8 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       whileHover={{ scale: 1.005 }}
                       className={`p-4 md:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${
                         task.done 
-                          ? 'bg-cyan-500/10 border-cyan-500/30 text-text-secondary' 
-                          : 'bg-bg-main/40 border-border-color/60 hover:border-cyan-500/50 text-text-main'
+                          ? 'bg-brand-primary/10 border-brand-primary/30 text-text-secondary' 
+                          : 'bg-bg-main/40 border-border-color/60 hover:border-brand-primary/50 text-text-main'
                       }`}
                       onClick={() => toggleTask(task.id)}
                     >
@@ -342,20 +342,20 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                           }}
                           className={`w-6 h-6 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
                             task.done 
-                              ? 'bg-cyan-400 text-black shadow-[0_0_10px_rgba(34,211,238,0.5)]' 
-                              : 'border-2 border-text-secondary/40 hover:border-cyan-400'
+                              ? 'bg-brand-primary text-black shadow-[0_0_10px_rgba(0,176,148,0.4)]' 
+                              : 'border-2 border-text-secondary/40 hover:border-brand-primary'
                           }`}
                         >
                           {task.done && <Check size={14} strokeWidth={3} />}
                         </button>
 
-                        <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 flex-shrink-0 hidden sm:flex">
+                        <div className="p-2 rounded-xl bg-brand-primary/10 text-brand-primary flex-shrink-0 hidden sm:flex">
                           <TaskIcon size={18} />
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
                               {meta.category}
                             </span>
                             <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
@@ -374,7 +374,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
                         {syncingTaskId === task.id && (
-                          <div className="animate-spin w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full" />
+                          <div className="animate-spin w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full" />
                         )}
                         <span className="text-xs font-semibold opacity-70 text-text-secondary bg-text-main/5 px-3 py-1 rounded-xl">
                           {task.estimated_time || '30 min'}
@@ -385,7 +385,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                             e.stopPropagation();
                             onTabChange?.(task.target_tab);
                           }}
-                          className="px-3.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-bold text-xs transition-colors flex items-center gap-1.5"
+                          className="px-3.5 py-1.5 rounded-xl bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold text-xs transition-colors flex items-center gap-1.5"
                           title="Ir para atividade"
                         >
                           <span>Iniciar</span>
@@ -410,7 +410,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
               {!showAddTask ? (
                 <button
                   onClick={() => setShowAddTask(true)}
-                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 px-3.5 py-2 rounded-xl transition-all"
+                  className="text-xs font-bold text-brand-primary hover:opacity-80 flex items-center gap-1.5 bg-brand-primary/10 border border-brand-primary/20 px-3.5 py-2 rounded-xl transition-all"
                 >
                   <Plus size={14} /> Adicionar tarefa personalizada
                 </button>
@@ -426,13 +426,13 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       placeholder="Ex: Resolver 15 questões de Biologia..."
                       value={newTaskTitle}
                       onChange={(e) => setNewTaskTitle(e.target.value)}
-                      className="flex-1 bg-bg-main border border-border-color rounded-xl px-3.5 py-2 text-xs text-text-main focus:outline-none focus:border-cyan-400"
+                      className="flex-1 bg-bg-main border border-border-color rounded-xl px-3.5 py-2 text-xs text-text-main focus:outline-none focus:border-brand-primary"
                       required
                     />
                     <select
                       value={newTaskTime}
                       onChange={(e) => setNewTaskTime(e.target.value)}
-                      className="bg-bg-main border border-border-color rounded-xl px-3 py-2 text-xs text-text-secondary focus:outline-none focus:border-cyan-400"
+                      className="bg-bg-main border border-border-color rounded-xl px-3 py-2 text-xs text-text-secondary focus:outline-none focus:border-brand-primary"
                     >
                       <option value="15 min">15 min</option>
                       <option value="30 min">30 min</option>
@@ -442,7 +442,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                     <button
                       type="submit"
                       disabled={creatingTask}
-                      className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs px-4 py-2 rounded-xl transition-all disabled:opacity-50"
+                      className="bg-brand-primary hover:bg-emerald-400 text-black font-bold text-xs px-4 py-2 rounded-xl transition-all disabled:opacity-50"
                     >
                       {creatingTask ? 'Salvando...' : 'Salvar'}
                     </button>
@@ -468,7 +468,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       onTabChange?.('questions');
                     }
                   }}
-                  className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-brand-primary hover:from-cyan-400 hover:to-brand-primary text-black font-black text-sm px-8 py-4 rounded-2xl transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-3 cursor-pointer"
+                  className="w-full sm:w-auto bg-gradient-to-r from-brand-primary to-emerald-400 hover:from-emerald-400 hover:to-brand-primary text-black font-black text-sm px-8 py-4 rounded-2xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 cursor-pointer"
                 >
                   Continuar missão do dia <ArrowRight size={18} />
                 </button>
@@ -486,11 +486,11 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           >
             <div className="flex items-center justify-between mb-6">
               <div>
-                <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-1">Rotina Semanal</span>
+                <span className="text-xs font-bold text-brand-primary uppercase tracking-wider block mb-1">Rotina Semanal</span>
                 <h3 className="text-2xl font-black text-text-main tracking-tight">Cronograma das Disciplinas</h3>
               </div>
               <span className="text-xs font-bold bg-text-main/5 text-text-secondary px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                <Calendar size={14} className="text-cyan-400" /> Semana Atual
+                <Calendar size={14} className="text-brand-primary" /> Semana Atual
               </span>
             </div>
 
@@ -500,9 +500,9 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                   key={i}
                   className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     item.status === 'past'
-                      ? 'bg-brand-primary/5 border-brand-primary/20'
+                      ? 'bg-brand-primary/10 border-brand-primary/20'
                       : item.status === 'today'
-                      ? 'bg-cyan-500/10 border-cyan-500/40 ring-1 ring-cyan-500/30'
+                      ? 'bg-brand-primary/15 border-brand-primary/40 ring-1 ring-brand-primary/30'
                       : 'bg-bg-main/30 border-border-color/30 opacity-75'
                   }`}
                 >
@@ -511,7 +511,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       item.status === 'past'
                         ? 'bg-brand-primary/20 text-brand-primary'
                         : item.status === 'today'
-                        ? 'bg-cyan-500 text-black font-black'
+                        ? 'bg-brand-primary text-black font-black'
                         : 'bg-text-main/5 text-text-secondary'
                     }`}>
                       {item.status === 'past' ? <CheckCircle2 size={16} /> : i + 1}
@@ -520,7 +520,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       <h4 className="text-sm font-bold text-text-main flex items-center gap-2">
                         {item.day}
                         {item.status === 'today' && (
-                          <span className="text-[9px] uppercase font-black bg-cyan-400 text-black px-2 py-0.5 rounded-full">
+                          <span className="text-[9px] uppercase font-black bg-brand-primary text-black px-2 py-0.5 rounded-full">
                             Hoje
                           </span>
                         )}
@@ -544,17 +544,17 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block mb-1">Rota para Aprovação</span>
+                  <span className="text-[10px] font-bold text-brand-primary uppercase tracking-wider block mb-1">Rota para Aprovação</span>
                   <h3 className="text-xl font-black text-text-main tracking-tight">Previsão de Nota</h3>
                 </div>
-                <div className="bg-cyan-500/10 p-2.5 rounded-2xl text-cyan-400">
+                <div className="bg-brand-primary/10 p-2.5 rounded-2xl text-brand-primary">
                   <Trophy size={20} />
                 </div>
               </div>
 
               <div className="mb-4">
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-3xl font-black text-cyan-400">{estimatedScore} pts</span>
+                  <span className="text-3xl font-black text-brand-primary">{estimatedScore} pts</span>
                   <span className="text-xs font-bold text-text-secondary opacity-60">Meta: {targetScore}</span>
                 </div>
                 <p className="text-xs text-text-secondary opacity-75 font-medium">
@@ -564,7 +564,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
 
               <div className="h-2 bg-bg-main rounded-full overflow-hidden p-0.5">
                 <div 
-                  className="h-full bg-cyan-400 rounded-full transition-all duration-500" 
+                  className="h-full bg-brand-primary rounded-full transition-all duration-500" 
                   style={{ width: `${Math.min(100, Math.round((estimatedScore / targetScore) * 100))}%` }}
                 />
               </div>
@@ -573,9 +573,9 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             {/* AI Tutor Advice Card */}
             <motion.div 
               variants={itemVariants}
-              className="bg-indigo-950/20 border border-indigo-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
+              className="bg-emerald-950/20 border border-brand-primary/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
             >
-              <div className="flex items-center gap-3 mb-3 text-indigo-400">
+              <div className="flex items-center gap-3 mb-3 text-brand-primary">
                 <Bot size={22} />
                 <h4 className="text-sm font-black uppercase tracking-wider">Ajuste Inteligente da IA</h4>
               </div>
@@ -595,7 +595,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 type="button"
                 onClick={handleAiAutoAdjust}
                 disabled={aiAdjusting || aiAdjusted}
-                className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 font-bold text-xs py-3 rounded-xl border border-indigo-500/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold text-xs py-3 rounded-xl border border-brand-primary/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {aiAdjusting ? (
                   <>
@@ -631,9 +631,9 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 initial={{ scale: 0.8, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.8, y: 20 }}
-                className="bg-bg-card border border-cyan-500/30 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center space-y-5 relative overflow-hidden"
+                className="bg-bg-card border border-brand-primary/30 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center space-y-5 relative overflow-hidden"
               >
-                <div className="w-16 h-16 mx-auto rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-3xl">
+                <div className="w-16 h-16 mx-auto rounded-full bg-brand-primary/20 text-brand-primary flex items-center justify-center text-3xl">
                   🎉
                 </div>
 
@@ -647,7 +647,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                 <div className="bg-bg-main/60 p-4 rounded-2xl border border-border-color text-left space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-text-secondary font-bold">XP Ganho:</span>
-                    <span className="text-cyan-400 font-black">+{tasks.length * 15 + 50} XP</span>
+                    <span className="text-brand-primary font-black">+{tasks.length * 15 + 50} XP</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-text-secondary font-bold">Sequência:</span>
@@ -661,7 +661,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       setShowCelebrationModal(false);
                       onTabChange?.('questions');
                     }}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-brand-primary text-black font-black text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-cyan-500/20"
+                    className="w-full bg-gradient-to-r from-brand-primary to-emerald-400 text-black font-black text-xs py-3.5 rounded-xl transition-all shadow-lg shadow-brand-primary/20"
                   >
                     Continuar Estudando (Questões Extras)
                   </button>
