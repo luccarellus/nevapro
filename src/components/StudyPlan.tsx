@@ -5,7 +5,7 @@ import {
   Target, CheckCircle2, Clock, Sparkles, ArrowRight, 
   Calendar, Award, BookOpen, RotateCcw, Flame, Check,
   Calculator, Plus, Trash2, Zap, Play, RefreshCw,
-  Trophy, TrendingUp, Bot, Lightbulb
+  Trophy, TrendingUp, Bot, Lightbulb, Globe, FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { studyPlanService, StudyTask } from '../services/studyPlanService';
@@ -176,36 +176,108 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
   const estimatedScore = Math.min(840, Math.max(560, 620 + Math.round(userQuestions * 0.35) + Math.round((userAccuracy - 50) * 2.2)));
   const targetScore = 760;
 
-  // Task Subject Theme Helper
+  // Task Subject Theme Helper (Visão Geral das Áreas do ENEM)
   const getTaskMeta = (title: string) => {
     const lower = title.toLowerCase();
-    if (lower.includes('matemática') || lower.includes('geometria') || lower.includes('pa') || lower.includes('física') || lower.includes('química') || lower.includes('exatas')) {
+    if (lower.includes('matemática') || lower.includes('exatas')) {
       return {
         icon: Calculator,
-        category: 'Exatas',
-        reason: 'Matemática possui o maior peso TRI no ENEM.',
+        category: 'Matemática & Tecnologias',
+        reason: 'Área com maior impacto e variância de TRI no ENEM.',
       };
     }
-    if (lower.includes('português') || lower.includes('literatura') || lower.includes('linguagens') || lower.includes('humanas') || lower.includes('interpretação')) {
+    if (lower.includes('natureza') || lower.includes('biologia') || lower.includes('física') || lower.includes('química')) {
+      return {
+        icon: Flame,
+        category: 'Ciências da Natureza',
+        reason: 'Visão integrada de Biologia, Física e Química no ENEM.',
+      };
+    }
+    if (lower.includes('humanas') || lower.includes('história') || lower.includes('geografia') || lower.includes('filosofia') || lower.includes('sociologia')) {
+      return {
+        icon: Globe,
+        category: 'Ciências Humanas',
+        reason: 'Análise crítica de contextos sociais, históricos e geográficos.',
+      };
+    }
+    if (lower.includes('linguagens') || lower.includes('português') || lower.includes('literatura') || lower.includes('interpretação')) {
       return {
         icon: BookOpen,
-        category: 'Linguagens & Humanas',
-        reason: 'Consolidar interpretação de texto e repertório para a prova.',
+        category: 'Linguagens & Códigos',
+        reason: 'Interpretação textual, gêneros e repertório para a prova.',
       };
     }
     if (lower.includes('erro') || lower.includes('revisar') || lower.includes('pendência')) {
       return {
         icon: RotateCcw,
-        category: 'Revisão',
-        reason: 'Fixação ativa dos erros da última semana.',
+        category: 'Revisão Geral ENEM',
+        reason: 'Fixação ativa dos erros cometidos nos simulados do ENEM.',
       };
     }
     return {
       icon: Target,
-      category: 'Prática',
-      reason: 'Treino de questões para aumentar a precisão.',
+      category: 'Visão Geral ENEM',
+      reason: 'Treino integrativo de questões para a matriz da prova.',
     };
   };
+
+  const enemAreasOverview = [
+    {
+      id: 'matematica',
+      title: 'Matemática e suas Tecnologias',
+      day: 'Dia 2 da Prova',
+      dayColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      questions: '45 Questões',
+      weight: 'TRI Elevada',
+      icon: Calculator,
+      targetTab: 'questions',
+      description: 'Álgebra, Geometria, Matemática Financeira, Estatística e Proporcionalidade.',
+    },
+    {
+      id: 'natureza',
+      title: 'Ciências da Natureza e suas Tecnologias',
+      day: 'Dia 2 da Prova',
+      dayColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      questions: '45 Questões',
+      weight: 'Interdisciplinar',
+      icon: Flame,
+      targetTab: 'questions',
+      description: 'Biologia (Ecologia/Genética), Química (Físico-Química) e Física (Mecânica/Eletricidade).',
+    },
+    {
+      id: 'linguagens',
+      title: 'Linguagens, Códigos e suas Tecnologias',
+      day: 'Dia 1 da Prova',
+      dayColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+      questions: '45 Questões + Redação',
+      weight: 'Base Textual',
+      icon: BookOpen,
+      targetTab: 'questions',
+      description: 'Interpretação textual, Literatura, Artes, Língua Estrangeira e Tecnologias da Informação.',
+    },
+    {
+      id: 'humanas',
+      title: 'Ciências Humanas e suas Tecnologias',
+      day: 'Dia 1 da Prova',
+      dayColor: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+      questions: '45 Questões',
+      weight: 'Análise Crítica',
+      icon: Globe,
+      targetTab: 'questions',
+      description: 'História do Brasil/Geral, Geografia, Filosofia e Sociologia.',
+    },
+    {
+      id: 'redacao',
+      title: 'Redação Dissertativa-Argumentativa',
+      day: 'Dia 1 da Prova',
+      dayColor: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      questions: '1000 Pontos',
+      weight: 'Decisivo',
+      icon: FileText,
+      targetTab: 'redacao',
+      description: 'Estrutura em 4 parágrafos, 5 Competências oficiais e Proposta de Intervenção.',
+    },
+  ];
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -238,13 +310,13 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         <header className="mb-10 md:mb-14 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <motion.div variants={itemVariants}>
             <div className="flex items-center gap-3 text-brand-primary text-xs font-bold mb-3 uppercase tracking-wider">
-              <Target size={16} /> Plano de Estudos Personalizado
+              <Target size={16} /> Plano de Estudos • Visão Geral do ENEM
             </div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text-main leading-tight">
               Sua rota de aprovação no <span className="text-brand-primary">ENEM</span>
             </h1>
             <p className="text-text-secondary text-xs md:text-sm font-medium mt-2 max-w-xl">
-              Organize seus estudos diários, acompanhe metas semanais e execute o plano ajustado pelo tutor IA.
+              Organize seus estudos com foco na visão geral das 4 Áreas do Conhecimento do ENEM + Redação, acompanhando suas metas diárias.
             </p>
           </motion.div>
 
@@ -478,61 +550,64 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           </div>
         </motion.div>
 
-        {/* LOWER SECTION: WEEKLY ROUTINE & AI DIAGNOSTIC */}
+        {/* LOWER SECTION: ENEM OVERVIEW & AI DIAGNOSTIC */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-          {/* Weekly Schedule Timeline (8 cols) */}
+          {/* ENEM Areas Overview (8 cols) */}
           <motion.div 
             variants={itemVariants}
             className="lg:col-span-8 bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-2xl"
           >
             <div className="flex items-center justify-between mb-6">
               <div>
-                <span className="text-xs font-bold text-brand-primary uppercase tracking-wider block mb-1">Rotina Semanal</span>
-                <h3 className="text-2xl font-black text-text-main tracking-tight">Cronograma das Disciplinas</h3>
+                <span className="text-xs font-bold text-brand-primary uppercase tracking-wider block mb-1">Visão Geral do Exame</span>
+                <h3 className="text-2xl font-black text-text-main tracking-tight">Áreas do Conhecimento ENEM</h3>
               </div>
               <span className="text-xs font-bold bg-text-main/5 text-text-secondary px-3 py-1.5 rounded-full flex items-center gap-1.5">
-                <Calendar size={14} className="text-brand-primary" /> Semana Atual
+                <Target size={14} className="text-brand-primary" /> Matriz de Referência
               </span>
             </div>
 
             <div className="space-y-3">
-              {weeklyDays.map((item, i) => (
-                <div 
-                  key={i}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    item.status === 'past'
-                      ? 'bg-brand-primary/10 border-brand-primary/20'
-                      : item.status === 'today'
-                      ? 'bg-brand-primary/15 border-brand-primary/40 ring-1 ring-brand-primary/30'
-                      : 'bg-bg-main/30 border-border-color/30 opacity-75'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                      item.status === 'past'
-                        ? 'bg-brand-primary/20 text-brand-primary'
-                        : item.status === 'today'
-                        ? 'bg-brand-primary text-black font-black'
-                        : 'bg-text-main/5 text-text-secondary'
-                    }`}>
-                      {item.status === 'past' ? <CheckCircle2 size={16} /> : i + 1}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-text-main flex items-center gap-2">
-                        {item.day}
-                        {item.status === 'today' && (
-                          <span className="text-[9px] uppercase font-black bg-brand-primary text-black px-2 py-0.5 rounded-full">
-                            Hoje
+              {enemAreasOverview.map((area) => {
+                const AreaIcon = area.icon;
+                return (
+                  <div 
+                    key={area.id}
+                    className="p-4 rounded-2xl border bg-bg-main/30 border-border-color/40 hover:border-brand-primary/40 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className="w-10 h-10 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <AreaIcon size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="text-sm font-bold text-text-main truncate">
+                            {area.title}
+                          </h4>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${area.dayColor}`}>
+                            {area.day}
                           </span>
-                        )}
-                      </h4>
-                      <p className="text-xs font-medium text-text-secondary opacity-70">
-                        {item.status === 'past' ? 'Dia concluído' : item.status === 'today' ? 'Estudos de hoje' : 'Aguardando'}
-                      </p>
+                          <span className="text-[10px] font-bold text-text-secondary bg-text-main/5 px-2 py-0.5 rounded-md">
+                            {area.questions}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium text-text-secondary opacity-75 line-clamp-1">
+                          {area.description}
+                        </p>
+                      </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onTabChange?.(area.targetTab)}
+                      className="px-3.5 py-2 rounded-xl bg-brand-primary/10 hover:bg-brand-primary text-brand-primary hover:text-black font-bold text-xs transition-all flex items-center justify-center gap-1.5 flex-shrink-0 cursor-pointer"
+                    >
+                      <span>Praticar Área</span>
+                      <ArrowRight size={13} />
+                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
 

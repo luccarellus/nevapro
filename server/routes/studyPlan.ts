@@ -48,7 +48,7 @@ router.get('/tasks', requireAuth, async (req: AuthenticatedRequest, res: Respons
         const defaults = [
           {
             user_id: user.id,
-            title: `Matemática - 15 questões de Geometria e PA`,
+            title: `Matemática e suas Tecnologias - 15 questões estilo ENEM`,
             estimated_time: '45 min',
             target_tab: 'questions',
             done: false,
@@ -66,7 +66,7 @@ router.get('/tasks', requireAuth, async (req: AuthenticatedRequest, res: Respons
           },
           {
             user_id: user.id,
-            title: `Linguagens & Interpretação - 15 questões de Português e Literatura`,
+            title: `Linguagens, Códigos & Humanas - 15 questões de interpretação ENEM`,
             estimated_time: '30 min',
             target_tab: 'questions',
             done: false,
