@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, Loader2, Check, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Lock, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 import Logo from './Logo';
+import Spinner from './Spinner';
 import { executeRecaptcha } from '../lib/recaptcha';
 
 interface ResetPasswordProps {
@@ -145,7 +146,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
   if (isValidSession === null) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-bg-main">
-        <Loader2 className="animate-spin w-8 h-8 text-brand-primary" />
+        <Spinner size={32} />
       </div>
     );
   }
@@ -224,7 +225,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
               disabled={isLoading}
               className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-5 rounded-3xl font-black uppercase tracking-[0.3em] text-xs transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
             >
-              {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Redefinir senha'}
+              {isLoading ? <Spinner size={20} className="text-white" /> : 'Redefinir senha'}
             </button>
           </form>
         </div>

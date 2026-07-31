@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar as CalendarIcon, Clock, Video, FileText, Send, ArrowRight, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Video, FileText, Send, ArrowRight } from 'lucide-react';
 import { eventService } from '../services/eventService';
 import { StudyEvent } from '../types';
+import Spinner from './Spinner';
 
 export default function Calendar() {
   const [eventos, setEventos] = useState<StudyEvent[]>([]);
@@ -28,7 +29,7 @@ export default function Calendar() {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center pt-20">
-        <Loader2 className="animate-spin text-brand-primary" size={32} />
+        <Spinner size={32} />
       </div>
     );
   }

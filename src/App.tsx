@@ -16,6 +16,8 @@ import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
 import { invalidateRequestCache } from './lib/requestCache';
 
+import Spinner from './components/Spinner';
+
 // Lazy-loaded route components (code splitting)
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const Questions = lazy(() => import('./components/Questions'));
@@ -37,7 +39,7 @@ const ResetPassword = lazy(() => import('./components/ResetPassword'));
 
 const PageLoading = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
+    <Spinner size={36} />
   </div>
 );
 

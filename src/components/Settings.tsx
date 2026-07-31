@@ -8,7 +8,6 @@ import {
   X, 
   ChevronDown,
   CheckCircle2,
-  Loader2,
   Check,
   AlertTriangle,
   Upload,
@@ -17,6 +16,7 @@ import {
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { uploadService } from '../services/uploadService';
+import Spinner from './Spinner';
 
 interface SettingsProps {
   user: UserProfile;
@@ -273,7 +273,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       title="Alterar foto de perfil"
                     >
                       {isUploadingAvatar ? (
-                        <Loader2 size={14} className="animate-spin" />
+                        <Spinner size={14} className="text-white" />
                       ) : (
                         <Camera size={14} />
                       )}
@@ -304,7 +304,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       }`}
                     >
                       {isUploadingAvatar ? (
-                        <Loader2 size={12} className="animate-spin" />
+                        <Spinner size={12} />
                       ) : (
                         <Upload size={12} />
                       )}
@@ -466,7 +466,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                     className="bg-[#00b094] hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-bold text-[12px] shadow-lg shadow-[#00b094]/20 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSaving ? (
-                      <Loader2 size={16} className="animate-spin" />
+                      <Spinner size={16} className="text-white" />
                     ) : saveStatus === 'success' ? (
                       <CheckCircle2 size={16} />
                     ) : null}
@@ -532,7 +532,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                     className="bg-brand-primary hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-lg shadow-brand-primary/20 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {isSaving ? (
-                      <Loader2 size={16} className="animate-spin" />
+                      <Spinner size={16} className="text-white" />
                     ) : saveStatus === 'success' ? (
                       <CheckCircle2 size={16} />
                     ) : null}
@@ -779,7 +779,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       disabled={passwordStatus === 'loading'}
                       className="bg-brand-primary hover:bg-[#00d1b0] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-brand-primary/20 transition-all active:scale-95 flex items-center justify-center gap-2.5 disabled:opacity-50"
                     >
-                      {passwordStatus === 'loading' && <Loader2 size={14} className="animate-spin" />}
+                      {passwordStatus === 'loading' && <Spinner size={14} className="text-white" />}
                       Atualizar Senha
                     </button>
                   </div>
@@ -790,7 +790,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                   disabled={isSaving}
                   className="bg-[#00b094] hover:bg-[#00d1b0] text-white px-10 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-lg shadow-[#00b094]/20 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
                 >
-                  {isSaving && <Loader2 size={16} className="animate-spin" />}
+                  {isSaving && <Spinner size={16} className="text-white" />}
                   Salvar Preferências de Privacidade
                 </button>
 
@@ -829,7 +829,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                        disabled={isDeleting}
                        className="bg-red-500/20 hover:bg-red-500 text-red-500 hover:text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2.5 disabled:opacity-50 w-full md:w-auto shadow-sm hover:shadow-red-500/25"
                       >
-                        {isDeleting && <Loader2 size={14} className="animate-spin" />}
+                        {isDeleting && <Spinner size={14} className="text-white" />}
                         Excluir meu perfil
                       </button>
                    </div>
@@ -885,7 +885,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                   className="px-5 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
                   disabled={isDeleting}
                 >
-                  {isDeleting && <Loader2 size={12} className="animate-spin" />}
+                  {isDeleting && <Spinner size={12} className="text-white" />}
                   Excluir Permanentemente
                 </button>
               </div>

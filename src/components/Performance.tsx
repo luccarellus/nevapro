@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { performanceService, TriScore, SubjectMastery, MasteryEvolution } from '../services/performanceService';
+import Spinner from './Spinner';
 
 interface PerformanceProps {
   user: UserProfile;
@@ -140,7 +141,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
         {/* Loading State */}
         {loading && (
           <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-400" />
+            <Spinner size={40} />
           </div>
         )}
 
@@ -184,7 +185,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     <p className="text-6xl md:text-7xl font-black text-text-main tracking-tighter leading-none mb-2">
                       {calculatingTri ? (
                         <span className="inline-flex items-center gap-3">
-                          <span className="animate-spin h-8 w-8 border-2 border-emerald-400 border-t-transparent rounded-full" />
+                          <Spinner size={32} />
                           <span className="text-sm font-bold text-text-secondary">Calculando...</span>
                         </span>
                       ) : estimatedTri > 0 ? estimatedTri : '---'}

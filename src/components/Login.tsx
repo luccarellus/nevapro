@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Mail, Lock, UserPlus, MapPin, School, Flag, Loader2, Check, AlertCircle } from 'lucide-react';
+import { ArrowRight, Mail, Lock, UserPlus, MapPin, School, Flag, Check, AlertCircle } from 'lucide-react';
 import Logo from './Logo';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
+import Spinner from './Spinner';
 import cidadesEscolasData from '../data/cidades_escolas.json';
 
 interface LoginProps {
@@ -192,7 +193,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       disabled={isLoading}
                       className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-5 rounded-3xl font-black uppercase tracking-[0.3em] text-xs transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:cursor-wait"
                     >
-                      {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Enviar link de recuperação'}
+                      {isLoading ? <Spinner size={20} className="text-white" /> : 'Enviar link de recuperação'}
                     </button>
                     <button
                       type="button"
@@ -349,7 +350,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                       className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-5 mt-4 rounded-3xl font-black uppercase tracking-[0.3em] text-xs transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 group active:scale-95 disabled:opacity-50 disabled:cursor-wait"
                     >
                       {isLoading ? (
-                        <Loader2 className="animate-spin" size={20} />
+                        <Spinner size={20} className="text-white" />
                       ) : (
                         <>
                           {isRegistering ? 'Cadastrar' : 'Acessar'}

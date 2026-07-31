@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Plus, Trash2, Loader2, CheckCircle2,
+  Plus, Trash2, CheckCircle2,
   ShieldCheck, X, ArrowRight
 } from 'lucide-react';
+import Spinner from './Spinner';
 import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
 import { eventService } from '../services/eventService';
@@ -358,7 +359,7 @@ export default function AdminDashboard({
                   <div className="flex gap-4 pt-4">
                     <button onClick={handleSaveEvent} disabled={isLoading}
                       className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
                       {isSuccess ? (editingId ? 'Evento Atualizado' : 'Evento Salvo') : (editingId ? 'Atualizar evento' : 'Salvar evento')}
                     </button>
                     <button onClick={() => setEventForm({ title: '', releaseDate: '', xpReward: '20', category: 'Evento', observation: '' })}
@@ -398,7 +399,7 @@ export default function AdminDashboard({
                   <div className="flex gap-4 pt-4">
                     <button onClick={handleSaveMural} disabled={isLoading}
                       className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
                       {isSuccess ? (editingId ? 'Recado Atualizado' : 'Recado Salvo') : (editingId ? 'Atualizar recado' : 'Salvar recado')}
                     </button>
                     <button onClick={() => setMuralForm({ title: '', category: 'importante', tag: '', content: '' })}
@@ -457,7 +458,7 @@ export default function AdminDashboard({
                   <div className="flex gap-4 pt-4">
                     <button onClick={handleSaveMaterial} disabled={isLoading}
                       className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
                       {isSuccess ? (editingId ? 'Material Atualizado' : 'Material Salvo') : (editingId ? 'Atualizar Material' : 'Salvar Material')}
                     </button>
                     <button onClick={() => { setMaterialForm({ title: '', type: 'pdf', foco: 'ENEM geral', url: '', description: '' }); setSelectedFile(null); }}
@@ -490,7 +491,7 @@ export default function AdminDashboard({
                     className="flex-1 bg-text-main/10 hover:bg-text-main/20 text-text-main py-3.5 rounded-xl font-black text-[10px] tracking-wider transition-all cursor-pointer">Cancelar</button>
                   <button onClick={handleConfirmDelete} disabled={isLoading}
                     className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
-                    {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {isLoading ? <Spinner size={14} className="text-white" /> : <Trash2 size={14} />}
                     Confirmar exclusão</button>
                 </div>
               </div>

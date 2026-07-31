@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, X, Loader2, CheckCircle2, Trash2, ChevronRight, TrendingUp,
+  Users, X, CheckCircle2, Trash2, ChevronRight, TrendingUp,
   ShieldAlert, Crown, UserCircle, Send, Clock, Trophy, Building2
 } from 'lucide-react';
+import Spinner from '../Spinner';
 import { UserProfile } from '../../types';
 import { calculateLevelAndProgression } from '../../utils/xpUtils';
 import { getStudentRankInfo } from './AdminUtils';
@@ -532,7 +533,7 @@ export default function AdminAlunos({
                     disabled={isUpdatingAccuracy}
                     className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-3 rounded-xl font-black text-[10px] tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {isUpdatingAccuracy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                    {isUpdatingAccuracy ? <Spinner size={14} className="text-white" /> : <CheckCircle2 size={14} />}
                     Salvar precisao
                   </button>
                 </div>
@@ -566,7 +567,7 @@ export default function AdminAlunos({
                         <button onClick={handleDeleteStudent}
                           disabled={isDeleting}
                           className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
-                          {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          {isDeleting ? <Spinner size={14} className="text-white" /> : <Trash2 size={14} />}
                           Confirmar exclusão
                         </button>
                       </div>

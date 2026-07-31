@@ -5,13 +5,14 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import confetti from 'canvas-confetti';
 import { 
-  AlertOctagon, ArrowRight, Loader2, Award, 
+  AlertOctagon, ArrowRight, Award, 
   Check, X, ChevronDown, MessageSquare, 
   BarChart2, CheckCircle2, Frown, Sparkles, Search, RotateCcw
 } from 'lucide-react';
 import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
 import { UserProfile } from '../types';
+import Spinner from './Spinner';
 
 interface ErrorQuestion {
   id: string;
@@ -201,7 +202,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-rose-500 animate-spin mx-auto mb-6" />
+          <Spinner className="w-16 h-16 text-rose-500 mx-auto mb-6" />
           <p className="text-text-main font-black uppercase tracking-widest text-sm">Carregando Erros</p>
           <p className="text-text-secondary text-[10px] mt-2 font-bold uppercase opacity-60">Sincronizando seu desempenho...</p>
         </div>

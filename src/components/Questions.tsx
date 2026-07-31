@@ -6,9 +6,10 @@ import rehypeRaw from 'rehype-raw';
 import { Question, UserProfile } from '../types';
 import { ENEM_YEARS, ENEM_SUBJECTS } from '../data/mockData';
 import { enemService } from '../services/enemService';
-import { ArrowRight, Award, Loader2, BookOpen } from 'lucide-react';
+import { ArrowRight, Award, BookOpen } from 'lucide-react';
 import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
+import Spinner from './Spinner';
 
 interface QuestionsProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -120,11 +121,8 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="relative mb-6">
-            <Loader2 className="w-16 h-16 text-[#00b094] animate-spin mx-auto" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-2 h-2 bg-[#00b094] rounded-full animate-ping" />
-            </div>
+          <div className="relative mb-6 flex items-center justify-center">
+            <Spinner className="w-16 h-16 mx-auto" />
           </div>
           <p className="text-white font-bold text-xs">Sincronizando banco de dados</p>
           <p className="text-zinc-500 text-[10px] mt-2 font-bold">Buscando questões do ENEM {selectedYear}...</p>

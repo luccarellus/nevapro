@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { materialService } from '../services/materialService';
 import { Material } from '../types';
 import PdfVisualizer from './PdfVisualizer';
+import Spinner from './Spinner';
 
 type MaterialType = 'all' | 'pdf' | 'video' | 'link';
 
@@ -135,7 +136,7 @@ export default function Materiais() {
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={40} className="text-[#00b094] animate-spin mb-4" />
+            <Spinner size={40} className="mb-4" />
             <p className="text-zinc-600 font-bold uppercase text-[9px] tracking-widest">Carregando...</p>
           </div>
         ) : (

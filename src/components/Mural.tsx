@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { muralService } from '../services/muralService';
 import { Notice } from '../types';
+import Spinner from './Spinner';
 
 type NoticeCategory = 'tudo' | 'importante' | 'estudos' | 'apoio';
 
@@ -172,7 +173,7 @@ export default function Mural() {
           <div className="bg-bg-card/20 backdrop-blur-sm border border-border-color rounded-3xl lg:rounded-[40px] relative min-h-[500px] overflow-hidden">
              {isLoading ? (
                <div className="absolute inset-0 flex items-center justify-center">
-                 <Loader2 className="text-brand-primary animate-spin" size={48} />
+                 <Spinner size={48} />
                </div>
              ) : (
                <AnimatePresence mode="popLayout">

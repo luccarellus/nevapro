@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { studyPlanService, StudyTask } from '../services/studyPlanService';
+import Spinner from './Spinner';
 
 interface StudyPlanProps {
   user: UserProfile;
@@ -298,7 +299,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             {/* Loading State */}
             {loading && (
               <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary" />
+                <Spinner size={32} />
               </div>
             )}
 
@@ -374,7 +375,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
                         {syncingTaskId === task.id && (
-                          <div className="animate-spin w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full" />
+                          <Spinner size={16} />
                         )}
                         <span className="text-xs font-semibold opacity-70 text-text-secondary bg-text-main/5 px-3 py-1 rounded-xl">
                           {task.estimated_time || '30 min'}

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Trophy, Medal, Crown, Loader2 } from 'lucide-react';
+import { Trophy, Medal, Crown } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
+import Spinner from './Spinner';
 
 interface LeaderboardProps {
   user: UserProfile;
@@ -30,7 +31,7 @@ export default function Leaderboard({ user }: LeaderboardProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-10 h-10 animate-spin text-brand-primary" />
+        <Spinner size={40} />
       </div>
     );
   }

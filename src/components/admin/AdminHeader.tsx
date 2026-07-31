@@ -12,12 +12,12 @@ import {
   UserCircle,
   LogOut,
   PanelLeftClose,
-  Upload,
-  Loader2
+  Upload
 } from 'lucide-react';
 import Logo from '../Logo';
 import { userService } from '../../services/userService';
 import { uploadService } from '../../services/uploadService';
+import Spinner from '../Spinner';
 
 type AdminTab = 'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos';
 
@@ -165,7 +165,7 @@ export default function AdminHeader({
                       : 'text-text-main hover:bg-text-main/10 cursor-pointer'
                   }`}
                 >
-                  {isUploadingAvatar ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                  {isUploadingAvatar ? <Spinner size={13} /> : <Upload size={13} />}
                   {isUploadingAvatar ? 'Enviando foto' : adminAvatarUrl ? 'Trocar foto de perfil' : 'Enviar foto de perfil'}
                 </label>
                 {avatarUploadError && (

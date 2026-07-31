@@ -6,9 +6,10 @@ import rehypeRaw from 'rehype-raw';
 import { MOCK_SIMULADOS, ENEM_YEARS } from '../data/mockData';
 import { Question, UserProfile } from '../types';
 import { enemService } from '../services/enemService';
-import { ClipboardList, Clock, ArrowRight, Loader2, Award, Check, X, Info, ChevronDown, AlertTriangle } from 'lucide-react';
+import { ClipboardList, Clock, ArrowRight, Award, Check, X, Info, ChevronDown, AlertTriangle } from 'lucide-react';
 import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
+import Spinner from './Spinner';
 
 interface SimuladosProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -285,7 +286,7 @@ export default function Simulados({
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-brand-primary animate-spin mx-auto mb-6" />
+          <Spinner className="w-16 h-16 mx-auto mb-6" />
           <p className="text-text-main font-black uppercase tracking-widest text-sm">Preparando Simulado</p>
           <p className="text-text-secondary text-[10px] mt-2 font-bold uppercase opacity-60">Sincronizando 90 questões oficiais...</p>
         </div>
