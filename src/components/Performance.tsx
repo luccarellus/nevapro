@@ -1,17 +1,92 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import {
   TrendingUp, AlertTriangle, ArrowUpRight, Sparkles,
-  ArrowRight, ShieldCheck, Zap
+  ArrowRight, CheckCircle2, Zap, Target, Search,
+  Award, Activity, Calculator, Atom, Globe, Languages,
+  BarChart3, PieChart as PieChartIcon, ShieldCheck, Filter,
+  BookOpen, Check, X
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend
+} from 'recharts';
 import { performanceService, TriScore, SubjectMastery, MasteryEvolution } from '../services/performanceService';
 import Spinner from './Spinner';
 
 interface PerformanceProps {
   user: UserProfile;
   onTabChange?: (tab: string) => void;
+}
+
+// Semicircular Gauge Meter Component matching reference image
+function SemicircleGauge({
+  value,
+  max = 1000,
+  label,
+  color = '#34d399',
+  icon: Icon
+}: {
+  value: number;
+  max?: number;
+  label: string;
+  color?: string;
+  icon?: any;
+}) {
+  const percentage = max > 0 ? Math.min(100, Math.max(0, Math.round((value / max) * 100))) : 0;
+  const radius = 38;
+  const strokeWidth = 7;
+  const arcLength = Math.PI * radius; // 180 degrees arc length
+
+  return (
+    <div className="bg-bg-card/40 backdrop-blur-xl p-4 rounded-2xl border border-border-color/30 flex flex-col items-center justify-between transition-all hover:scale-[1.02]">
+      <div className="flex items-center gap-1.5 mb-2 w-full justify-center">
+        {Icon && <Icon size={14} style={{ color }} />}
+        <span className="text-xs font-black text-text-main truncate max-w-[130px]">{label}</span>
+      </div>
+
+      <div className="relative w-32 h-20 flex items-end justify-center">
+        <svg className="w-32 h-32 transform -rotate-180 overflow-visible" viewBox="0 0 100 100">
+          {/* Background Track Arc */}
+          <path
+            d="M 12,50 A 38,38 0 0,1 88,50"
+            fill="none"
+            stroke="var(--border-color)"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            opacity={0.3}
+          />
+          {/* Foreground Progress Arc */}
+          <path
+            d="M 12,50 A 38,38 0 0,1 88,50"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={arcLength}
+            strokeDashoffset={(1 - (percentage / 100)) * arcLength}
+            className="transition-all duration-1000 ease-out"
+          />
+        </svg>
+
+        <div className="absolute bottom-1 text-center">
+          <span className="text-xl font-black text-text-main leading-none block">
+            {value > 0 ? value : '---'}
+          </span>
+          <span className="text-[9px] font-bold text-text-secondary opacity-60">
+            {value > 0 ? `meta ${max}` : 'sem dados'}
+          </span>
+        </div>
+      </div>
+
+      <div className="w-full flex justify-between items-center text-[10px] font-bold text-text-secondary mt-2 px-2 border-t border-border-color/20 pt-1.5">
+        <span>0</span>
+        <span className="font-black" style={{ color }}>{value > 0 ? `${percentage}%` : '0%'}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function Performance({ user, onTabChange }: PerformanceProps) {
@@ -25,6 +100,10 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   const [triCalculationMessage, setTriCalculationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Filter & Search States
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user.email) return;
@@ -37,10 +116,10 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
         ]);
 
         setLatestTriScore(triData.latest_score);
-        setTriTarget(triData.tri_target);
-        setStats(triData.stats);
-        setSubjectsMastery(masteryData.subjects);
-        setEvolution(masteryData.evolution);
+        setTriTarget(triData.tri_target || 750);
+        setStats(triData.stats || { hit_rate: 0, answered: 0, correct: 0, xp: 0 });
+        setSubjectsMastery(masteryData.subjects || []);
+        setEvolution(masteryData.evolution || []);
 
         // Auto-trigger TRI calculation based on latest answers
         setCalculatingTri(true);
@@ -61,7 +140,6 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
           }
         } catch (calcErr) {
           console.error('[Performance] Erro no cálculo TRI:', calcErr);
-          // Non-critical — keep showing existing tri data
         } finally {
           setCalculatingTri(false);
         }
@@ -79,28 +157,71 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   const triGoal = triTarget || 750;
   const triProgress = triGoal > 0 ? Math.min(100, Math.round((estimatedTri / triGoal) * 100)) : 0;
 
-  // Build evolution chart data — always from real data only
-  const evolutionData = evolution.length > 0
-    ? evolution
-    : [];
+  // Categories list for filtering
+  const categoriesList = useMemo(() => {
+    const cats = Array.from(new Set(subjectsMastery.map(s => s.category))).filter(Boolean);
+    return ['all', ...cats];
+  }, [subjectsMastery]);
 
-  // Group subjects by category for the heatmap
-  const groupedSubjects = subjectsMastery.reduce<Record<string, SubjectMastery[]>>((acc, subject) => {
-    if (!acc[subject.category]) acc[subject.category] = [];
-    acc[subject.category].push(subject);
-    return acc;
-  }, {});
+  // Filtered subjects for table
+  const filteredSubjects = useMemo(() => {
+    return subjectsMastery.filter(item => {
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+      const matchesSearch = !searchTerm || item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [subjectsMastery, selectedCategory, searchTerm]);
 
-  // Find critical subjects for the spaced repetition warning
-  const criticalSubjects = subjectsMastery.filter(s => s.level === 'critical');
-  const totalCriticalQuestions = criticalSubjects.reduce((sum, s) => sum + (s.total || 0), 0);
+  // Donut Chart Data (Domain Mastery levels)
+  const masteryDistributionData = useMemo(() => {
+    const high = subjectsMastery.filter(s => s.level === 'high').length;
+    const medium = subjectsMastery.filter(s => s.level === 'medium').length;
+    const critical = subjectsMastery.filter(s => s.level === 'critical').length;
+
+    if (high === 0 && medium === 0 && critical === 0) {
+      return [
+        { name: 'Sem dados', value: 1, color: 'var(--border-color)' }
+      ];
+    }
+
+    return [
+      { name: 'Dominado (≥ 70%)', value: high, color: '#34d399' },
+      { name: 'Em Progresso (50-69%)', value: medium, color: '#fbbf24' },
+      { name: 'Atenção (< 50%)', value: critical, color: '#f43f5e' }
+    ].filter(item => item.value > 0);
+  }, [subjectsMastery]);
+
+  // Bar Chart Data (Correct vs Incorrect by Area)
+  const areaBarData = useMemo(() => {
+    const areaStats: Record<string, { correct: number; incorrect: number }> = {
+      'Matemática': { correct: 0, incorrect: 0 },
+      'Ciências da Natureza': { correct: 0, incorrect: 0 },
+      'Ciências Humanas': { correct: 0, incorrect: 0 },
+      'Linguagens': { correct: 0, incorrect: 0 }
+    };
+
+    subjectsMastery.forEach(sub => {
+      const catKey = areaStats[sub.category] ? sub.category : 'Outros';
+      if (!areaStats[catKey]) {
+        areaStats[catKey] = { correct: 0, incorrect: 0 };
+      }
+      areaStats[catKey].correct += sub.correct || 0;
+      areaStats[catKey].incorrect += Math.max(0, (sub.total || 0) - (sub.correct || 0));
+    });
+
+    return Object.entries(areaStats).map(([area, data]) => ({
+      name: area.replace('Ciências da ', '').replace(' e suas Tecnologias', ''),
+      Corretas: data.correct,
+      Incorretas: data.incorrect
+    }));
+  }, [subjectsMastery]);
+
+  // Critical subjects for alert
+  const criticalSubjects = useMemo(() => subjectsMastery.filter(s => s.level === 'critical'), [subjectsMastery]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
   };
 
   const itemVariants = {
@@ -108,375 +229,335 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
   };
 
-  // Calculate 7-day trend
-  const trendPts = evolution.length >= 2
-    ? evolution.slice(-2)
-    : null;
-  const trendDiff = trendPts && trendPts.length === 2
-    ? trendPts[1].precision - trendPts[0].precision
-    : 0;
-
   return (
-    <div className="max-w-6xl mx-auto pt-24 pb-32 px-4 md:px-8">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Header */}
-        <header className="mb-10 md:mb-14">
-          <motion.div variants={itemVariants}>
-            <div className="flex items-center gap-3 text-emerald-400 text-xs font-bold mb-3 uppercase tracking-wider">
-              <TrendingUp size={16} /> Central de Desempenho & Inteligência TRI
+    <div className="max-w-7xl mx-auto pt-6 pb-24 px-4 md:px-8">
+      <motion.div variants={containerVariants} initial="hidden" animate="visible">
+        
+        {/* Main Header inspired by Dashboard Title */}
+        <header className="mb-8 border-b border-border-color/30 pb-6">
+          <motion.div variants={itemVariants} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-wider mb-2">
+                <TrendingUp size={14} /> Relatório Acadêmico Individual
+              </div>
+              <h1 className="text-2xl md:text-4xl font-black text-text-main tracking-tight">
+                Painel de pontuação e avaliação de desempenho do aluno
+              </h1>
+              <p className="text-text-secondary text-xs md:text-sm font-medium mt-1">
+                Visualização consolidada do seu aprendizado no ENEM, notas por área e raio-x por assuntos.
+              </p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text-main leading-tight">
-              Sua evolução de <span className="text-emerald-400"></span>estudos
-            </h1>
-            <p className="text-text-secondary text-xs md:text-sm font-medium mt-2 max-w-xl">
-              Análise contínua do seu desempenho no ENEM, projeção de nota TRI e diagnóstico por assuntos.
-            </p>
+
+            {/* Student Info Badge */}
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-bg-card/60 border border-border-color/40">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary flex items-center justify-center text-white font-black text-sm">
+                {user.avatarUrl || user.avatar ? (
+                  <img src={user.avatarUrl || user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  user.name?.charAt(0)?.toUpperCase() || 'A'
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-main truncate max-w-[150px]">{user.name || 'Aluno Neva'}</p>
+                <p className="text-[10px] font-semibold text-emerald-400">Nível {user.level || 1} • {stats.xp} XP</p>
+              </div>
+            </div>
           </motion.div>
         </header>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center py-20">
-            <Spinner size={40} />
+          <div className="flex flex-col items-center justify-center py-24">
+            <Spinner size={44} className="text-emerald-400 mb-4" />
+            <p className="text-xs font-bold text-text-secondary uppercase tracking-widest animate-pulse">Carregando métricas do painel...</p>
           </div>
         )}
 
         {/* Error State */}
         {error && !loading && (
-          <motion.div variants={itemVariants} className="text-center py-20 bg-rose-500/5 border border-rose-500/20 rounded-[40px]">
-            <p className="text-rose-400 font-bold text-lg">{error}</p>
+          <motion.div variants={itemVariants} className="text-center py-16 px-6 bg-rose-500/5 border border-rose-500/20 rounded-[32px]">
+            <AlertTriangle className="mx-auto mb-4 text-rose-500" size={40} />
+            <p className="text-rose-400 font-bold text-base md:text-lg mb-2">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="mt-4 text-sm font-bold text-emerald-400 hover:text-emerald-300 underline"
+              className="mt-2 text-xs font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 underline"
             >
               Tentar novamente
             </button>
           </motion.div>
         )}
 
-        {/* Main Content */}
         {!loading && !error && (
-          <>
-            {/* Top Grid: TRI Score Card + 30 Days Evolution */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-              {/* Estimated TRI Score Card (5 cols) */}
-              <motion.div
-                variants={itemVariants}
-                className="lg:col-span-5 bg-gradient-to-br from-emerald-950/40 via-bg-card/60 to-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-emerald-500/30 shadow-2xl relative overflow-hidden flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">Métrica ENEM</span>
-                      <h3 className="text-xl font-black text-text-main">Nota TRI Estimada</h3>
-                    </div>
-                    {trendDiff !== 0 && (
-                      <span className={`${trendDiff > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'} border ${trendDiff > 0 ? 'border-emerald-500/30' : 'border-rose-500/30'} px-3 py-1 rounded-full text-xs font-black flex items-center gap-1`}>
-                        <ArrowUpRight size={14} className={trendDiff < 0 ? 'rotate-90' : ''} /> {trendDiff > 0 ? '+' : ''}{trendDiff} pts
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mb-8">
-                    <p className="text-6xl md:text-7xl font-black text-text-main tracking-tighter leading-none mb-2">
-                      {calculatingTri ? (
-                        <span className="inline-flex items-center gap-3">
-                          <Spinner size={32} />
-                          <span className="text-sm font-bold text-text-secondary">Calculando...</span>
-                        </span>
-                      ) : estimatedTri > 0 ? estimatedTri : '---'}
-                    </p>
-                    {triCalculationMessage && estimatedTri === 0 && (
-                      <p className="text-xs font-medium text-amber-400 mt-2">
-                        {triCalculationMessage}
-                      </p>
-                    )}
-                    {!triCalculationMessage && (
-                      <p className="text-xs font-semibold text-text-secondary opacity-70">
-                        {estimatedTri > 0
-                          ? 'Calculada com base na coerência pedagógica dos seus simulados e questões (modelo TRI 3PL).'
-                          : 'Responda questões para gerar sua estimativa TRI.'}
-                      </p>
-                    )}
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* LEFT COLUMN: Average Subject Score Gauges (3 cols on desktop) */}
+            <motion.div variants={itemVariants} className="lg:col-span-3 space-y-4">
+              <div className="bg-bg-card/50 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl">
+                <div className="mb-4 pb-3 border-b border-border-color/30">
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Média por Área</span>
+                  <h3 className="text-base font-black text-text-main tracking-tight">Pontuação do Aluno</h3>
                 </div>
 
-                <div className="bg-bg-main/50 p-4 rounded-2xl border border-border-color/40">
-                  <div className="flex justify-between items-center text-xs font-bold mb-2">
-                    <span className="text-text-secondary opacity-70">Rumo à meta ({triTarget}+)</span>
-                    <span className="text-emerald-400 font-black">{triProgress}%</span>
+                <div className="space-y-4">
+                  <SemicircleGauge
+                    label="Matemática"
+                    value={latestTriScore?.math_score || 0}
+                    max={1000}
+                    color="#38bdf8"
+                    icon={Calculator}
+                  />
+
+                  <SemicircleGauge
+                    label="Ciências da Natureza"
+                    value={latestTriScore?.nature_score || 0}
+                    max={1000}
+                    color="#34d399"
+                    icon={Atom}
+                  />
+
+                  <SemicircleGauge
+                    label="Ciências Humanas"
+                    value={latestTriScore?.humanities_score || 0}
+                    max={1000}
+                    color="#fbbf24"
+                    icon={Globe}
+                  />
+
+                  <SemicircleGauge
+                    label="Linguagens"
+                    value={latestTriScore?.languages_score || 0}
+                    max={1000}
+                    color="#c084fc"
+                    icon={Languages}
+                  />
+                </div>
+              </div>
+            </motion.div>
+
+            {/* CENTER COLUMN: Top KPIs + Donut Chart + Bar Chart (5 cols on desktop) */}
+            <div className="lg:col-span-5 space-y-6">
+              
+              {/* Top KPI Cards (TRI Score & Attendance / Hit Rate) */}
+              <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-br from-emerald-950/40 via-bg-card/60 to-bg-card/40 p-4 rounded-2xl border border-emerald-500/30 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Nota TRI Geral</span>
+                    <Target size={16} className="text-emerald-400" />
                   </div>
-                  <div className="h-2.5 bg-bg-main rounded-full overflow-hidden p-0.5">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${triProgress}%` }}
-                      transition={{ duration: 1.2 }}
-                      className="h-full bg-gradient-to-r from-emerald-500 to-brand-primary rounded-full shadow-[0_0_12px_rgba(52,211,153,0.4)]"
-                    />
+                  <p className="text-3xl font-black text-text-main tracking-tight">
+                    {calculatingTri ? '...' : estimatedTri > 0 ? estimatedTri : '---'}
+                  </p>
+                  <span className="text-[10px] font-semibold text-text-secondary mt-1 opacity-70">
+                    Meta: {triTarget} pts
+                  </span>
+                </div>
+
+                <div className="bg-bg-card/40 backdrop-blur-xl p-4 rounded-2xl border border-border-color/40 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Precisão Geral</span>
+                    <Activity size={16} className="text-emerald-400" />
                   </div>
+                  <p className="text-3xl font-black text-emerald-400 tracking-tight">{stats.hit_rate}%</p>
+                  <span className="text-[10px] font-semibold text-text-secondary mt-1 opacity-70">
+                    {stats.answered} respondidas
+                  </span>
+                </div>
+              </motion.div>
+
+              {/* Donut Chart: Mastery Level Distribution */}
+              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl">
+                <div className="mb-3">
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Proporção Acadêmica</span>
+                  <h3 className="text-base font-black text-text-main tracking-tight">Distribuição por Nível de Domínio</h3>
+                </div>
+
+                <div className="h-52 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={masteryDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={75}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {masteryDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'var(--bg-sidebar)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '14px',
+                          color: 'var(--text-main)'
+                        }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        iconType="circle"
+                        formatter={(val) => <span className="text-xs font-bold text-text-secondary">{val}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
               </motion.div>
 
-              {/* 30-Day Evolution Chart (7 cols) */}
-              <motion.div
-                variants={itemVariants}
-                className="lg:col-span-7 bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-2xl flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-1">
-                        {evolution.length > 0 ? 'Evolução Contínua' : 'Últimos 30 Dias'}
-                      </span>
-                      <h3 className="text-2xl font-black text-text-main tracking-tight">Evolução de Precisão</h3>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-text-secondary opacity-60">Taxa de Acertos</span>
-                      <p className="text-lg font-black text-emerald-400">{stats.hit_rate}%</p>
-                    </div>
-                  </div>
-
-                  {/* Chart — only render when there are data points */}
-                  {evolutionData.length > 0 ? (
-                    <div className="h-52 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={evolutionData}>
-                          <defs>
-                            <linearGradient id="colorPrec" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
-                          <XAxis
-                            dataKey="label"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 'bold' }}
-                          />
-                          <YAxis hide domain={[30, 100]} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'var(--bg-sidebar)',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '16px',
-                              boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                              color: 'var(--text-main)'
-                            }}
-                            itemStyle={{ color: '#34d399', fontWeight: '900', fontSize: '14px' }}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="precision"
-                            stroke="#34d399"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorPrec)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-52 w-full flex items-center justify-center bg-bg-main/20 rounded-2xl border border-dashed border-border-color/50">
-                      <p className="text-xs font-medium text-text-secondary opacity-50">
-                        {stats.answered > 0 ? 'Acumulando dados para o gráfico de evolução...' : 'Responda questões para gerar o gráfico de evolução.'}
-                      </p>
-                    </div>
-                  )}
+              {/* Bar Chart: Correct vs Incorrect by Area */}
+              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl">
+                <div className="mb-3">
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Resultados por Ramo</span>
+                  <h3 className="text-base font-black text-text-main tracking-tight">Acertos vs Erros por Área</h3>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border-color/30">
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-text-secondary opacity-60">Respondidas</p>
-                    <p className="text-lg font-black text-text-main">{stats.answered}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-text-secondary opacity-60">Acertos</p>
-                    <p className="text-lg font-black text-emerald-400">{stats.correct}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-text-secondary opacity-60">Precisão</p>
-                    <p className="text-lg font-black text-text-main">{stats.hit_rate}%</p>
-                  </div>
+                <div className="h-52 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={areaBarData}>
+                      <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: '700' }} />
+                      <YAxis hide />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'var(--bg-sidebar)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '14px',
+                          color: 'var(--text-main)'
+                        }}
+                      />
+                      <Bar dataKey="Corretas" fill="#34d399" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Incorretas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </motion.div>
+
             </div>
 
-            {/* Second Row: Subject Heatmap & Spaced Repetition Warning */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-              {/* Subject Heatmap (8 cols) */}
-              <motion.div
-                variants={itemVariants}
-                className="lg:col-span-8 bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-8 border border-border-color shadow-2xl"
-              >
-                <div className="mb-6">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-1">Mapa dos Assuntos</span>
-                  <h3 className="text-2xl font-black text-text-main tracking-tight">Nível de Domínio por Conteúdo</h3>
-                </div>
-
-                {subjectsMastery.length === 0 ? (
-                  <div className="py-12 text-center bg-bg-main/30 border border-dashed border-border-color rounded-3xl">
-                    <p className="text-text-secondary font-bold text-sm">Nenhum dado de assunto disponível</p>
-                    <p className="text-text-secondary text-xs mt-2 opacity-60">Responda questões para ver seu nível de domínio.</p>
-                    <button
-                      onClick={() => onTabChange?.('questions')}
-                      className="mt-4 bg-emerald-500/10 text-emerald-400 font-bold text-xs px-6 py-3 rounded-xl border border-emerald-500/30 hover:bg-emerald-500/20 transition-all"
-                    >
-                      Responder questões
-                    </button>
+            {/* RIGHT COLUMN: Student Details Table & AI Tutor Diagnostics (4 cols on desktop) */}
+            <div className="lg:col-span-4 space-y-6">
+              
+              {/* Spaced Repetition / Critical Warning */}
+              {criticalSubjects.length > 0 && (
+                <motion.div variants={itemVariants} className="bg-amber-950/20 border border-amber-500/30 rounded-[28px] p-5 backdrop-blur-xl">
+                  <div className="flex items-center gap-2 mb-2 text-amber-400">
+                    <AlertTriangle size={16} />
+                    <h4 className="text-xs font-black uppercase tracking-wider">Atenção Necessária</h4>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    {Object.entries(groupedSubjects).map(([category, items]) => (
-                      <div key={category} className="space-y-3">
-                        <p className="text-xs font-bold text-text-secondary opacity-60 uppercase tracking-wider">{category}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {items.map((item, i) => {
-                            const isHigh = item.level === 'high';
-                            const isMed = item.level === 'medium';
-                            return (
-                              <div
-                                key={i}
-                                className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isHigh
-                                    ? 'bg-emerald-500/10 border-emerald-500/30'
-                                    : isMed
-                                      ? 'bg-amber-500/10 border-amber-500/30'
-                                      : 'bg-rose-500/10 border-rose-500/30'
-                                  }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <span className={`w-3 h-3 rounded-full ${isHigh ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : isMed ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]'
-                                    }`} />
-                                  <span className="text-xs font-bold text-text-main">{item.name}</span>
-                                  <span className="text-[9px] font-semibold text-text-secondary opacity-40">({item.total}q)</span>
-                                </div>
-                                <span className={`text-xs font-black ${isHigh ? 'text-emerald-400' : isMed ? 'text-amber-400' : 'text-rose-400'
-                                  }`}>
-                                  {item.percentage}%
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-
-              {/* Right Column: Spaced Repetition & Tutor Diagnosis (4 cols) */}
-              <div className="lg:col-span-4 space-y-6">
-                {/* Spaced Repetition Warning */}
-                {criticalSubjects.length > 0 && (
-                  <motion.div
-                    variants={itemVariants}
-                    className="bg-amber-950/20 border border-amber-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
-                  >
-                    <div className="flex items-center gap-3 mb-3 text-amber-400">
-                      <AlertTriangle size={20} />
-                      <h4 className="text-sm font-black uppercase tracking-wider">⚠️ Precisa de atenção</h4>
-                    </div>
-                    <p className="text-xs font-bold text-text-main mb-1">Revisões pendentes</p>
-                    <p className="text-xs font-medium text-text-secondary opacity-80 mb-4">
-                      {criticalSubjects.map(s => s.name).join(', ')} — {totalCriticalQuestions} questões com desempenho abaixo de 50%.
-                    </p>
-                    <button
-                      onClick={() => onTabChange?.('errors')}
-                      className="w-full bg-amber-500 text-black font-black text-xs py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
-                    >
-                      Revisar agora <ArrowRight size={14} />
-                    </button>
-                  </motion.div>
-                )}
-
-                {/* Empty state when no critical subjects */}
-                {criticalSubjects.length === 0 && stats.answered > 0 && (
-                  <motion.div
-                    variants={itemVariants}
-                    className="bg-emerald-950/20 border border-emerald-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
-                  >
-                    <div className="flex items-center gap-3 mb-3 text-emerald-400">
-                      <ShieldCheck size={20} />
-                      <h4 className="text-sm font-black uppercase tracking-wider">✅ Tudo em dia!</h4>
-                    </div>
-                    <p className="text-xs font-medium text-text-secondary leading-relaxed">
-                      Seu desempenho está equilibrado. Continue praticando para manter o ritmo.
-                    </p>
-                  </motion.div>
-                )}
-
-                {/* Onboarding state for new users */}
-                {stats.answered === 0 && (
-                  <motion.div
-                    variants={itemVariants}
-                    className="bg-indigo-950/20 border border-indigo-500/30 rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
-                  >
-                    <div className="flex items-center gap-3 mb-3 text-indigo-400">
-                      <TrendingUp size={20} />
-                      <h4 className="text-sm font-black uppercase tracking-wider">📊 Comece agora!</h4>
-                    </div>
-                    <p className="text-xs font-medium text-text-secondary leading-relaxed mb-4">
-                      Responda suas primeiras questões para começarmos a analisar seu desempenho e identificar seus pontos fortes.
-                    </p>
-                    <button
-                      onClick={() => onTabChange?.('questions')}
-                      className="w-full bg-indigo-500 text-white font-black text-xs py-3.5 rounded-2xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-400 transition-all flex items-center justify-center gap-2"
-                    >
-                      Responder questões <ArrowRight size={14} />
-                    </button>
-                  </motion.div>
-                )}
-
-                {/* AI Tutor Diagnostic Analysis */}
-                <motion.div
-                  variants={itemVariants}
-                  className="bg-bg-card/40 border border-border-color rounded-3xl md:rounded-[40px] p-6 backdrop-blur-xl"
-                >
-                  <div className="flex items-center gap-2 text-brand-primary text-xs font-bold uppercase tracking-wider mb-3">
-                    <Sparkles size={16} /> Análise IA • Professor Virtual
-                  </div>
-                  <div className="space-y-3 text-xs font-medium text-text-secondary leading-relaxed mb-4">
-                    {stats.answered > 0 ? (
-                      <>
-                        <p>
-                          {stats.hit_rate >= 70
-                            ? `Continue assim! Sua precisão de ${stats.hit_rate}% mostra que você está no caminho certo.`
-                            : stats.hit_rate >= 50
-                              ? `Seu desempenho está evoluindo com ${stats.hit_rate}% de acertos. Foque nos assuntos com desempenho crítico para acelerar.`
-                              : `Você está no início da jornada com ${stats.hit_rate}% de acertos. O importante é manter a consistência!`}
-                        </p>
-                        {criticalSubjects.length > 0 && (
-                          <>
-                            <p className="text-text-main font-bold">Minha sugestão:</p>
-                            <ul className="space-y-1.5 list-disc list-inside text-text-secondary opacity-90">
-                              <li>Resolver {Math.min(25, totalCriticalQuestions + 10)} questões de {criticalSubjects[0].name}</li>
-                              <li>Revisar a teoria dos assuntos com menor desempenho</li>
-                              <li>Fazer mini simulado de fixação</li>
-                            </ul>
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <p>
-                        Comece a responder questões para que eu possa analisar seu desempenho e dar recomendações personalizadas!
-                      </p>
-                    )}
-                  </div>
-
+                  <p className="text-xs font-bold text-text-main mb-1">Revisão Pendente</p>
+                  <p className="text-xs font-medium text-text-secondary opacity-80 mb-3 leading-relaxed">
+                    {criticalSubjects.map(s => s.name).join(', ')} — desempenho abaixo de 50%.
+                  </p>
                   <button
-                    onClick={() => onTabChange?.('questions')}
-                    className="w-full bg-text-main/5 hover:bg-text-main/10 text-text-main font-bold text-xs py-3 rounded-xl border border-border-color transition-colors flex items-center justify-center gap-2"
+                    onClick={() => onTabChange?.('errors')}
+                    className="w-full bg-amber-500 text-black font-black text-xs py-2.5 rounded-xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
                   >
-                    {stats.answered > 0 ? 'Executar recomendação' : 'Começar agora'} <Zap size={14} className="text-brand-primary" />
+                    Revisar no Caderno de Erros <ArrowRight size={14} />
                   </button>
                 </motion.div>
-              </div>
+              )}
+
+              {/* Table of Student Details (Detalhamento dos Tópicos) */}
+              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Histórico de Assuntos</span>
+                      <h3 className="text-base font-black text-text-main tracking-tight">Detalhamento dos Tópicos</h3>
+                    </div>
+                  </div>
+
+                  {/* Search and Filters */}
+                  <div className="space-y-2 mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={14} />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Filtrar assunto..."
+                        className="w-full bg-bg-main/60 border border-border-color/40 rounded-xl py-2 pl-9 pr-3 text-xs text-text-main placeholder:text-text-secondary/50 focus:outline-none focus:border-emerald-500/50 transition-all"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                      {categoriesList.map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${
+                            selectedCategory === cat
+                              ? 'bg-emerald-500 text-black font-black'
+                              : 'bg-bg-main/40 text-text-secondary hover:text-text-main border border-border-color/20'
+                          }`}
+                        >
+                          {cat === 'all' ? 'Todos' : cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Table View */}
+                  <div className="max-h-[360px] overflow-y-auto custom-scrollbar border border-border-color/30 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-bg-main/80 text-text-secondary uppercase text-[9px] font-black tracking-wider sticky top-0 backdrop-blur-md">
+                        <tr>
+                          <th className="p-3">Assunto</th>
+                          <th className="p-3 text-center">Respostas</th>
+                          <th className="p-3 text-right">Precisão</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-color/20">
+                        {filteredSubjects.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="p-6 text-center text-text-secondary opacity-60 font-medium">
+                              Nenhum tópico encontrado.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredSubjects.map((item, idx) => {
+                            const isHigh = item.level === 'high';
+                            const isMed = item.level === 'medium';
+
+                            return (
+                              <tr key={idx} className="hover:bg-text-main/[0.02] transition-colors">
+                                <td className="p-3">
+                                  <p className="font-bold text-text-main line-clamp-1">{item.name}</p>
+                                  <p className="text-[9px] font-semibold text-text-secondary opacity-60">{item.category}</p>
+                                </td>
+                                <td className="p-3 text-center font-bold text-text-secondary">
+                                  {item.correct}/{item.total}
+                                </td>
+                                <td className="p-3 text-right">
+                                  <span className={`font-black text-xs px-2 py-0.5 rounded-md inline-block ${
+                                    isHigh ? 'bg-emerald-500/20 text-emerald-400' : isMed ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'
+                                  }`}>
+                                    {item.percentage}%
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Direct CTA */}
+                <button
+                  onClick={() => onTabChange?.('questions')}
+                  className="w-full mt-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs py-3 rounded-xl border border-emerald-500/30 transition-all flex items-center justify-center gap-2"
+                >
+                  Praticar mais questões <Zap size={14} />
+                </button>
+              </motion.div>
+
             </div>
-          </>
+
+          </div>
         )}
       </motion.div>
     </div>
