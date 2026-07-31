@@ -135,29 +135,38 @@ export default function App() {
     } catch (error: any) {
       if (error.status === 401) {
         clearLocalSession();
-      } else {
-        console.error('Failed to fetch user:', error);
       }
     }
     return false;
   };
 
   useEffect(() => {
-    if (customTheme && customTheme !== 'default') {
-      document.documentElement.setAttribute('data-theme', customTheme);
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+    let activeTheme = customTheme;
+    if (!customTheme || customTheme === 'default') {
+      activeTheme = isDarkMode ? 'dark' : 'light';
+    }
+
+    document.documentElement.setAttribute('data-theme', activeTheme);
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
     } else {
-      if (isDarkMode) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.setAttribute('data-theme', 'light');
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.classList.remove('dark');
+    }
+
+    const bgColors: Record<string, string> = {
+      'dark': '#060a12',
+      'light': '#f8fafc',
+      'cyberpunk': isDarkMode ? '#08070d' : '#faf8fc',
+      'forest': isDarkMode ? '#050806' : '#f4f9f6',
+      'dracula': isDarkMode ? '#11111b' : '#eff1f5',
+      'neva': isDarkMode ? '#060b0d' : '#f0f8fa',
+      'minimalist': isDarkMode ? '#09090b' : '#fafafa',
+      'retro': isDarkMode ? '#0c0805' : '#f4ecd8'
+    };
+
+    const themeMeta = document.getElementById('theme-color-meta');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', bgColors[activeTheme] || '#060a12');
     }
   }, [customTheme, isDarkMode]);
 
@@ -382,7 +391,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-main transition-colors duration-300">
+    <div className="min-h-[100dvh] bg-bg-main transition-colors duration-300">
       {isLoggedIn && !isFullPageTab && (
         <>
           <Header 
@@ -403,7 +412,7 @@ export default function App() {
         </>
       )}
 
-      <main className={`transition-all duration-300 ${isLoggedIn && !isFullPageTab ? 'lg:pl-64' : ''}`}>
+      <main className={`transition-all duration-300 ${isLoggedIn && !isFullPageTab ? 'pt-[calc(4.25rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-12 lg:pl-64' : ''}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={isLoggedIn ? activeTab : 'login'}

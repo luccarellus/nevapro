@@ -233,14 +233,49 @@
   }
 }
 
-@utility safe-p-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+html {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  min-height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   @apply font-sans transition-colors duration-300;
   color: var(--text-main);
   background-color: var(--bg-main);
+  min-height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+  background-color: var(--bg-main);
+}
+
+@utility safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+
+@utility safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility safe-p-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility min-h-dvh {
+  min-height: 100dvh;
+}
+
+@utility h-dvh {
+  height: 100dvh;
 }
 
 /* Tailwind v4 removeu o cursor:pointer padrão de botões.

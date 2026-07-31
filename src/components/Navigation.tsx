@@ -136,7 +136,7 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
       </aside>
 
       {/* Mobile Bottom Navigation - Expandable */}
-      <nav className="fixed bottom-0 left-0 right-0 lg:hidden bg-bg-sidebar/95 backdrop-blur-xl z-[100] border-t border-border-color shadow-2xl safe-p-bottom transition-all duration-300">
+      <nav className="fixed bottom-0 left-0 right-0 lg:hidden bg-bg-sidebar/95 backdrop-blur-2xl z-[100] border-t border-border-color/40 shadow-2xl pb-[env(safe-area-inset-bottom)] transition-all duration-300">
         <div className="flex flex-col px-2">
           
           <AnimatePresence>

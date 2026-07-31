@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <link rel="icon" type="image/png" href="/favicon.png?v=1" />
   <link rel="shortcut icon" href="/favicon.png?v=1" />
   <link rel="manifest" href="/manifest.json" />
@@ -16,21 +16,41 @@
   <script>
     (function () {
       // Aplica o tema ANTES do primeiro paint para eliminar o flash/delay no F5
-      var theme = localStorage.getItem('neva_custom_theme');
+      var theme = localStorage.getItem('neva_custom_theme') || 'default';
       var isDark = localStorage.getItem('neva_dark_mode');
       var isDarkMode = isDark !== 'false'; // default: true
 
-      if (theme && theme !== 'default') {
-        document.documentElement.setAttribute('data-theme', theme);
-      } else {
-        document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+      var activeTheme = theme;
+      if (theme === 'default') {
+        activeTheme = isDarkMode ? 'dark' : 'light';
       }
+      document.documentElement.setAttribute('data-theme', activeTheme);
 
       if (isDarkMode) {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
+
+      var bgColors = {
+        'dark': '#060a12',
+        'light': '#f8fafc',
+        'cyberpunk': isDarkMode ? '#08070d' : '#faf8fc',
+        'forest': isDarkMode ? '#050806' : '#f4f9f6',
+        'dracula': isDarkMode ? '#11111b' : '#eff1f5',
+        'neva': isDarkMode ? '#060b0d' : '#f0f8fa',
+        'minimalist': isDarkMode ? '#09090b' : '#fafafa',
+        'retro': isDarkMode ? '#0c0805' : '#f4ecd8'
+      };
+
+      var themeMeta = document.getElementById('theme-color-meta');
+      if (!themeMeta) {
+        themeMeta = document.createElement('meta');
+        themeMeta.name = 'theme-color';
+        themeMeta.id = 'theme-color-meta';
+        document.head.appendChild(themeMeta);
+      }
+      themeMeta.setAttribute('content', bgColors[activeTheme] || '#060a12');
     })();
   </script>
   <script type="text/javascript">

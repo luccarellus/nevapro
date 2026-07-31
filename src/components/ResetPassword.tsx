@@ -94,7 +94,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
 
   if (isValidSession === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-bg-main">
+      <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-bg-main">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -123,7 +123,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-bg-main">
+      <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-bg-main">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -145,14 +145,14 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
 
   if (isValidSession === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-bg-main">
+      <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-bg-main">
         <Spinner size={32} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-bg-main">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-bg-main">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

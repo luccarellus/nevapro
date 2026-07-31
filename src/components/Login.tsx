@@ -105,7 +105,7 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-bg-main">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))] relative overflow-hidden bg-bg-main">
       {/* Background blobs for aesthetic */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-apple-blue/10 blur-[100px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-brand-primary/5 blur-[100px] rounded-full pointer-events-none" />

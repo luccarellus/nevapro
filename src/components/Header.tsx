@@ -99,8 +99,8 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-bg-main/50 backdrop-blur-xl">
-      <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 z-40 bg-bg-main/80 backdrop-blur-xl pt-[env(safe-area-inset-top)] transition-colors duration-300 border-b border-border-color/20">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="lg:hidden">
           <Logo className="h-14" />
         </div>

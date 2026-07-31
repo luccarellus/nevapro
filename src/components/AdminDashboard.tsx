@@ -242,7 +242,7 @@ export default function AdminDashboard({
 
   if (user.role !== 'admin') {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-bg-main text-text-main">
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-bg-main text-text-main pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="text-center">
           <ShieldCheck size={64} className="mx-auto mb-6 text-red-500" />
           <h1 className="text-3xl font-black mb-2">Acesso Restrito</h1>
@@ -255,7 +255,7 @@ export default function AdminDashboard({
   }
 
   return (
-    <div className="h-screen bg-bg-main text-text-secondary font-sans overflow-hidden transition-colors duration-300">
+    <div className="h-[100dvh] bg-bg-main text-text-secondary font-sans overflow-hidden transition-colors duration-300 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <AdminHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
