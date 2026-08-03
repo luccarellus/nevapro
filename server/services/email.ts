@@ -29,6 +29,8 @@ export async function sendPasswordResetEmail(
 ): Promise<void> {
   const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
+  const baseUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
+  const logoUrl = `${baseUrl.replace(/\/$/, '')}/logo.png`;
 
   const { error } = await getClient().emails.send({
     from: `${senderName} <${from}>`,
@@ -49,7 +51,7 @@ export async function sendPasswordResetEmail(
           <!-- Logo -->
           <tr>
             <td style="padding-bottom:24px;text-align:center;">
-              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Neva PRO</span>
+              <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" style="max-width:340px;width:100%;height:auto;display:inline-block;border:0;" />
             </td>
           </tr>
           <!-- Card -->
@@ -94,7 +96,7 @@ export async function sendPasswordResetEmail(
           <tr>
             <td style="padding:24px 32px 0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                Neva PRO<br />
+                Neva PRO &bull; Instituto Olhar Jovem<br />
                 Se tiver dúvidas, entre em contato pelo nosso suporte.
               </p>
             </td>
@@ -123,6 +125,8 @@ export async function sendWelcomeEmail(
 ): Promise<void> {
   const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
+  const baseUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
+  const logoUrl = `${baseUrl.replace(/\/$/, '')}/logo.png`;
 
   const { error } = await getClient().emails.send({
     from: `${senderName} <${from}>`,
@@ -143,7 +147,7 @@ export async function sendWelcomeEmail(
           <!-- Logo -->
           <tr>
             <td style="padding-bottom:24px;text-align:center;">
-              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Neva PRO</span>
+              <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" style="max-width:340px;width:100%;height:auto;display:inline-block;border:0;" />
             </td>
           </tr>
           <!-- Card -->
@@ -195,7 +199,7 @@ export async function sendWelcomeEmail(
           <tr>
             <td style="padding:24px 32px 0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                Neva PRO &bull; Olhar Jovem<br />
+                Neva PRO &bull; Instituto Olhar Jovem<br />
                 Bons estudos!
               </p>
             </td>
@@ -215,4 +219,6 @@ export async function sendWelcomeEmail(
 
   log.info(`[Email] E-mail de boas-vindas enviado para ${to}`);
 }
+
+
 
