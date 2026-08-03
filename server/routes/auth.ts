@@ -9,7 +9,8 @@ import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
-import { sendPasswordResetEmail } from '../services/email';
+import { sendPasswordResetEmail, sendWelcomeEmail } from '../services/email';
+
 
 const router = Router();
 
@@ -168,7 +169,13 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
 
     if (error) throw error;
 
+    // Enviar e-mail de boas-vindas assincronamente via Resend
+    void sendWelcomeEmail(cleanEmail, safeName || cleanEmail.split('@')[0]).catch((emailErr) => {
+      log.error('[Auth] Erro ao enviar e-mail de boas-vindas:', emailErr);
+    });
+
     const userObj = {
+
       ...data,
       id: data.id,
       role: 'student' as const,

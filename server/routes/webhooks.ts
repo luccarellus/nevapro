@@ -4,8 +4,10 @@ import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { normalizeEmail, sanitizeInput } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { sendWelcomeEmail } from '../services/email';
 
 const router = Router();
+
 
 /**
  * Webhook de integração do EventEase -> NevaPro
@@ -97,6 +99,12 @@ router.post('/eventease', rateLimiter(30, 60_000), async (req: Request, res: Res
     }
 
     log.info(`[Webhook EventEase] Aluno cadastrado com sucesso: ${cleanEmail}`);
+
+    // 5. Enviar e-mail de boas-vindas assincronamente via Resend
+    void sendWelcomeEmail(cleanEmail, safeName).catch((emailErr) => {
+      log.error('[Webhook EventEase] Erro ao enviar e-mail de boas-vindas:', emailErr);
+    });
+
 
     res.status(201).json({
       success: true,

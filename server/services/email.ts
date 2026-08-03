@@ -114,3 +114,105 @@ export async function sendPasswordResetEmail(
 
   log.info(`[Email] E-mail de redefinição enviado para ${to}`);
 }
+
+/** E‑mail de boas-vindas para novos cadastros (incluindo integração EventEase) */
+export async function sendWelcomeEmail(
+  to: string,
+  userName: string,
+  loginUrl: string = process.env.APP_URL || 'https://nevapro.olharjovem.org',
+): Promise<void> {
+  const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
+  const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
+
+  const { error } = await getClient().emails.send({
+    from: `${senderName} <${from}>`,
+    to,
+    subject: 'Bem-vindo(a) ao Neva PRO! 🎉',
+    html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+          <!-- Logo -->
+          <tr>
+            <td style="padding-bottom:24px;text-align:center;">
+              <span style="font-size:28px;font-weight:900;color:#6C5CE7;">Neva PRO</span>
+            </td>
+          </tr>
+          <!-- Card -->
+          <tr>
+            <td style="background:#ffffff;border-radius:24px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;">
+                Bem-vindo(a) ao Neva PRO!
+              </h1>
+              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;">
+                Olá, <strong>${userName}</strong>!
+              </p>
+              <p style="margin:0 0 20px;font-size:15px;color:#64748b;line-height:1.6;">
+                Sua conta foi criada com sucesso e você já pode acessar a nossa plataforma de estudos e simulados.
+              </p>
+              
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:24px;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#334155;">
+                  🔑 Dados de Acesso:
+                </p>
+                <p style="margin:0 0 6px;font-size:14px;color:#475569;">
+                  <strong>E-mail:</strong> ${to}
+                </p>
+                <p style="margin:0;font-size:14px;color:#475569;">
+                  <strong>Senha padrão:</strong> <code style="background:#e2e8f0;padding:2px 8px;border-radius:6px;color:#6C5CE7;font-weight:bold;">nevapro123</code>
+                </p>
+              </div>
+
+              <!-- CTA -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+                <tr>
+                  <td align="center">
+                    <a href="${loginUrl}"
+                       style="display:inline-block;padding:16px 40px;background:#6C5CE7;color:#ffffff;
+                              text-decoration:none;border-radius:40px;font-size:14px;font-weight:700;
+                              letter-spacing:0.5px;">
+                      Acessar a Plataforma
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+                💡 <em>Dica de Segurança:</em> Recomendamos que você altere sua senha após o primeiro acesso.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 32px 0;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;">
+                Neva PRO &bull; Olhar Jovem<br />
+                Bons estudos!
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim(),
+  });
+
+  if (error) {
+    log.error('[Email] Erro ao enviar e-mail de boas-vindas:', error);
+    throw error;
+  }
+
+  log.info(`[Email] E-mail de boas-vindas enviado para ${to}`);
+}
+
