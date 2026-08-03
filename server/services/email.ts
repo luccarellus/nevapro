@@ -27,10 +27,27 @@ export async function sendPasswordResetEmail(
   userName: string,
   resetLink: string,
 ): Promise<void> {
+/** Helper para garantir URL pública HTTPS válida da logo */
+function getLogoUrl(): string {
+  const envUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
+  let cleanUrl = envUrl.trim().replace(/\/$/, '');
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    cleanUrl = `https://${cleanUrl}`;
+  }
+  // Forçar sempre https para evitar bloqueios de conteúdo misto em clientes de e-mail (Outlook/Gmail)
+  cleanUrl = cleanUrl.replace(/^http:/, 'https:');
+  return `${cleanUrl}/logo.png`;
+}
+
+/** E‑mail de redefinição de senha */
+export async function sendPasswordResetEmail(
+  to: string,
+  userName: string,
+  resetLink: string,
+): Promise<void> {
   const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
-  const baseUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
-  const logoUrl = `${baseUrl.replace(/\/$/, '')}/logo.png`;
+  const logoUrl = getLogoUrl();
 
   const { error } = await getClient().emails.send({
     from: `${senderName} <${from}>`,
@@ -48,27 +65,25 @@ export async function sendPasswordResetEmail(
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
-          <!-- Logo -->
-          <tr>
-            <td style="padding-bottom:24px;text-align:center;">
-              <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" style="max-width:340px;width:100%;height:auto;display:inline-block;border:0;" />
-            </td>
-          </tr>
           <!-- Card -->
           <tr>
-            <td style="background:#ffffff;border-radius:24px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;">
+            <td style="background:#ffffff;border-radius:24px;padding:32px 32px 40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+              <!-- Logo Header -->
+              <div style="text-align:center;padding-bottom:20px;border-bottom:1px solid #f1f5f9;margin-bottom:24px;">
+                <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
+              </div>
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;text-align:left;">
                 Redefinição de senha
               </h1>
-              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;">
+              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;text-align:left;">
                 Olá, <strong>${userName}</strong>!
               </p>
-              <p style="margin:0 0 24px;font-size:15px;color:#64748b;line-height:1.6;">
+              <p style="margin:0 0 24px;font-size:15px;color:#64748b;line-height:1.6;text-align:left;">
                 Recebemos uma solicitação de redefinição de senha para sua conta no
                 <strong>Neva PRO</strong>. Clique no botão abaixo para criar uma nova senha:
               </p>
               <!-- CTA -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;">
                 <tr>
                   <td align="center">
                     <a href="${resetLink}"
@@ -81,12 +96,12 @@ export async function sendPasswordResetEmail(
                 </tr>
               </table>
               <!-- Fallback link -->
-              <p style="margin:0 0 24px;font-size:13px;color:#94a3b8;word-break:break-all;">
+              <p style="margin:0 0 24px;font-size:13px;color:#94a3b8;word-break:break-all;text-align:left;">
                 Ou copie o link:<br />
                 <a href="${resetLink}" style="color:#6C5CE7;">${resetLink}</a>
               </p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
-              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;text-align:left;">
                 Este link expira em <strong>1 hora</strong>.<br />
                 Se você não solicitou esta redefinição, ignore este e-mail.
               </p>
@@ -125,8 +140,7 @@ export async function sendWelcomeEmail(
 ): Promise<void> {
   const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
-  const baseUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
-  const logoUrl = `${baseUrl.replace(/\/$/, '')}/logo.png`;
+  const logoUrl = getLogoUrl();
 
   const { error } = await getClient().emails.send({
     from: `${senderName} <${from}>`,
@@ -144,26 +158,24 @@ export async function sendWelcomeEmail(
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
-          <!-- Logo -->
-          <tr>
-            <td style="padding-bottom:24px;text-align:center;">
-              <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" style="max-width:340px;width:100%;height:auto;display:inline-block;border:0;" />
-            </td>
-          </tr>
           <!-- Card -->
           <tr>
-            <td style="background:#ffffff;border-radius:24px;padding:40px 32px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;">
+            <td style="background:#ffffff;border-radius:24px;padding:32px 32px 40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+              <!-- Logo Header -->
+              <div style="text-align:center;padding-bottom:20px;border-bottom:1px solid #f1f5f9;margin-bottom:24px;">
+                <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
+              </div>
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;text-align:left;">
                 Bem-vindo(a) ao Neva PRO!
               </h1>
-              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;">
+              <p style="margin:0 0 16px;font-size:15px;color:#64748b;line-height:1.6;text-align:left;">
                 Olá, <strong>${userName}</strong>!
               </p>
-              <p style="margin:0 0 20px;font-size:15px;color:#64748b;line-height:1.6;">
+              <p style="margin:0 0 20px;font-size:15px;color:#64748b;line-height:1.6;text-align:left;">
                 Sua conta foi criada com sucesso e você já pode acessar a nossa plataforma de estudos e simulados.
               </p>
               
-              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:24px;">
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:24px;text-align:left;">
                 <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#334155;">
                   🔑 Dados de Acesso:
                 </p>
@@ -176,7 +188,7 @@ export async function sendWelcomeEmail(
               </div>
 
               <!-- CTA -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;">
                 <tr>
                   <td align="center">
                     <a href="${loginUrl}"
@@ -190,7 +202,7 @@ export async function sendWelcomeEmail(
               </table>
 
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
-              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;text-align:left;">
                 💡 <em>Dica de Segurança:</em> Recomendamos que você altere sua senha após o primeiro acesso.
               </p>
             </td>
@@ -219,6 +231,7 @@ export async function sendWelcomeEmail(
 
   log.info(`[Email] E-mail de boas-vindas enviado para ${to}`);
 }
+
 
 
 
