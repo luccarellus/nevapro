@@ -18,7 +18,9 @@ const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },
   { vars: ['GEMINI_API_KEY'], purpose: 'Gemini AI API' },
   { vars: ['RESEND_API_KEY', 'RESEND_FROM_EMAIL'], purpose: 'Resend (envio de e‑mails de redefinição de senha)' },
+  { vars: ['EVENTEASE_WEBHOOK_SECRET'], purpose: 'Integração Webhook EventEase' },
 ];
+
 
 /**
  * Validates environment variables on startup.

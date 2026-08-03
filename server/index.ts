@@ -42,6 +42,8 @@ import studyPlanRoutes from './routes/studyPlan';
 import performanceRoutes from './routes/performance';
 import cronRoutes from './routes/cron';
 import clientLogRoutes from './routes/clientLogs';
+import webhookRoutes from './routes/webhooks';
+
 
 // Validate critical environment variables before starting
 validateEnv();
@@ -151,8 +153,12 @@ app.use(express.json({ limit: '1mb' }));
 // ===== Rate Limiting (global) =====
 app.use('/api', rateLimiter(300, 15 * 60 * 1000));
 
+// ===== Webhooks (Server-to-server, bypasses CSRF) =====
+app.use('/api/webhooks', webhookRoutes);
+
 // ===== CSRF Protection =====
 app.use('/api', csrfProtection);
+
 
 // ===== API Routes =====
 app.use('/api/auth', authRoutes);
