@@ -188,6 +188,9 @@ export async function sendWelcomeEmail(
                   🔑 Dados de Acesso:
                 </p>
                 <p style="margin:0 0 6px;font-size:14px;color:#475569;">
+                  <strong>Link da Plataforma:</strong> <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;text-decoration:underline;">nevapro.olharjovem.org</a>
+                </p>
+                <p style="margin:0 0 6px;font-size:14px;color:#475569;">
                   <strong>E-mail:</strong> ${to}
                 </p>
                 <p style="margin:0;font-size:14px;color:#475569;">
@@ -196,7 +199,7 @@ export async function sendWelcomeEmail(
               </div>
 
               <!-- CTA -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;width:100%;">
                 <tr>
                   <td align="center">
                     <a href="${loginUrl}"
@@ -208,6 +211,12 @@ export async function sendWelcomeEmail(
                   </td>
                 </tr>
               </table>
+
+              <!-- Direct Link -->
+              <p style="margin:0 0 24px;font-size:13px;color:#94a3b8;word-break:break-all;text-align:center;">
+                Ou acesse diretamente pelo endereço:<br />
+                <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;">nevapro.olharjovem.org</a>
+              </p>
 
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
               <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.5;text-align:left;">
