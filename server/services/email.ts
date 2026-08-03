@@ -1,7 +1,7 @@
 /**
  * Email Service — Resend
  *
- * Gerencia o envio de e‑mails transacionais, como redefinição de senha.
+ * Gerencia o envio de e‑mails transacionais, como redefinição de senha e boas-vindas.
  * Requer a variável de ambiente RESEND_API_KEY.
  */
 
@@ -21,12 +21,6 @@ function getClient(): Resend {
   return resendClient;
 }
 
-/** E‑mail de redefinição de senha */
-export async function sendPasswordResetEmail(
-  to: string,
-  userName: string,
-  resetLink: string,
-): Promise<void> {
 /** Helper para garantir URL pública HTTPS válida da logo */
 function getLogoUrl(): string {
   const envUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
@@ -34,7 +28,6 @@ function getLogoUrl(): string {
   if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
     cleanUrl = `https://${cleanUrl}`;
   }
-  // Forçar sempre https para evitar bloqueios de conteúdo misto em clientes de e-mail (Outlook/Gmail)
   cleanUrl = cleanUrl.replace(/^http:/, 'https:');
   return `${cleanUrl}/logo.png`;
 }
@@ -231,7 +224,3 @@ export async function sendWelcomeEmail(
 
   log.info(`[Email] E-mail de boas-vindas enviado para ${to}`);
 }
-
-
-
-
