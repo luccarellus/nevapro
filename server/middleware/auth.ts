@@ -12,12 +12,12 @@ import bcrypt from 'bcryptjs';
 const STUDENT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 
 const getStudentSessionSecret = (): string | null =>
-  process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || null;
+  process.env.JWT_SECRET || null;
 
 const createStudentSessionToken = (user: AuthenticatedUser): string => {
   const secret = getStudentSessionSecret();
   if (!secret) {
-    throw new Error('JWT_SECRET ou SUPABASE_SERVICE_ROLE_KEY é obrigatório para sessões de alunos.');
+    throw new Error('JWT_SECRET é obrigatório para assinar sessões de alunos.');
   }
 
   const payload = Buffer.from(JSON.stringify({

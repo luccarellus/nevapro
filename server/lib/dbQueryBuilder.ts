@@ -172,15 +172,15 @@ class PostgresQueryBuilder {
     } else if (this.action === 'insert') {
       const keys = Object.keys(this.insertData);
       const vals = Object.values(this.insertData);
-      const placeholders = keys.map((_, i) => `$${i+1}`).join(', ');
-      keys.forEach(k => sanitizeIdentifier(k));
-      sql = `INSERT INTO ${safeTable} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING ${safeSelectCols}`;
+      const safeKeys = keys.map(k => sanitizeIdentifier(k));
+      const placeholders = safeKeys.map((_, i) => `$${i+1}`).join(', ');
+      sql = `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders}) RETURNING ${safeSelectCols}`;
       params.push(...vals);
     } else if (this.action === 'update') {
       const keys = Object.keys(this.updateData);
       const vals = Object.values(this.updateData);
-      keys.forEach(k => sanitizeIdentifier(k));
-      const setClause = keys.map((k, i) => `${k} = $${i+1}`).join(', ');
+      const safeKeys = keys.map(k => sanitizeIdentifier(k));
+      const setClause = safeKeys.map((k, i) => `${k} = $${i+1}`).join(', ');
       sql = `UPDATE ${safeTable} SET ${setClause}`;
       params.push(...vals);
       

@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import fs from 'fs';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -8,12 +9,36 @@ const isSupabaseDatabase =
   !!connectionString &&
   /supabase/i.test(connectionString);
 
-const ssl =
-  process.env.DISABLE_DB_SSL === 'true'
-    ? false
-    : isSupabaseDatabase || process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : undefined;
+const getSslConfig = () => {
+  if (process.env.DISABLE_DB_SSL === 'true') {
+    return false;
+  }
+
+  const isProd = process.env.NODE_ENV === 'production';
+  if (!isProd && !isSupabaseDatabase && !process.env.DB_CA_CERT) {
+    return undefined;
+  }
+
+  let caContent: string | undefined;
+  if (process.env.DB_CA_CERT) {
+    try {
+      caContent = fs.existsSync(process.env.DB_CA_CERT)
+        ? fs.readFileSync(process.env.DB_CA_CERT, 'utf-8')
+        : process.env.DB_CA_CERT;
+    } catch {
+      caContent = process.env.DB_CA_CERT;
+    }
+  }
+
+  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+
+  return {
+    rejectUnauthorized,
+    ...(caContent ? { ca: caContent } : {}),
+  };
+};
+
+const ssl = getSslConfig();
 
 const pool = new Pool({
   connectionString,

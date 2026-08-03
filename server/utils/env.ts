@@ -8,6 +8,7 @@ const REQUIRED_VARS: string[] = [
   'DATABASE_URL',
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
+  'JWT_SECRET',
 ];
 
 const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [

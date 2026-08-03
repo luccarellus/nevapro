@@ -54,18 +54,12 @@ export const app = express();
 app.set('trust proxy', 1);
 app.disable('etag');
 
-// Agrupa os logs de cada requisição e confirma a gravação antes de encerrar a resposta.
+// Agrupa os logs de cada requisição e grava assincronamente após o término da resposta.
 app.use((req, res, next) => {
   const startedAt = Date.now();
   runWithLogContext(() => {
-    const originalEnd = res.end.bind(res);
-    let ending = false;
-
-    (res as any).end = (...args: unknown[]) => {
-      if (ending) return res;
-      ending = true;
-
-      const flush = flushLogContext({
+    res.on('finish', () => {
+      void flushLogContext({
         method: req.method,
         path: req.path,
         statusCode: res.statusCode,
@@ -73,24 +67,12 @@ app.use((req, res, next) => {
         userId: req.user?.userId,
         role: req.user?.role,
         requestId: req.headers['x-request-id'],
+      }).catch((error) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[Logger] Falha ao finalizar lote de logs:', error);
+        }
       });
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<void>((resolve) => {
-        timeoutId = setTimeout(resolve, 4_000);
-      });
-
-      void Promise.race([flush, timeout])
-        .catch((error) => {
-          if (process.env.NODE_ENV !== 'production') {
-            console.warn('[Logger] Falha ao finalizar lote de logs:', error);
-          }
-        })
-        .finally(() => {
-          if (timeoutId) clearTimeout(timeoutId);
-          originalEnd(...args as any[]);
-        });
-      return res;
-    };
+    });
 
     log.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
@@ -242,13 +224,15 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
       res.status(404).json({ error: 'Arquivo não encontrado.' });
       return;
     }
-    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Type', contentType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    const chunks: Buffer[] = [];
-    for await (const chunk of (stream as unknown as AsyncIterable<Uint8Array | Buffer>)) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    
+    const { Readable } = await import('stream');
+    if (stream instanceof Readable) {
+      stream.pipe(res);
+    } else {
+      Readable.from(stream as any).pipe(res);
     }
-    res.send(Buffer.concat(chunks));
   } catch (error: unknown) {
     log.error('[Storage] Error:', error);
     res.status(500).json({ error: 'Erro ao servir arquivo.' });
