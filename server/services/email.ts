@@ -21,16 +21,31 @@ function getClient(): Resend {
   return resendClient;
 }
 
-/** Helper para garantir URL pública HTTPS válida da logo */
+/** Helper para garantir URL pública HTTPS válida e confiável da logo */
 function getLogoUrl(): string {
-  const envUrl = process.env.APP_URL || 'https://nevapro.olharjovem.org';
-  let cleanUrl = envUrl.trim().replace(/\/$/, '');
-  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-    cleanUrl = `https://${cleanUrl}`;
+  let logoUrl = process.env.LOGO_URL?.trim();
+
+  // Se LOGO_URL não foi definida, usa a URL da própria aplicação (mesmo domínio do envio)
+  if (!logoUrl) {
+    let baseUrl = process.env.APP_URL?.trim() || 'https://nevapro.olharjovem.org';
+    baseUrl = baseUrl.replace(/^APP_URL=/, '').trim();
+    baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    logoUrl = `${baseUrl}/logo.png`;
   }
-  cleanUrl = cleanUrl.replace(/^http:/, 'https:');
-  return `${cleanUrl}/logo.png`;
+
+  // Sanitização de segurança: corrige acidentes comuns de digitação/cópia em variáveis de ambiente
+  if (logoUrl.includes('APP_URL=')) {
+    logoUrl = logoUrl.replace(/.*APP_URL=/, '').trim();
+  }
+
+  // Garante protocolo HTTPS
+  if (logoUrl.startsWith('http://')) {
+    logoUrl = logoUrl.replace('http://', 'https://');
+  }
+
+  return logoUrl;
 }
+
 
 /** E‑mail de redefinição de senha */
 export async function sendPasswordResetEmail(
