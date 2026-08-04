@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { getClient } from '../../src/lib/db';
+import { getClient, query } from '../../src/lib/db';
 import { requireAuth } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { AuthenticatedRequest } from '../types';
@@ -15,6 +15,47 @@ type AnswerInput = {
 };
 
 const router = Router();
+
+router.post('/', rateLimiter(30, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  if (req.user?.role !== 'admin' && req.user?.userId !== userId) {
+    res.status(403).json({ error: 'Acesso negado.' });
+    return;
+  }
+  try {
+    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
+    if (qCheck.rows.length === 0 && questionData) {
+      await query(
+        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING`,
+        [questionId, questionData.subject || 'Geral', questionData.text, questionData.imageUrl || null,
+         questionData.correctOptionIndex, questionData.explanation || '', questionData.difficulty || 'médio',
+         questionData.xpReward || 50, questionData.year || 2023, questionData.index || 0],
+      );
+      if (Array.isArray(questionData.options)) {
+        for (let idx = 0; idx < questionData.options.length; idx++) {
+          const letter = String.fromCharCode(65 + idx);
+          await query(
+            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+            [questionId, questionData.options[idx], questionData.optionImages?.[idx] || null, letter, idx === questionData.correctOptionIndex],
+          );
+        }
+      }
+    }
+    await query(
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect],
+    );
+    await invalidateUserCache(req.user?.email || '', userId);
+    res.json({ success: true });
+  } catch (err) {
+    log.error('[POST /api/answers] Error:', err);
+    res.status(500).json({ error: 'Erro ao registrar resposta.' });
+  }
+});
 
 router.post('/batch', rateLimiter(10, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const answers = req.body?.answers as AnswerInput[];
