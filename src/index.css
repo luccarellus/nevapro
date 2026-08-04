@@ -76,6 +76,36 @@
   --card-shadow: rgba(194, 24, 194, 0.04);
 }
 
+[data-theme='eighties'] {
+  --bg-main: #080313;
+  --bg-card: #140b24;
+  --bg-card-rgb: 20 11 36;
+  --bg-sidebar: #0d061a;
+  --text-main: #fff7ff;
+  --text-main-rgb: 255 247 255;
+  --text-secondary: #b8a6d9;
+  --border-color: rgba(255, 0, 128, 0.1);
+  --brand-primary: #ff0080;
+  --brand-secondary: #00e5ff;
+  --input-bg: #1d1033;
+  --card-shadow: rgba(255, 0, 128, 0.08);
+}
+
+[data-theme='eighties']:not(.dark) {
+  --bg-main: #fff3fb;
+  --bg-card: #ffffff;
+  --bg-card-rgb: 255 255 255;
+  --bg-sidebar: #f7ddf1;
+  --text-main: #24113f;
+  --text-main-rgb: 36 17 63;
+  --text-secondary: #7e639f;
+  --border-color: #f0c4e3;
+  --brand-primary: #e6007e;
+  --brand-secondary: #009ec3;
+  --input-bg: #ffffff;
+  --card-shadow: rgba(230, 0, 126, 0.04);
+}
+
 [data-theme='forest'] {
   --bg-main: #050806;
   --bg-card: #0f1612;

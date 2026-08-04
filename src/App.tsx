@@ -157,6 +157,7 @@ export default function App() {
       'dark': '#060a12',
       'light': '#f8fafc',
       'cyberpunk': isDarkMode ? '#08070d' : '#faf8fc',
+      'eighties': isDarkMode ? '#080313' : '#fff3fb',
       'forest': isDarkMode ? '#050806' : '#f4f9f6',
       'dracula': isDarkMode ? '#11111b' : '#eff1f5',
       'neva': isDarkMode ? '#060b0d' : '#f0f8fa',

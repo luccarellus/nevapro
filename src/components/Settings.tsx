@@ -596,6 +596,16 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       glowClass: 'bg-[#d946ef]',
                     },
                     { 
+                      id: 'eighties', 
+                      name: 'Anos 80', 
+                      description: 'Visual synthwave com neon rosa, ciano e energia arcade.',
+                      primaryBgClass: 'bg-[#ff0080]',
+                      borderClass: 'border-[#ff0080]',
+                      bgPreviewClass: 'bg-[#080313]',
+                      cardPreviewClass: 'bg-[#140b24]',
+                      glowClass: 'bg-[#ff0080]',
+                    },
+                    { 
                       id: 'forest', 
                       name: 'Moss Forest', 
                       description: 'Tema de tons verdes relaxantes e confortáveis.',
