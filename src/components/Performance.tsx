@@ -40,7 +40,7 @@ function SemicircleGauge({
   const arcLength = Math.PI * radius; // 180 degrees arc length
 
   return (
-    <div className="bg-bg-card/80 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 flex flex-col items-center justify-between transition-all hover:border-brand-primary/40 shadow-md">
+    <div className="bg-bg-card/90 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 flex flex-col items-center justify-between transition-all hover:border-brand-primary/40 shadow-sm">
       <div className="flex items-center gap-1.5 mb-2 w-full justify-center">
         {Icon && <Icon size={15} style={{ color }} />}
         <span className="text-xs font-black text-text-main truncate max-w-[140px] tracking-tight">{label}</span>
@@ -52,10 +52,10 @@ function SemicircleGauge({
           <path
             d="M 12,50 A 38,38 0 0,1 88,50"
             fill="none"
-            stroke="var(--bg-main)"
+            stroke="var(--text-secondary)"
             strokeWidth={strokeWidth}
             strokeLinecap="round"
-            className="opacity-80"
+            strokeOpacity={0.2}
           />
           {/* Foreground Progress Arc */}
           <path
@@ -339,35 +339,35 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               
               {/* Top KPI Cards (TRI Score & Attendance / Hit Rate) */}
               <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
-                <div className="bg-gradient-to-br from-emerald-950/60 via-bg-card/90 to-bg-card/80 p-4 rounded-2xl border border-emerald-500/50 flex flex-col justify-between shadow-lg">
+                <div className="bg-gradient-to-br from-brand-primary/10 via-bg-card to-bg-card p-4 rounded-2xl border border-brand-primary/30 flex flex-col justify-between shadow-sm">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">Nota TRI Geral</span>
-                    <Target size={17} className="text-emerald-400" />
+                    <span className="text-[11px] font-black text-brand-primary uppercase tracking-wider">Nota TRI Geral</span>
+                    <Target size={17} className="text-brand-primary" />
                   </div>
                   <p className="text-3xl font-black text-text-main tracking-tight">
                     {calculatingTri ? '...' : estimatedTri > 0 ? estimatedTri : '---'}
                   </p>
-                  <span className="text-xs font-extrabold text-text-secondary mt-1">
+                  <span className="text-xs font-bold text-text-secondary mt-1">
                     Meta: {triTarget} pts
                   </span>
                 </div>
 
-                <div className="bg-bg-card/80 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 flex flex-col justify-between shadow-lg">
+                <div className="bg-bg-card p-4 rounded-2xl border border-border-color/60 flex flex-col justify-between shadow-sm">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[11px] font-black text-text-secondary uppercase tracking-wider">Precisão Geral</span>
-                    <Activity size={17} className="text-emerald-400" />
+                    <Activity size={17} className="text-brand-primary" />
                   </div>
-                  <p className="text-3xl font-black text-emerald-400 tracking-tight">{stats.hit_rate}%</p>
-                  <span className="text-xs font-extrabold text-text-secondary mt-1">
+                  <p className="text-3xl font-black text-brand-primary tracking-tight">{stats.hit_rate}%</p>
+                  <span className="text-xs font-bold text-text-secondary mt-1">
                     {stats.answered} respondidas
                   </span>
                 </div>
               </motion.div>
 
               {/* Donut Chart: Mastery Level Distribution */}
-              <motion.div variants={itemVariants} className="bg-bg-card/80 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/60 shadow-xl">
+              <motion.div variants={itemVariants} className="bg-bg-card rounded-[28px] p-5 border border-border-color/60 shadow-sm">
                 <div className="mb-3">
-                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Proporção Acadêmica</span>
+                  <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">Proporção Acadêmica</span>
                   <h3 className="text-base font-black text-text-main tracking-tight">Distribuição por Nível de Domínio</h3>
                 </div>
 
@@ -392,16 +392,16 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                           backgroundColor: 'var(--bg-card)',
                           border: '1px solid var(--border-color)',
                           borderRadius: '14px',
-                          color: '#ffffff',
+                          color: 'var(--text-main)',
                           fontWeight: 'bold',
-                          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+                          boxShadow: 'var(--card-shadow)'
                         }}
                       />
                       <Legend
                         verticalAlign="bottom"
                         height={36}
                         iconType="circle"
-                        formatter={(val) => <span className="text-xs font-black text-text-main">{val}</span>}
+                        formatter={(val) => <span className="text-xs font-bold text-text-secondary">{val}</span>}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -409,26 +409,26 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               </motion.div>
 
               {/* Bar Chart: Correct vs Incorrect by Area */}
-              <motion.div variants={itemVariants} className="bg-bg-card/80 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/60 shadow-xl">
+              <motion.div variants={itemVariants} className="bg-bg-card rounded-[28px] p-5 border border-border-color/60 shadow-sm">
                 <div className="mb-3">
-                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Resultados por Ramo</span>
+                  <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">Resultados por Ramo</span>
                   <h3 className="text-base font-black text-text-main tracking-tight">Acertos vs Erros por Área</h3>
                 </div>
 
                 <div className="h-52 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={areaBarData}>
-                      <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.1} vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-main)', fontSize: 11, fontWeight: '800' }} />
+                      <CartesianGrid strokeDasharray="0" stroke="var(--text-secondary)" strokeOpacity={0.15} vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontWeight: '700' }} />
                       <YAxis hide />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: 'var(--bg-card)',
                           border: '1px solid var(--border-color)',
                           borderRadius: '14px',
-                          color: '#ffffff',
+                          color: 'var(--text-main)',
                           fontWeight: 'bold',
-                          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+                          boxShadow: 'var(--card-shadow)'
                         }}
                       />
                       <Bar dataKey="Corretas" fill="#34d399" radius={[6, 6, 0, 0]} />

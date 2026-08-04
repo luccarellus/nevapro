@@ -334,13 +334,13 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         {/* HERO CARD: TODAY'S MISSION */}
         <motion.div 
           variants={itemVariants}
-          className="bg-gradient-to-br from-bg-card/90 via-bg-card/70 to-bg-card/90 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-10 border border-border-color/80 shadow-2xl mb-10 relative overflow-hidden"
+          className="bg-bg-card rounded-3xl md:rounded-[40px] p-6 md:p-10 border border-border-color/60 shadow-xl mb-10 relative overflow-hidden"
         >
           <div className="relative z-10">
             {/* Top Info Bar */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
-                <div className="flex items-center gap-2 bg-brand-primary/15 border border-brand-primary/40 px-3.5 py-1 rounded-full text-brand-primary text-xs font-black w-fit mb-3 shadow-sm">
+                <div className="flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/30 px-3.5 py-1 rounded-full text-brand-primary text-xs font-black w-fit mb-3">
                   <Sparkles size={13} /> {allCompleted ? '🎉 Dia Concluído!' : `Missão de Hoje • ${completedCount}/${tasks.length} Concluídas`}
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight">
@@ -353,9 +353,9 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full lg:w-72 bg-bg-main/70 p-4 rounded-2xl border border-border-color/60 shadow-inner">
+              <div className="w-full lg:w-72 bg-bg-main/60 p-4 rounded-2xl border border-border-color/40">
                 <div className="flex justify-between items-center text-xs font-bold mb-2">
-                  <span className="text-text-secondary font-extrabold uppercase tracking-wider text-[10px]">Progresso diário</span>
+                  <span className="text-text-secondary font-bold uppercase tracking-wider text-[10px]">Progresso diário</span>
                   <span className="text-brand-primary font-black text-sm">{progressPercent}%</span>
                 </div>
                 <div className="h-3 bg-bg-main rounded-full overflow-hidden p-0.5 border border-border-color/30">
@@ -363,7 +363,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPercent}%` }}
                     transition={{ duration: 0.8 }}
-                    className="h-full bg-gradient-to-r from-brand-primary via-emerald-400 to-teal-300 rounded-full shadow-[0_0_12px_rgba(0,176,148,0.5)]"
+                    className="h-full bg-gradient-to-r from-brand-primary via-emerald-400 to-teal-300 rounded-full shadow-[0_0_12px_rgba(0,176,148,0.3)]"
                   />
                 </div>
               </div>
@@ -402,8 +402,8 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                       whileHover={{ scale: 1.005 }}
                       className={`p-4 md:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer group ${
                         task.done 
-                          ? 'bg-brand-primary/15 border-brand-primary/40 text-text-secondary' 
-                          : 'bg-bg-main/60 border-border-color hover:border-brand-primary/60 text-text-main shadow-md'
+                          ? 'bg-brand-primary/10 border-brand-primary/30 text-text-secondary' 
+                          : 'bg-bg-card border-border-color/60 hover:border-brand-primary/60 text-text-main shadow-sm'
                       }`}
                       onClick={() => toggleTask(task.id)}
                     >
