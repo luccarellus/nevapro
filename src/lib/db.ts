@@ -30,7 +30,23 @@ const getSslConfig = () => {
     }
   }
 
-  const rejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+  // Se DB_SSL_REJECT_UNAUTHORIZED for 'true', exige validação estrita do certificado.
+  // Se DB_SSL_REJECT_UNAUTHORIZED for 'false' ou NODE_TLS_REJECT_UNAUTHORIZED === '0', desativa validação.
+  // Caso contrário, se nenhum certificado CA customizado for fornecido, desativa a rejeição por padrão para aceitar cadeias de SSL em nuvem/Supabase.
+  let rejectUnauthorized = false;
+
+  if (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true') {
+    rejectUnauthorized = true;
+  } else if (
+    process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false' ||
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
+  ) {
+    rejectUnauthorized = false;
+  } else if (caContent) {
+    rejectUnauthorized = true;
+  } else {
+    rejectUnauthorized = false;
+  }
 
   return {
     rejectUnauthorized,

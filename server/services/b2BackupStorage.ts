@@ -187,10 +187,13 @@ export async function runDatabaseBackup(): Promise<{
   log.info('[Backup] Iniciando backup diário do banco de dados...');
 
   // 1. Gera o Dump SQL
+  log.info('[Backup] Extraindo dump SQL do banco de dados...');
   const { sql, tableCount, method } = await generateSqlDump();
   const rawSizeBytes = Buffer.byteLength(sql, 'utf-8');
+  log.info(`[Backup] Exportação SQL concluída (${tableCount} tabelas, ${(rawSizeBytes / 1024 / 1024).toFixed(2)} MB, método: ${method}).`);
 
   // 2. Comprime em Gzip
+  log.info('[Backup] Comprimindo arquivo de backup com Gzip...');
   const compressedBuffer = zlib.gzipSync(Buffer.from(sql, 'utf-8'));
   const compressedSizeBytes = compressedBuffer.length;
 
@@ -205,6 +208,7 @@ export async function runDatabaseBackup(): Promise<{
   const objectKey = `${config.backupPrefix}/db/nevapro_db_${timestampStr}_${shortId}.sql.gz`;
 
   // 4. Faz Upload para o Backblaze B2
+  log.info(`[Backup] Enviando backup comprimido para Backblaze B2 (${objectKey})...`);
   const s3 = getB2Client();
   await s3.send(
     new PutObjectCommand({

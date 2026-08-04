@@ -9,6 +9,8 @@
  */
 
 import { S3Client } from '@aws-sdk/client-s3';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import https from 'node:https';
 
 interface B2Config {
   endpoint: string;
@@ -66,6 +68,16 @@ export function getB2Client(): S3Client {
     );
   }
 
+  const rejectUnauthorized =
+    process.env.B2_SSL_REJECT_UNAUTHORIZED === 'false' ||
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
+      ? false
+      : true;
+
+  const agent = new https.Agent({
+    rejectUnauthorized,
+  });
+
   client = new S3Client({
     endpoint: config.endpoint,
     region: config.region,
@@ -74,6 +86,9 @@ export function getB2Client(): S3Client {
       secretAccessKey: config.secretAccessKey,
     },
     forcePathStyle: true,
+    requestHandler: new NodeHttpHandler({
+      httpsAgent: agent,
+    }),
   });
 
   return client;
