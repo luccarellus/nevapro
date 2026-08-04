@@ -40,10 +40,10 @@ function SemicircleGauge({
   const arcLength = Math.PI * radius; // 180 degrees arc length
 
   return (
-    <div className="bg-bg-card/40 backdrop-blur-xl p-4 rounded-2xl border border-border-color/30 flex flex-col items-center justify-between transition-all hover:scale-[1.02]">
+    <div className="bg-bg-card/80 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 flex flex-col items-center justify-between transition-all hover:border-brand-primary/40 shadow-md">
       <div className="flex items-center gap-1.5 mb-2 w-full justify-center">
-        {Icon && <Icon size={14} style={{ color }} />}
-        <span className="text-xs font-black text-text-main truncate max-w-[130px]">{label}</span>
+        {Icon && <Icon size={15} style={{ color }} />}
+        <span className="text-xs font-black text-text-main truncate max-w-[140px] tracking-tight">{label}</span>
       </div>
 
       <div className="relative w-32 h-20 flex items-end justify-center">
@@ -52,10 +52,10 @@ function SemicircleGauge({
           <path
             d="M 12,50 A 38,38 0 0,1 88,50"
             fill="none"
-            stroke="var(--border-color)"
+            stroke="var(--bg-main)"
             strokeWidth={strokeWidth}
             strokeLinecap="round"
-            opacity={0.3}
+            className="opacity-80"
           />
           {/* Foreground Progress Arc */}
           <path
@@ -71,18 +71,18 @@ function SemicircleGauge({
         </svg>
 
         <div className="absolute bottom-1 text-center">
-          <span className="text-xl font-black text-text-main leading-none block">
+          <span className="text-2xl font-black text-text-main leading-none block tracking-tight">
             {value > 0 ? value : '---'}
           </span>
-          <span className="text-[9px] font-bold text-text-secondary opacity-60">
+          <span className="text-[10px] font-extrabold text-text-secondary">
             {value > 0 ? `meta ${max}` : 'sem dados'}
           </span>
         </div>
       </div>
 
-      <div className="w-full flex justify-between items-center text-[10px] font-bold text-text-secondary mt-2 px-2 border-t border-border-color/20 pt-1.5">
+      <div className="w-full flex justify-between items-center text-[10px] font-black text-text-secondary mt-2 px-2 border-t border-border-color/40 pt-2">
         <span>0</span>
-        <span className="font-black" style={{ color }}>{value > 0 ? `${percentage}%` : '0%'}</span>
+        <span className="font-black text-xs" style={{ color }}>{value > 0 ? `${percentage}%` : '0%'}</span>
         <span>{max}</span>
       </div>
     </div>
@@ -339,33 +339,33 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               
               {/* Top KPI Cards (TRI Score & Attendance / Hit Rate) */}
               <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
-                <div className="bg-gradient-to-br from-emerald-950/40 via-bg-card/60 to-bg-card/40 p-4 rounded-2xl border border-emerald-500/30 flex flex-col justify-between">
+                <div className="bg-gradient-to-br from-emerald-950/60 via-bg-card/90 to-bg-card/80 p-4 rounded-2xl border border-emerald-500/50 flex flex-col justify-between shadow-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">Nota TRI Geral</span>
-                    <Target size={16} className="text-emerald-400" />
+                    <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">Nota TRI Geral</span>
+                    <Target size={17} className="text-emerald-400" />
                   </div>
                   <p className="text-3xl font-black text-text-main tracking-tight">
                     {calculatingTri ? '...' : estimatedTri > 0 ? estimatedTri : '---'}
                   </p>
-                  <span className="text-[10px] font-semibold text-text-secondary mt-1 opacity-70">
+                  <span className="text-xs font-extrabold text-text-secondary mt-1">
                     Meta: {triTarget} pts
                   </span>
                 </div>
 
-                <div className="bg-bg-card/40 backdrop-blur-xl p-4 rounded-2xl border border-border-color/40 flex flex-col justify-between">
+                <div className="bg-bg-card/80 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 flex flex-col justify-between shadow-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black text-text-secondary uppercase tracking-wider">Precisão Geral</span>
-                    <Activity size={16} className="text-emerald-400" />
+                    <span className="text-[11px] font-black text-text-secondary uppercase tracking-wider">Precisão Geral</span>
+                    <Activity size={17} className="text-emerald-400" />
                   </div>
                   <p className="text-3xl font-black text-emerald-400 tracking-tight">{stats.hit_rate}%</p>
-                  <span className="text-[10px] font-semibold text-text-secondary mt-1 opacity-70">
+                  <span className="text-xs font-extrabold text-text-secondary mt-1">
                     {stats.answered} respondidas
                   </span>
                 </div>
               </motion.div>
 
               {/* Donut Chart: Mastery Level Distribution */}
-              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl">
+              <motion.div variants={itemVariants} className="bg-bg-card/80 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/60 shadow-xl">
                 <div className="mb-3">
                   <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Proporção Acadêmica</span>
                   <h3 className="text-base font-black text-text-main tracking-tight">Distribuição por Nível de Domínio</h3>
@@ -389,17 +389,19 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'var(--bg-sidebar)',
+                          backgroundColor: 'var(--bg-card)',
                           border: '1px solid var(--border-color)',
                           borderRadius: '14px',
-                          color: 'var(--text-main)'
+                          color: '#ffffff',
+                          fontWeight: 'bold',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
                         }}
                       />
                       <Legend
                         verticalAlign="bottom"
                         height={36}
                         iconType="circle"
-                        formatter={(val) => <span className="text-xs font-bold text-text-secondary">{val}</span>}
+                        formatter={(val) => <span className="text-xs font-black text-text-main">{val}</span>}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -407,7 +409,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               </motion.div>
 
               {/* Bar Chart: Correct vs Incorrect by Area */}
-              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl">
+              <motion.div variants={itemVariants} className="bg-bg-card/80 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/60 shadow-xl">
                 <div className="mb-3">
                   <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Resultados por Ramo</span>
                   <h3 className="text-base font-black text-text-main tracking-tight">Acertos vs Erros por Área</h3>
@@ -416,19 +418,21 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                 <div className="h-52 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={areaBarData}>
-                      <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.05} vertical={false} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: '700' }} />
+                      <CartesianGrid strokeDasharray="0" stroke="var(--text-main)" strokeOpacity={0.1} vertical={false} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-main)', fontSize: 11, fontWeight: '800' }} />
                       <YAxis hide />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'var(--bg-sidebar)',
+                          backgroundColor: 'var(--bg-card)',
                           border: '1px solid var(--border-color)',
                           borderRadius: '14px',
-                          color: 'var(--text-main)'
+                          color: '#ffffff',
+                          fontWeight: 'bold',
+                          boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
                         }}
                       />
-                      <Bar dataKey="Corretas" fill="#34d399" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Incorretas" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Corretas" fill="#34d399" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Incorretas" fill="#f43f5e" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -441,18 +445,18 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               
               {/* Spaced Repetition / Critical Warning */}
               {criticalSubjects.length > 0 && (
-                <motion.div variants={itemVariants} className="bg-amber-950/20 border border-amber-500/30 rounded-[28px] p-5 backdrop-blur-xl">
+                <motion.div variants={itemVariants} className="bg-amber-950/30 border border-amber-500/50 rounded-[28px] p-5 backdrop-blur-xl shadow-lg">
                   <div className="flex items-center gap-2 mb-2 text-amber-400">
-                    <AlertTriangle size={16} />
+                    <AlertTriangle size={17} />
                     <h4 className="text-xs font-black uppercase tracking-wider">Atenção Necessária</h4>
                   </div>
-                  <p className="text-xs font-bold text-text-main mb-1">Revisão Pendente</p>
-                  <p className="text-xs font-medium text-text-secondary opacity-80 mb-3 leading-relaxed">
+                  <p className="text-xs font-black text-text-main mb-1">Revisão Pendente</p>
+                  <p className="text-xs font-semibold text-text-secondary mb-3 leading-relaxed">
                     {criticalSubjects.map(s => s.name).join(', ')} — desempenho abaixo de 50%.
                   </p>
                   <button
                     onClick={() => onTabChange?.('errors')}
-                    className="w-full bg-amber-500 text-black font-black text-xs py-2.5 rounded-xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2"
+                    className="w-full bg-amber-500 text-black font-black text-xs py-2.5 rounded-xl hover:bg-amber-400 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
                   >
                     Revisar no Caderno de Erros <ArrowRight size={14} />
                   </button>
@@ -460,7 +464,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               )}
 
               {/* Table of Student Details (Detalhamento dos Tópicos) */}
-              <motion.div variants={itemVariants} className="bg-bg-card/40 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/40 shadow-xl flex flex-col justify-between">
+              <motion.div variants={itemVariants} className="bg-bg-card/80 backdrop-blur-xl rounded-[28px] p-5 border border-border-color/60 shadow-xl flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <div>
@@ -478,7 +482,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         placeholder="Filtrar assunto..."
-                        className="w-full bg-bg-main/60 border border-border-color/40 rounded-xl py-2 pl-9 pr-3 text-xs text-text-main placeholder:text-text-secondary/50 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        className="w-full bg-bg-main/80 border border-border-color/60 rounded-xl py-2 pl-9 pr-3 text-xs font-semibold text-text-main placeholder:text-text-secondary/70 focus:outline-none focus:border-emerald-500 transition-all"
                       />
                     </div>
 
@@ -487,10 +491,10 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all ${
+                          className={`px-3 py-1 rounded-lg text-[10px] font-black whitespace-nowrap transition-all cursor-pointer ${
                             selectedCategory === cat
-                              ? 'bg-emerald-500 text-black font-black'
-                              : 'bg-bg-main/40 text-text-secondary hover:text-text-main border border-border-color/20'
+                              ? 'bg-emerald-500 text-black font-black shadow-sm'
+                              : 'bg-bg-main/60 text-text-secondary hover:text-text-main border border-border-color/40'
                           }`}
                         >
                           {cat === 'all' ? 'Todos' : cat}
@@ -500,19 +504,19 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                   </div>
 
                   {/* Table View */}
-                  <div className="max-h-[360px] overflow-y-auto custom-scrollbar border border-border-color/30 rounded-xl overflow-hidden">
+                  <div className="max-h-[360px] overflow-y-auto custom-scrollbar border border-border-color/60 rounded-xl overflow-hidden shadow-inner">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-bg-main/80 text-text-secondary uppercase text-[9px] font-black tracking-wider sticky top-0 backdrop-blur-md">
+                      <thead className="bg-bg-main text-text-main uppercase text-[10px] font-black tracking-wider sticky top-0 backdrop-blur-md border-b border-border-color/40">
                         <tr>
                           <th className="p-3">Assunto</th>
                           <th className="p-3 text-center">Respostas</th>
                           <th className="p-3 text-right">Precisão</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border-color/20">
+                      <tbody className="divide-y divide-border-color/30 bg-bg-card/40">
                         {filteredSubjects.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="p-6 text-center text-text-secondary opacity-60 font-medium">
+                            <td colSpan={3} className="p-6 text-center text-text-secondary font-semibold">
                               Nenhum tópico encontrado.
                             </td>
                           </tr>
@@ -522,17 +526,17 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                             const isMed = item.level === 'medium';
 
                             return (
-                              <tr key={idx} className="hover:bg-text-main/[0.02] transition-colors">
+                              <tr key={idx} className="hover:bg-text-main/[0.04] transition-colors">
                                 <td className="p-3">
-                                  <p className="font-bold text-text-main line-clamp-1">{item.name}</p>
-                                  <p className="text-[9px] font-semibold text-text-secondary opacity-60">{item.category}</p>
+                                  <p className="font-extrabold text-text-main line-clamp-1">{item.name}</p>
+                                  <p className="text-[10px] font-bold text-text-secondary">{item.category}</p>
                                 </td>
-                                <td className="p-3 text-center font-bold text-text-secondary">
+                                <td className="p-3 text-center font-extrabold text-text-main">
                                   {item.correct}/{item.total}
                                 </td>
                                 <td className="p-3 text-right">
-                                  <span className={`font-black text-xs px-2 py-0.5 rounded-md inline-block ${
-                                    isHigh ? 'bg-emerald-500/20 text-emerald-400' : isMed ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'
+                                  <span className={`font-black text-xs px-2.5 py-1 rounded-md inline-block ${
+                                    isHigh ? 'bg-emerald-500/25 text-emerald-400 border border-emerald-500/30' : isMed ? 'bg-amber-500/25 text-amber-400 border border-amber-500/30' : 'bg-rose-500/25 text-rose-400 border border-rose-500/30'
                                   }`}>
                                     {item.percentage}%
                                   </span>
@@ -549,7 +553,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                 {/* Direct CTA */}
                 <button
                   onClick={() => onTabChange?.('questions')}
-                  className="w-full mt-4 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs py-3 rounded-xl border border-emerald-500/30 transition-all flex items-center justify-center gap-2"
+                  className="w-full mt-4 bg-emerald-500/15 hover:bg-emerald-500 hover:text-black text-emerald-400 font-black text-xs py-3 rounded-xl border border-emerald-500/40 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
                 >
                   Praticar mais questões <Zap size={14} />
                 </button>

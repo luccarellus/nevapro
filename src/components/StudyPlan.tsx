@@ -309,24 +309,24 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         {/* Header */}
         <header className="mb-10 md:mb-14 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <motion.div variants={itemVariants}>
-            <div className="flex items-center gap-3 text-brand-primary text-xs font-bold mb-3 uppercase tracking-wider">
-              <Target size={16} /> Plano de Estudos • Visão Geral do ENEM
+            <div className="flex items-center gap-2.5 text-brand-primary text-xs font-black mb-3 uppercase tracking-wider bg-brand-primary/10 border border-brand-primary/20 px-3 py-1 rounded-full w-fit">
+              <Target size={15} /> Plano de Estudos • Visão Geral do ENEM
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-text-main leading-tight">
-              Sua rota de aprovação no <span className="text-brand-primary">ENEM</span>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-text-main leading-tight">
+              Sua rota de aprovação no <span className="text-brand-primary drop-shadow-[0_0_15px_rgba(0,176,148,0.3)]">ENEM</span>
             </h1>
-            <p className="text-text-secondary text-xs md:text-sm font-medium mt-2 max-w-xl">
+            <p className="text-text-secondary text-sm font-semibold mt-2.5 max-w-xl leading-relaxed">
               Organize seus estudos com foco na visão geral das 4 Áreas do Conhecimento do ENEM + Redação, acompanhando suas metas diárias.
             </p>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="flex items-center gap-3 bg-bg-card/60 backdrop-blur-xl p-4 rounded-2xl border border-border-color">
-            <div className="bg-brand-primary/10 p-3 rounded-xl text-brand-primary">
+          <motion.div variants={itemVariants} className="flex items-center gap-3.5 bg-bg-card/90 backdrop-blur-xl p-4 rounded-2xl border border-border-color/60 shadow-lg">
+            <div className="bg-brand-primary/15 p-3 rounded-xl text-brand-primary border border-brand-primary/30">
               <Clock size={24} />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-text-secondary opacity-60 uppercase">Tempo Estimado Hoje</p>
-              <p className="text-xl font-black text-text-main">{completedMinutes} / {totalMinutes} min</p>
+              <p className="text-[11px] font-black text-text-secondary uppercase tracking-wider">Tempo Estimado Hoje</p>
+              <p className="text-2xl font-black text-text-main tracking-tight">{completedMinutes} / {totalMinutes} min</p>
             </div>
           </motion.div>
         </header>
@@ -334,35 +334,36 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         {/* HERO CARD: TODAY'S MISSION */}
         <motion.div 
           variants={itemVariants}
-          className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-10 border border-border-color shadow-2xl shadow-black/5 mb-10 relative overflow-hidden"
+          className="bg-gradient-to-br from-bg-card/90 via-bg-card/70 to-bg-card/90 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-6 md:p-10 border border-border-color/80 shadow-2xl mb-10 relative overflow-hidden"
         >
           <div className="relative z-10">
             {/* Top Info Bar */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
-                <div className="flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/30 px-3 py-1 rounded-full text-brand-primary text-[11px] font-black w-fit mb-3">
-                  <Sparkles size={12} /> {allCompleted ? '🎉 Dia Concluído!' : `Missão de Hoje • ${completedCount}/${tasks.length} Concluídas`}
+                <div className="flex items-center gap-2 bg-brand-primary/15 border border-brand-primary/40 px-3.5 py-1 rounded-full text-brand-primary text-xs font-black w-fit mb-3 shadow-sm">
+                  <Sparkles size={13} /> {allCompleted ? '🎉 Dia Concluído!' : `Missão de Hoje • ${completedCount}/${tasks.length} Concluídas`}
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-text-main tracking-tight">
                   🎯 Complete {totalMinutes} min de estudo hoje
                 </h2>
-                <p className="text-xs text-text-secondary opacity-70 font-medium mt-1">
-                  Mantenha sua sequência de {user.streak || 1} dias de estudos seguidos.
+                <p className="text-xs text-text-secondary font-semibold mt-1.5 flex items-center gap-1.5">
+                  <Flame size={14} className="text-amber-400 fill-amber-400" />
+                  Mantenha sua sequência de <strong className="text-text-main font-black">{user.streak || 1} dias</strong> de estudos seguidos.
                 </p>
               </div>
 
               {/* Progress Bar */}
-              <div className="w-full lg:w-64 bg-bg-main/50 p-4 rounded-2xl border border-border-color/40">
+              <div className="w-full lg:w-72 bg-bg-main/70 p-4 rounded-2xl border border-border-color/60 shadow-inner">
                 <div className="flex justify-between items-center text-xs font-bold mb-2">
-                  <span className="text-text-secondary opacity-70">Progresso diário</span>
-                  <span className="text-brand-primary font-black">{progressPercent}%</span>
+                  <span className="text-text-secondary font-extrabold uppercase tracking-wider text-[10px]">Progresso diário</span>
+                  <span className="text-brand-primary font-black text-sm">{progressPercent}%</span>
                 </div>
-                <div className="h-2.5 bg-bg-main rounded-full overflow-hidden p-0.5">
+                <div className="h-3 bg-bg-main rounded-full overflow-hidden p-0.5 border border-border-color/30">
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPercent}%` }}
                     transition={{ duration: 0.8 }}
-                    className="h-full bg-gradient-to-r from-brand-primary to-emerald-400 rounded-full shadow-[0_0_12px_rgba(0,176,148,0.4)]"
+                    className="h-full bg-gradient-to-r from-brand-primary via-emerald-400 to-teal-300 rounded-full shadow-[0_0_12px_rgba(0,176,148,0.5)]"
                   />
                 </div>
               </div>
@@ -377,11 +378,11 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
 
             {/* Error State */}
             {error && !loading && (
-              <div className="text-center py-12 bg-rose-500/5 border border-rose-500/20 rounded-3xl">
-                <p className="text-rose-400 font-bold text-sm">{error}</p>
+              <div className="text-center py-12 bg-rose-500/10 border border-rose-500/30 rounded-3xl">
+                <p className="text-rose-400 font-black text-sm">{error}</p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-4 text-xs font-bold text-brand-primary hover:underline"
+                  className="mt-4 text-xs font-black uppercase tracking-wider text-brand-primary hover:underline"
                 >
                   Tentar novamente
                 </button>
@@ -399,10 +400,10 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                     <motion.div 
                       key={task.id}
                       whileHover={{ scale: 1.005 }}
-                      className={`p-4 md:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer ${
+                      className={`p-4 md:p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer group ${
                         task.done 
-                          ? 'bg-brand-primary/10 border-brand-primary/30 text-text-secondary' 
-                          : 'bg-bg-main/40 border-border-color/60 hover:border-brand-primary/50 text-text-main'
+                          ? 'bg-brand-primary/15 border-brand-primary/40 text-text-secondary' 
+                          : 'bg-bg-main/60 border-border-color hover:border-brand-primary/60 text-text-main shadow-md'
                       }`}
                       onClick={() => toggleTask(task.id)}
                     >
@@ -415,31 +416,31 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                           }}
                           className={`w-6 h-6 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${
                             task.done 
-                              ? 'bg-brand-primary text-black shadow-[0_0_10px_rgba(0,176,148,0.4)]' 
-                              : 'border-2 border-text-secondary/40 hover:border-brand-primary'
+                              ? 'bg-brand-primary text-black font-black shadow-[0_0_12px_rgba(0,176,148,0.5)]' 
+                              : 'border-2 border-text-secondary/60 hover:border-brand-primary bg-bg-card'
                           }`}
                         >
-                          {task.done && <Check size={14} strokeWidth={3} />}
+                          {task.done && <Check size={15} strokeWidth={3.5} />}
                         </button>
 
-                        <div className="p-2 rounded-xl bg-brand-primary/10 text-brand-primary flex-shrink-0 hidden sm:flex">
+                        <div className="p-2.5 rounded-xl bg-brand-primary/15 text-brand-primary border border-brand-primary/30 flex-shrink-0 hidden sm:flex">
                           <TaskIcon size={18} />
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[10px] font-black px-2.5 py-0.5 rounded-md bg-brand-primary/15 text-brand-primary border border-brand-primary/30">
                               {meta.category}
                             </span>
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">
                               +15 XP
                             </span>
                           </div>
-                          <p className={`text-sm md:text-base font-bold truncate ${task.done ? 'line-through opacity-60' : ''}`}>
+                          <p className={`text-sm md:text-base font-extrabold truncate ${task.done ? 'line-through text-text-secondary opacity-70' : 'text-text-main'}`}>
                             {task.title}
                           </p>
-                          <p className="text-[11px] font-medium text-text-secondary opacity-60 flex items-center gap-1 mt-0.5">
-                            <Lightbulb size={11} className="text-amber-400 flex-shrink-0" />
+                          <p className="text-xs font-semibold text-text-secondary flex items-center gap-1.5 mt-1">
+                            <Lightbulb size={12} className="text-amber-400 flex-shrink-0" />
                             <span className="truncate">{meta.reason}</span>
                           </p>
                         </div>
@@ -449,7 +450,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                         {syncingTaskId === task.id && (
                           <Spinner size={16} />
                         )}
-                        <span className="text-xs font-semibold opacity-70 text-text-secondary bg-text-main/5 px-3 py-1 rounded-xl">
+                        <span className="text-xs font-bold text-text-main bg-text-main/10 border border-text-main/10 px-3 py-1 rounded-xl">
                           {task.estimated_time || '30 min'}
                         </span>
                         <button 
@@ -458,7 +459,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                             e.stopPropagation();
                             onTabChange?.(task.target_tab);
                           }}
-                          className="px-3.5 py-1.5 rounded-xl bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold text-xs transition-colors flex items-center gap-1.5"
+                          className="px-4 py-2 rounded-xl bg-brand-primary/15 hover:bg-brand-primary hover:text-black text-brand-primary font-black text-xs border border-brand-primary/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
                           title="Ir para atividade"
                         >
                           <span>Iniciar</span>
