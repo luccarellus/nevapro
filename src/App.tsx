@@ -89,6 +89,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (import.meta.env.VITE_MAINTENANCE_MODE === 'true') {
+      return;
+    }
+
     initConsentMode();
 
     // Check if user is returning from password reset email (via query params)
