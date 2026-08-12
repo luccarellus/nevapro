@@ -88,8 +88,10 @@ export default function App() {
     }
   };
 
+  const isUnderMaintenance = import.meta.env.VITE_MAINTENANCE_MODE !== 'false';
+
   useEffect(() => {
-    if (import.meta.env.VITE_MAINTENANCE_MODE === 'true') {
+    if (isUnderMaintenance) {
       return;
     }
 
@@ -388,8 +390,6 @@ export default function App() {
   };
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
-
-  const isUnderMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
   if (isUnderMaintenance) {
     return <Maintenance />;
