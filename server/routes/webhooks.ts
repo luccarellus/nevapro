@@ -5,6 +5,8 @@ import { normalizeEmail, sanitizeInput } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { sendWelcomeEmail } from '../services/email';
+import { query } from '../../src/lib/db';
+import { PLATFORM_TENANT_ID } from '../services/rbacService';
 
 const router = Router();
 
@@ -81,6 +83,7 @@ router.post('/eventease', rateLimiter(30, 60_000), async (req: Request, res: Res
           name: safeName,
           password_hash: passwordHash,
           role: 'student',
+          tenant_id: PLATFORM_TENANT_ID,
           city: safeCity,
           school: safeSchool,
           gremio: safeGremio,
@@ -96,6 +99,18 @@ router.post('/eventease', rateLimiter(30, 60_000), async (req: Request, res: Res
       log.error('[Webhook EventEase] Erro ao cadastrar aluno no Supabase:', insertError);
       res.status(500).json({ error: 'Erro ao criar conta no NevaPro.' });
       return;
+    }
+
+    // Vincula o novo aluno ao papel student (RBAC)
+    try {
+      await query(
+        `INSERT INTO public.user_tenant_roles (user_id, tenant_id, role_id)
+         SELECT $1, $2, id FROM public.roles WHERE code = 'student' AND tenant_id IS NULL
+         ON CONFLICT (user_id, tenant_id, role_id) DO NOTHING`,
+        [newUserId, PLATFORM_TENANT_ID],
+      );
+    } catch (rbacErr) {
+      log.error('[Webhook EventEase] Erro ao vincular papel student:', rbacErr);
     }
 
     log.info(`[Webhook EventEase] Aluno cadastrado com sucesso: ${cleanEmail}`);

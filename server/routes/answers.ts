@@ -1,10 +1,13 @@
 import { Router, Response } from 'express';
 import { getClient, query } from '../../src/lib/db';
 import { requireAuth } from '../middleware/auth';
+import { resolveTenant } from '../middleware/tenant';
+import { requirePermission } from '../middleware/rbac';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { AuthenticatedRequest } from '../types';
 import { log } from '../utils/logger';
 import { invalidateUserCache } from '../services/userCache';
+import { PERMISSIONS } from '../lib/permissions';
 
 type AnswerInput = {
   userId: string;
@@ -16,13 +19,14 @@ type AnswerInput = {
 
 const router = Router();
 
-router.post('/', rateLimiter(30, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', rateLimiter(30, 60_000), requireAuth, resolveTenant, requirePermission(PERMISSIONS.QUESTIONS_ANSWER), async (req: AuthenticatedRequest, res: Response) => {
   const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
   if (req.user?.role !== 'admin' && req.user?.userId !== userId) {
     res.status(403).json({ error: 'Acesso negado.' });
     return;
   }
   try {
+    const tenantId = req.tenantId || null;
     const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
     if (qCheck.rows.length === 0 && questionData) {
       await query(
@@ -45,9 +49,9 @@ router.post('/', rateLimiter(30, 60_000), requireAuth, async (req: Authenticated
       }
     }
     await query(
-      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
-      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect],
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, tenant_id, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())`,
+      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect, tenantId],
     );
     await invalidateUserCache(req.user?.email || '', userId);
     res.json({ success: true });
@@ -57,7 +61,7 @@ router.post('/', rateLimiter(30, 60_000), requireAuth, async (req: Authenticated
   }
 });
 
-router.post('/batch', rateLimiter(10, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/batch', rateLimiter(10, 60_000), requireAuth, resolveTenant, requirePermission(PERMISSIONS.QUESTIONS_ANSWER), async (req: AuthenticatedRequest, res: Response) => {
   const answers = req.body?.answers as AnswerInput[];
   if (!Array.isArray(answers) || answers.length === 0 || answers.length > 200) {
     res.status(400).json({ error: 'Envie entre 1 e 200 respostas.' });
@@ -101,6 +105,7 @@ router.post('/batch', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
     question_id: answer.questionId,
     selected_option_index: answer.selectedOption ?? null,
     is_correct: Boolean(answer.isCorrect),
+    tenant_id: req.tenantId || null,
   }));
 
   const client = await getClient();
@@ -133,10 +138,10 @@ router.post('/batch', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
       );
     }
     await client.query(
-      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, created_at)
-       SELECT gen_random_uuid(), user_id, question_id, selected_option_index, is_correct, NOW()
+      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, tenant_id, created_at)
+       SELECT gen_random_uuid(), user_id, question_id, selected_option_index, is_correct, tenant_id, NOW()
        FROM jsonb_to_recordset($1::jsonb) AS a(
-         user_id uuid, question_id varchar, selected_option_index integer, is_correct boolean
+         user_id uuid, question_id varchar, selected_option_index integer, is_correct boolean, tenant_id uuid
        )`,
       [JSON.stringify(answerRows)],
     );

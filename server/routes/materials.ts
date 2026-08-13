@@ -10,6 +10,7 @@ import { validateMaterialInput } from '../utils/validation';
 import { dbAdmin, getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { extractObjectKey } from '../utils/extractObjectKey';
+import { PERMISSIONS } from '../lib/permissions';
 
 const BUCKET = process.env.B2_BUCKET_NAME || 'neva-avatars';
 
@@ -18,6 +19,7 @@ const router = createCrudRouter({
   cacheKey: CACHE_KEYS.MATERIALS,
   validate: validateMaterialInput,
   notificationType: 'material',
+  writePermission: PERMISSIONS.MATERIALS_UPLOAD,
   extraInvalidateKeys: [CACHE_KEYS.ADMIN_ACTIVITIES],
   mapRow: (m) => ({
     id: m.id,

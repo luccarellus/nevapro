@@ -4,12 +4,14 @@
 import { createCrudRouter } from '../lib/createCrudRouter';
 import { CACHE_KEYS } from '../types';
 import { validateEventInput } from '../utils/validation';
+import { PERMISSIONS } from '../lib/permissions';
 
 const router = createCrudRouter({
   table: 'events',
   cacheKey: CACHE_KEYS.EVENTOS,
   validate: validateEventInput,
   notificationType: 'evento',
+  writePermission: PERMISSIONS.SIMULADOS_PUBLISH,
   extraInvalidateKeys: [CACHE_KEYS.ADMIN_ACTIVITIES],
   orderBy: 'date',
   orderAsc: true,

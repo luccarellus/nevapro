@@ -4,12 +4,14 @@
 import { createCrudRouter } from '../lib/createCrudRouter';
 import { CACHE_KEYS } from '../types';
 import { validateMuralInput } from '../utils/validation';
+import { PERMISSIONS } from '../lib/permissions';
 
 const router = createCrudRouter({
   table: 'mural',
   cacheKey: CACHE_KEYS.RECADOS,
   validate: validateMuralInput,
   notificationType: 'mural',
+  writePermission: PERMISSIONS.MURAL_POST,
   extraInvalidateKeys: [CACHE_KEYS.ADMIN_ACTIVITIES],
   fieldMap: { category: 'type' },
   defaults: { type: 'GERAL' },

@@ -6,6 +6,8 @@ import { log } from '../utils/logger';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
+import { getUserRbacContext } from '../services/rbacService';
+import { ADMIN_ROLE_CODES } from '../lib/permissions';
 
 import bcrypt from 'bcryptjs';
 
@@ -101,12 +103,20 @@ const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser |
         .maybeSingle();
 
       if (adminRow) {
+        // Carrega o contexto RBAC (papéis, permissões, tenants)
+        const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
         const authenticatedUser: AuthenticatedUser = {
           userId: adminRow.id,
           email,
           role: 'admin',
           authUserId: userData.user.id,
+          roles: rbacContext.roles,
+          permissions: rbacContext.permissions,
+          tenants: rbacContext.tenants,
+          tenantId: rbacContext.defaultTenantId || undefined,
+          isAdmin: rbacContext.isAdmin,
         };
+        (authenticatedUser as any).rbacContext = rbacContext;
         await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
         return authenticatedUser;
       }
@@ -142,6 +152,20 @@ export const requireAuth = async (
     const user = await verifySupabaseSession(token);
     if (user) {
       req.user = user;
+      // Anexa o contexto RBAC (se carregado na sessão) para os middlewares de autorização
+      const rbacContext = (user as any).rbacContext as import('../services/rbacService').RbacContext | undefined;
+      if (rbacContext) {
+        (req as any).rbacContext = rbacContext;
+      } else {
+        const { getUserRbacContext: loadCtx } = await import('../services/rbacService');
+        const ctx = await loadCtx(user.userId, user.role === 'admin' ? 'admin' : 'student');
+        (req as any).rbacContext = ctx;
+        user.roles = ctx.roles;
+        user.permissions = ctx.permissions;
+        user.tenants = ctx.tenants;
+        user.tenantId = ctx.defaultTenantId || undefined;
+        user.isAdmin = ctx.isAdmin;
+      }
       return next();
     }
 
@@ -153,7 +177,8 @@ export const requireAuth = async (
 };
 
 /**
- * Middleware: Requires the authenticated user to have admin role.
+ * Middleware: Requires the authenticated user to have admin role (RBAC-aware).
+ * Aceita super_admin, tenant_admin e o legado role === 'admin'.
  * Must be used AFTER requireAuth.
  */
 export const requireAdmin = async (
@@ -162,7 +187,10 @@ export const requireAdmin = async (
   next: NextFunction,
 ): Promise<void> => {
   await requireAuth(req, res, () => {
-    if (req.user?.role !== 'admin') {
+    const ctx = (req as any).rbacContext;
+    const isLegacyAdmin = req.user?.role === 'admin';
+    const isRbacAdmin = ctx?.isAdmin || (req.user?.roles || []).some((r) => ADMIN_ROLE_CODES.includes(r as any));
+    if (!isLegacyAdmin && !isRbacAdmin) {
       res.status(403).json({ error: 'Acesso negado: recursos exclusivos de administrador.' });
       return;
     }
@@ -238,6 +266,9 @@ export const authenticateUser = async (email: string, password: string) => {
       await ensureAdminUser(cleanEmail, authUserId);
     }
 
+    // Carrega o contexto RBAC (papéis, permissões, tenants)
+    const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
+
     return {
       user: {
         ...adminRow,
@@ -246,6 +277,11 @@ export const authenticateUser = async (email: string, password: string) => {
         answeredQuestions: adminRow.answered_questions || 0,
         correctAnswers: adminRow.correct_answers || 0,
         avatarUrl: resolveStoredFileUrl(adminRow.avatar_url),
+        roles: rbacContext.roles,
+        permissions: rbacContext.permissions,
+        tenants: rbacContext.tenants,
+        tenantId: rbacContext.defaultTenantId || undefined,
+        isAdmin: rbacContext.isAdmin,
       },
       session: authData.session,
     };
@@ -268,10 +304,18 @@ export const authenticateUser = async (email: string, password: string) => {
       return { error: 'E-mail ou senha inválidos.' };
     }
 
+    // Carrega o contexto RBAC (papéis, permissões, tenants)
+    const rbacContext = await getUserRbacContext(studentRow.id, 'student');
+
     const authenticatedUser: AuthenticatedUser = {
       userId: studentRow.id,
       email: cleanEmail,
       role: 'student',
+      roles: rbacContext.roles,
+      permissions: rbacContext.permissions,
+      tenants: rbacContext.tenants,
+      tenantId: rbacContext.defaultTenantId || undefined,
+      isAdmin: rbacContext.isAdmin,
     };
 
     // Generate student session token & cache it
@@ -279,7 +323,8 @@ export const authenticateUser = async (email: string, password: string) => {
     const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
 
     // Cache student session for 24 hours
-    await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, STUDENT_SESSION_TTL_SECONDS);
+    const sessionCacheValue: any = { ...authenticatedUser, rbacContext };
+    await setUserCache(userCacheKeys.auth(tokenHash), sessionCacheValue, STUDENT_SESSION_TTL_SECONDS);
 
     return {
       user: {
@@ -292,6 +337,11 @@ export const authenticateUser = async (email: string, password: string) => {
         showInLeaderboard: studentRow.show_in_leaderboard !== false,
         languagePreference: studentRow.language_preference || 'ingles',
         flashQuizCompleted: !!studentRow.flash_quiz_completed,
+        roles: rbacContext.roles,
+        permissions: rbacContext.permissions,
+        tenants: rbacContext.tenants,
+        tenantId: rbacContext.defaultTenantId || undefined,
+        isAdmin: rbacContext.isAdmin,
       },
       session: {
         access_token: sessionToken,

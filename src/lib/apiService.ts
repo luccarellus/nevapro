@@ -23,12 +23,19 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   const { method, body } = config;
   if (method === 'GET') return cachedFetchJson<T>(endpoint);
   
+  const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('neva_active_tenant') : null;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+    ...(config.headers || {}),
+  };
+  if (activeTenant) {
+    headers['X-Tenant-ID'] = activeTenant;
+  }
+
   const options: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-    },
+    headers,
   };
 
   if (body) {

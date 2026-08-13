@@ -1,29 +1,40 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin } from '../middleware/auth';
+import { resolveTenant } from '../middleware/tenant';
+import { requirePermission } from '../middleware/rbac';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { cacheGet, cacheSet } from '../services/cache';
 import { CACHE_KEYS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
+import { PERMISSIONS } from '../lib/permissions';
 
 const router = Router();
 
 // ============= LIST STUDENTS =============
-router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+router.get(
+  '/users',
+  requireAuth,
+  resolveTenant,
+  requirePermission(PERMISSIONS.USERS_MANAGE_STUDENTS, PERMISSIONS.USERS_MANAGE_TEACHERS),
+  async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const cached = await cacheGet<unknown[]>(CACHE_KEYS.ADMIN_USERS);
+    const tenantId = req.tenantId;
+    const cacheKey = tenantId ? `${CACHE_KEYS.ADMIN_USERS}:${tenantId}` : CACHE_KEYS.ADMIN_USERS;
+    const cached = await cacheGet<unknown[]>(cacheKey);
     if (cached) {
       res.json(cached);
       return;
     }
 
-    const { data, error } = await getSupabaseAdminClient()
-      .from('users')
-      .select('*')
-      .order('xp', { ascending: false });
+    let builder = getSupabaseAdminClient().from('users').select('*');
+    if (tenantId) {
+      builder = builder.eq('tenant_id', tenantId);
+    }
+    const { data, error } = await builder.order('xp', { ascending: false });
 
     if (error) throw error;
 
@@ -36,7 +47,7 @@ router.get('/users', requireAdmin, async (req: AuthenticatedRequest, res: Respon
         avatarUrl: resolveStoredFileUrl((u as any).avatar_url || (u as any).avatarUrl || (u as any).avatar),
       }));
 
-    await cacheSet(CACHE_KEYS.ADMIN_USERS, regularStudents);
+    await cacheSet(cacheKey, regularStudents);
     res.json(regularStudents);
   } catch (err) {
     log.error('[Admin Users] Error:', err);
@@ -128,7 +139,9 @@ router.get('/activities', requireAdmin, async (req: AuthenticatedRequest, res: R
 router.post(
   '/sync-auth-users',
   rateLimiter(1, 60_000),
-  requireAdmin,
+  requireAuth,
+  resolveTenant,
+  requirePermission(PERMISSIONS.USERS_MANAGE_ADMINS),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const supabase = getSupabaseAdminClient();

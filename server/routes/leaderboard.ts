@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { resolveTenant } from '../middleware/tenant';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { log } from '../utils/logger';
@@ -8,22 +9,28 @@ import { CACHE_KEYS } from '../types';
 const router = Router();
 
 // ============= LEADERBOARD =============
-router.get('/', async (req, res: Response) => {
+router.get('/', resolveTenant, async (req, res: Response) => {
   try {
-    const cached = await cacheGet<unknown[]>(CACHE_KEYS.LEADERBOARD);
+    const tenantId = (req as any).tenantId;
+    const cacheKey = tenantId ? `${CACHE_KEYS.LEADERBOARD}:${tenantId}` : CACHE_KEYS.LEADERBOARD;
+    const cached = await cacheGet<unknown[]>(cacheKey);
     if (cached) {
       res.json(cached);
       return;
     }
 
-    const { data, error } = await getSupabaseAdminClient()
+    let builder = getSupabaseAdminClient()
       .from('users')
       .select('name, city, xp, level, avatar_url')
       .not('role', 'is', null)
       .neq('role', 'admin')
-      .eq('show_in_leaderboard', true)
-      .order('xp', { ascending: false })
-      .limit(20);
+      .eq('show_in_leaderboard', true);
+
+    if (tenantId) {
+      builder = builder.eq('tenant_id', tenantId);
+    }
+
+    const { data, error } = await builder.order('xp', { ascending: false }).limit(20);
 
     if (error) throw error;
 
@@ -35,7 +42,7 @@ router.get('/', async (req, res: Response) => {
       avatarUrl: resolveStoredFileUrl((u as any).avatar_url),
     }));
 
-    await cacheSet(CACHE_KEYS.LEADERBOARD, filteredLeaderboard);
+    await cacheSet(cacheKey, filteredLeaderboard);
     res.json(filteredLeaderboard);
   } catch (err) {
     log.error('[Leaderboard] Error:', err);

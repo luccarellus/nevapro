@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
+import { resolveTenant } from '../middleware/tenant';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
@@ -36,7 +37,7 @@ async function markGlobalNotificationAsRead(notificationId: string, userId: stri
 }
 
 // ============= LIST NOTIFICATIONS =============
-router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
   const email = ((req.query.email as string) || req.user?.email || '').toLowerCase().trim();
 
   if (req.user?.role !== 'admin' && req.user?.email !== email) {
@@ -51,7 +52,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    const cacheKey = userCacheKeys.notifications(userId);
+    const tenantId = req.tenantId;
+    const cacheKey = tenantId ? `${userCacheKeys.notifications(userId)}:${tenantId}` : userCacheKeys.notifications(userId);
     const cached = await getUserCache<unknown[]>(cacheKey);
     if (cached) {
       res.json(cached);
@@ -64,9 +66,10 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
        FROM public.notifications n
        LEFT JOIN public.notification_reads nr
          ON nr.notification_id = n.id AND nr.user_id = $1
-       WHERE n.user_id = $1 OR n.user_id IS NULL
+       WHERE (n.user_id = $1 OR n.user_id IS NULL)
+         AND ($2::uuid IS NULL OR n.tenant_id = $2 OR n.tenant_id IS NULL)
        ORDER BY n.created_at DESC`,
-      [userId],
+      [userId, tenantId || null],
     );
     await setUserCache(cacheKey, rows, 45);
     res.json(rows);

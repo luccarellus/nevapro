@@ -85,7 +85,7 @@ router.get('/tri-scores', requireAuth, async (req: AuthenticatedRequest, res: Re
         languages_score: latestScore.languages_score,
         calculated_at: latestScore.calculated_at,
       } : null,
-      history: (scores || []).map(s => ({
+      history: (scores || []).map((s: any) => ({
         id: s.id,
         estimated_score: s.estimated_score,
         calculated_at: s.calculated_at,

@@ -93,6 +93,11 @@ router.post(
       delete updateData.role;
     }
 
+    // Multi-Tenancy: apenas administradores podem alterar o tenant padrão do usuário
+    if (updateData.tenant_id !== undefined && !req.user?.isAdmin) {
+      delete updateData.tenant_id;
+    }
+
     const { data: adminExists } = await getSupabaseAdminClient()
       .from('admin_users')
       .select('id')

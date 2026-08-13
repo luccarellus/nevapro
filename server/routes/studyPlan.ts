@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
+import { resolveTenant } from '../middleware/tenant';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { normalizeEmail } from '../utils/sanitize';
@@ -9,7 +10,7 @@ import { normalizeEmail } from '../utils/sanitize';
 const router = Router();
 
 // ============= LIST TODAY'S TASKS =============
-router.get('/tasks', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/tasks', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
   const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
   if (req.user?.role !== 'admin' && req.user?.email !== email) {
@@ -75,12 +76,12 @@ router.get('/tasks', requireAuth, async (req: AuthenticatedRequest, res: Respons
           },
         ];
 
-        const { data: inserted, error: insertError } = await supabase
-          .from('user_study_tasks')
-          .insert(defaults)
-          .select();
+    const { data: inserted, error: insertError } = await supabase
+      .from('user_study_tasks')
+      .insert(defaults.map((t) => ({ ...t, tenant_id: req.tenantId || null })))
+      .select();
 
-        if (insertError) throw insertError;
+    if (insertError) throw insertError;
 
         res.json({
           tasks: inserted || defaults,
@@ -139,6 +140,7 @@ router.post('/tasks', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
         target_tab: target_tab || 'questions',
         done: false,
         task_date: task_date || new Date().toISOString().split('T')[0],
+        tenant_id: req.tenantId || null,
         created_at: new Date().toISOString(),
       }])
       .select()

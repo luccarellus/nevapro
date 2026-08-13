@@ -23,12 +23,15 @@
 
 import { Router, Response } from 'express';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { requireAdmin } from '../middleware/auth';
+import { requireAuth, requireAdmin } from '../middleware/auth';
+import { resolveTenant } from '../middleware/tenant';
+import { requirePermission } from '../middleware/rbac';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { cacheInvalidate, cacheGet, cacheSet } from '../services/cache';
 import { addNotification } from '../services/notification';
 import { CACHE_KEYS } from '../types';
+import { PermissionCode } from './permissions';
 
 type Row = Record<string, unknown>;
 type ValidationFn = (body: unknown, partial?: boolean) => { data: Row } | { error: string };
@@ -43,6 +46,10 @@ interface CrudRouterOptions {
   validate: ValidationFn;
   /** Notification type sent on create (e.g. 'material', 'evento', 'mural') */
   notificationType: string;
+  /** Permission required for create/update/delete (default: any admin role) */
+  writePermission?: PermissionCode;
+  /** Optional: whether the table is tenant-scoped (has tenant_id column). Default: true. */
+  tenantScoped?: boolean;
   /** Optional: maps DB rows to API response shape */
   mapRow?: RowMapper;
   /** Optional: additional cache keys to invalidate on create (e.g. admin activities) */
@@ -120,23 +127,29 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   const orderAsc = options.orderAsc ?? false;
 
   // ===== LIST =====
-  router.get('/', async (_req, res: Response) => {
+  router.get('/', resolveTenant, async (req, res: Response) => {
     try {
-      const cached = await cacheGet<unknown[]>(options.cacheKey);
+      const tenantScoped = options.tenantScoped !== false;
+      const tenantId = req.tenantId;
+
+      // Cache por tenant para garantir isolamento
+      const cacheKey = tenantScoped && tenantId ? `${options.cacheKey}:${tenantId}` : options.cacheKey;
+      const cached = await cacheGet<unknown[]>(cacheKey);
       if (cached) {
         res.json(cached);
         return;
       }
 
-      const { data, error } = await getSupabaseAdminClient()
-        .from(options.table)
-        .select('*')
-        .order(orderColumn, { ascending: orderAsc });
+      let builder = getSupabaseAdminClient().from(options.table).select('*');
+      if (tenantScoped && tenantId) {
+        builder = builder.eq('tenant_id', tenantId);
+      }
+      const { data, error } = await builder.order(orderColumn, { ascending: orderAsc });
 
       if (error) throw error;
 
       const mapped = (data || []).map((row: Row) => mapRow(row));
-      await cacheSet(options.cacheKey, mapped);
+      await cacheSet(cacheKey, mapped);
       res.json(mapped);
     } catch (err) {
       log.error(`[${options.table} List] Error:`, err);
@@ -145,7 +158,11 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   });
 
   // ===== CREATE =====
-  router.post('/', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
+  const writeGuard = options.writePermission
+    ? [requireAuth, resolveTenant, requirePermission(options.writePermission)]
+    : [requireAdmin, resolveTenant];
+
+  router.post('/', rateLimiter(10, 60_000), ...writeGuard, async (req, res: Response) => {
     try {
       const validation = options.validate(req.body);
       if ('error' in validation) {
@@ -161,6 +178,11 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         updated_at: new Date().toISOString(),
       };
 
+      // Escopo de tenant: associa o registro ao tenant ativo da requisição
+      if (options.tenantScoped !== false && req.tenantId && !insertData.tenant_id) {
+        insertData.tenant_id = req.tenantId;
+      }
+
       // Handle table-specific date columns
       if (options.table === 'materials') {
         insertData.uploaded_at = new Date().toISOString();
@@ -174,16 +196,18 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
 
       if (error) throw error;
 
-      // Invalidate caches
+      // Invalidate caches (incluindo o do tenant)
       const invalidateKeys = [options.cacheKey, ...(options.extraInvalidateKeys || [])];
+      if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
 
-      // Send notification
+      // Send notification (escopada ao tenant ativo da requisição)
       const title = (result.title as string) || validation.data.title as string || 'Novo item';
       await addNotification(
         `Novo ${options.notificationType}`,
         title,
         options.notificationType,
+        req.tenantId || null,
       );
 
       res.status(201).json(mapRow(result));
@@ -194,7 +218,7 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   });
 
   // ===== UPDATE =====
-  router.put('/:id', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
+  router.put('/:id', rateLimiter(10, 60_000), ...writeGuard, async (req, res: Response) => {
     try {
       const { id } = req.params;
       const validation = options.validate(req.body, true);
@@ -208,15 +232,17 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await getSupabaseAdminClient()
-        .from(options.table)
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      // Escopo de tenant no update: só atualiza registros do tenant ativo
+      let builder = getSupabaseAdminClient().from(options.table).update(updates);
+      if (options.tenantScoped !== false && req.tenantId) {
+        builder = builder.eq('tenant_id', req.tenantId);
+      }
+      const { data, error } = await builder.eq('id', id).select().single();
 
       if (error) throw error;
-      await cacheInvalidate(options.cacheKey);
+      const invalidateKeys = [options.cacheKey];
+      if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
+      await cacheInvalidate(...invalidateKeys);
       res.json(data);
     } catch (err) {
       log.error(`[${options.table} Update] Error:`, err);
@@ -225,7 +251,7 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   });
 
   // ===== DELETE =====
-  router.delete('/:id', rateLimiter(10, 60_000), requireAdmin, async (req, res: Response) => {
+  router.delete('/:id', rateLimiter(10, 60_000), ...writeGuard, async (req, res: Response) => {
     try {
       const { id } = req.params;
 
@@ -234,13 +260,16 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         await options.onBeforeDelete(id);
       }
 
-      const { error } = await getSupabaseAdminClient()
-        .from(options.table)
-        .delete()
-        .eq('id', id);
+      let builder = getSupabaseAdminClient().from(options.table).delete();
+      if (options.tenantScoped !== false && req.tenantId) {
+        builder = builder.eq('tenant_id', req.tenantId);
+      }
+      const { error } = await builder.eq('id', id);
 
       if (error) throw error;
-      await cacheInvalidate(options.cacheKey);
+      const invalidateKeys = [options.cacheKey];
+      if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
+      await cacheInvalidate(...invalidateKeys);
       res.json({ success: true });
     } catch (err) {
       log.error(`[${options.table} Delete] Error:`, err);
@@ -249,14 +278,14 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   });
 
   // ===== GET BY ID =====
-  router.get('/:id', async (req, res: Response) => {
+  router.get('/:id', resolveTenant, async (req, res: Response) => {
     try {
       const { id } = req.params;
-      const { data, error } = await getSupabaseAdminClient()
-        .from(options.table)
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
+      let builder = getSupabaseAdminClient().from(options.table).select('*');
+      if (options.tenantScoped !== false && req.tenantId) {
+        builder = builder.eq('tenant_id', req.tenantId);
+      }
+      const { data, error } = await builder.eq('id', id).maybeSingle();
 
       if (error) throw error;
       if (!data) {

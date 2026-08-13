@@ -35,6 +35,54 @@ as $$
   select lower(coalesce(auth.jwt() ->> 'email', ''));
 $$;
 
+-- Resolve o id do usuário (users.id ou admin_users.id) a partir do JWT
+create or replace function public.jwt_user_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select au.id from public.admin_users au where au.auth_user_id = auth.uid()),
+    (select u.id from public.users u where lower(u.email) = lower(coalesce(auth.jwt() ->> 'email', ''))),
+    auth.uid()
+  );
+$$;
+
+-- true se o usuário JWT é membro do tenant informado
+create or replace function public.is_tenant_member(target_tenant_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_tenant_roles utr
+    where utr.user_id = public.jwt_user_id()
+      and utr.tenant_id = target_tenant_id
+  );
+$$;
+
+-- true se o usuário JWT possui o papel super_admin (RBAC)
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.user_tenant_roles utr
+    join public.roles r on r.id = utr.role_id
+    where utr.user_id = public.jwt_user_id()
+      and r.code = 'super_admin'
+  );
+$$;
+
 -- Enable RLS on all exposed tables
 alter table public.admin_users enable row level security;
 alter table public.users enable row level security;
@@ -56,6 +104,11 @@ alter table public.consent_logs enable row level security;
 alter table public.revoked_tokens enable row level security;
 alter table public.login_attempts enable row level security;
 alter table public.mural enable row level security;
+alter table public.tenants enable row level security;
+alter table public.roles enable row level security;
+alter table public.permissions enable row level security;
+alter table public.role_permissions enable row level security;
+alter table public.user_tenant_roles enable row level security;
 
 -- Default: authenticated users can read, admins can write
 
@@ -438,6 +491,126 @@ create policy "login_attempts_admin" on public.login_attempts
   for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
+-- ===== TENANTS (Multi-Tenancy) =====
+-- Leitura: membros do tenant e admins. Escrita: apenas super_admin.
+drop policy if exists "tenants_select" on public.tenants;
+create policy "tenants_select" on public.tenants
+  for select to authenticated
+  using (public.is_admin() or public.is_tenant_member(id));
+
+drop policy if exists "tenants_insert" on public.tenants;
+create policy "tenants_insert" on public.tenants
+  for insert to authenticated
+  with check (public.is_super_admin());
+
+drop policy if exists "tenants_update" on public.tenants;
+create policy "tenants_update" on public.tenants
+  for update to authenticated
+  using (public.is_super_admin()) with check (public.is_super_admin());
+
+drop policy if exists "tenants_delete" on public.tenants;
+create policy "tenants_delete" on public.tenants
+  for delete to authenticated
+  using (public.is_super_admin());
+
+-- ===== ROLES (RBAC) =====
+-- Leitura: papéis globais (tenant_id NULL) para todos; papéis do tenant para membros.
+-- Escrita: admins.
+drop policy if exists "roles_select" on public.roles;
+create policy "roles_select" on public.roles
+  for select to authenticated
+  using (
+    public.is_admin()
+    or tenant_id is null
+    or public.is_tenant_member(tenant_id)
+  );
+
+drop policy if exists "roles_insert" on public.roles;
+create policy "roles_insert" on public.roles
+  for insert to authenticated
+  with check (public.is_admin());
+
+drop policy if exists "roles_update" on public.roles;
+create policy "roles_update" on public.roles
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "roles_delete" on public.roles;
+create policy "roles_delete" on public.roles
+  for delete to authenticated
+  using (public.is_admin());
+
+-- ===== PERMISSIONS (catálogo) =====
+-- Leitura pública para autenticados; escrita apenas admin.
+drop policy if exists "permissions_select" on public.permissions;
+create policy "permissions_select" on public.permissions
+  for select to authenticated using (true);
+
+drop policy if exists "permissions_insert" on public.permissions;
+create policy "permissions_insert" on public.permissions
+  for insert to authenticated
+  with check (public.is_admin());
+
+drop policy if exists "permissions_update" on public.permissions;
+create policy "permissions_update" on public.permissions
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "permissions_delete" on public.permissions;
+create policy "permissions_delete" on public.permissions
+  for delete to authenticated
+  using (public.is_admin());
+
+-- ===== ROLE_PERMISSIONS (matriz) =====
+-- Leitura: admins ou membros de tenants cujos papéis estão expostos. Escrita: admin.
+drop policy if exists "role_permissions_select" on public.role_permissions;
+create policy "role_permissions_select" on public.role_permissions
+  for select to authenticated
+  using (
+    public.is_admin()
+    or role_id in (
+      select r.id from public.roles r
+      where r.tenant_id is null or public.is_tenant_member(r.tenant_id)
+    )
+  );
+
+drop policy if exists "role_permissions_insert" on public.role_permissions;
+create policy "role_permissions_insert" on public.role_permissions
+  for insert to authenticated
+  with check (public.is_admin());
+
+drop policy if exists "role_permissions_update" on public.role_permissions;
+create policy "role_permissions_update" on public.role_permissions
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "role_permissions_delete" on public.role_permissions;
+create policy "role_permissions_delete" on public.role_permissions
+  for delete to authenticated
+  using (public.is_admin());
+
+-- ===== USER_TENANT_ROLES (vínculos) =====
+-- Leitura: o próprio usuário ou admin. Escrita: apenas admin.
+drop policy if exists "user_tenant_roles_select_own" on public.user_tenant_roles;
+create policy "user_tenant_roles_select_own" on public.user_tenant_roles
+  for select to authenticated
+  using (user_id = public.jwt_user_id() or public.is_admin());
+
+drop policy if exists "user_tenant_roles_insert" on public.user_tenant_roles;
+create policy "user_tenant_roles_insert" on public.user_tenant_roles
+  for insert to authenticated
+  with check (public.is_admin());
+
+drop policy if exists "user_tenant_roles_update" on public.user_tenant_roles;
+create policy "user_tenant_roles_update" on public.user_tenant_roles
+  for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "user_tenant_roles_delete" on public.user_tenant_roles;
+create policy "user_tenant_roles_delete" on public.user_tenant_roles
+  for delete to authenticated
+  using (public.is_admin());
+
 -- Remove overly broad grants — the server uses service_role key with RLS bypass
 -- Only grant what's strictly needed via the anon key
 revoke all on public.admin_users from anon;
@@ -460,3 +633,8 @@ revoke all on public.consent_logs from anon;
 revoke all on public.revoked_tokens from anon;
 revoke all on public.login_attempts from anon;
 revoke all on public.mural from anon;
+revoke all on public.tenants from anon;
+revoke all on public.roles from anon;
+revoke all on public.permissions from anon;
+revoke all on public.role_permissions from anon;
+revoke all on public.user_tenant_roles from anon;

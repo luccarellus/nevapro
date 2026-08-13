@@ -121,6 +121,12 @@ export default function App() {
     }
   }, []);
 
+  const handleSelectTenant = (tenantId: string) => {
+    localStorage.setItem('neva_active_tenant', tenantId);
+    setUser(prev => ({ ...prev, tenantId }));
+    invalidateRequestCache();
+  };
+
   const fetchUser = async (email?: string): Promise<boolean> => {
     if (!email) return false;
     try {
@@ -130,6 +136,11 @@ export default function App() {
         const profileWithNextLevel = { ...profile, nextLevelXp, currentLevelMinXp };
         setUser(prev => ({ ...prev, ...profileWithNextLevel }));
         setIsLoggedIn(true);
+
+        if (profile.tenantId && !localStorage.getItem('neva_active_tenant')) {
+          localStorage.setItem('neva_active_tenant', profile.tenantId);
+        }
+
         // Atualiza a sessão no localStorage para ambos os perfis (aluno e admin) para persistir no F5
         localStorage.setItem('neva_student_session', JSON.stringify(profileWithNextLevel));
         
@@ -406,6 +417,7 @@ export default function App() {
             onTabChange={handleTabChange}
             userEmail={user.email}
             user={user}
+            onSelectTenant={handleSelectTenant}
           />
           <Navigation 
             activeTab={activeTab} 

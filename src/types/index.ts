@@ -11,6 +11,16 @@ export interface Question {
   xpReward: number;
 }
 
+/** Papéis RBAC do NevaPro (Multi-Tenancy). */
+export type RbacRole = 'super_admin' | 'tenant_admin' | 'teacher' | 'student';
+
+export interface TenantInfo {
+  id: string;
+  slug: string;
+  name: string;
+  plan: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -24,7 +34,18 @@ export interface UserProfile {
   correctAnswers?: number;
   streak?: number;
   rewards?: Reward[];
+  /** Papel legado (student | admin) — mantido para compatibilidade. */
   role: 'student' | 'admin';
+  /** Papéis RBAC efetivos (super_admin, tenant_admin, teacher, student). */
+  roles?: RbacRole[];
+  /** Permissões RBAC efetivas (ex.: 'materials:upload'). */
+  permissions?: string[];
+  /** Tenant padrão do usuário. */
+  tenantId?: string;
+  /** Tenants aos quais o usuário está vinculado. */
+  tenants?: TenantInfo[];
+  /** true se possui papel administrativo (super_admin | tenant_admin). */
+  isAdmin?: boolean;
   city?: string;
   school?: string;
   gremio?: string;

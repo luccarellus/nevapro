@@ -13,14 +13,15 @@ export const addNotification = async (
   title: string,
   message: string,
   type: string,
+  tenantId?: string | null,
 ): Promise<void> => {
   try {
     await query(
-      `INSERT INTO public.notifications (id, user_id, title, content, type, is_read, created_at)
-       VALUES (gen_random_uuid(), NULL, $1, $2, $3, false, NOW())`,
-      [title, message, type.toLowerCase()],
+      `INSERT INTO public.notifications (id, user_id, title, content, type, is_read, tenant_id, created_at)
+       VALUES (gen_random_uuid(), NULL, $1, $2, $3, false, $4, NOW())`,
+      [title, message, type.toLowerCase(), tenantId || null],
     );
-    log.info(`[addNotification] Global notification sent: "${title}"`);
+    log.info(`[addNotification] Global notification sent: "${title}" (tenant: ${tenantId || 'global'})`);
   } catch (e) {
     log.error('[addNotification] Failed to save notification:', e);
   }

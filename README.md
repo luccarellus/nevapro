@@ -17,6 +17,8 @@ A **Neva Pro** é uma plataforma web full-stack voltada para a preparação de e
 | ⚙️ **Configurações** | Perfil do usuário, temas visuais, preferências de idioma |
 | 🛡️ **Admin Dashboard** | Painel completo de administração para gestão de usuários, questões e conteúdo |
 | 🤖 **Flash Quiz** | Quiz rápido diário com recompensa de XP (protegido contra duplicação) |
+| 🏢 **Multi-Tenancy** | Isolamento por instituição (tenants) com escopo `tenant_id` em todas as entidades |
+| 🔐 **RBAC** | Papéis (`super_admin`, `tenant_admin`, `teacher`, `student`) com permissões granulares auditáveis |
 
 ---
 
@@ -88,12 +90,15 @@ A Neva Pro implementa um conjunto robusto de proteções de segurança:
 - **Proteção Mass Assignment** — campo `role` não pode ser alterado por estudantes
 - **Content Security Policy** — CSP ativada em produção via Helmet
 - **Separação de papéis** — middlewares `requireAuth` e `requireAdmin` em todas as rotas protegidas
+- **RBAC granular** — middlewares `requirePermission` e `requireRole` validam permissões por papel e por tenant
+- **Multi-Tenancy** — middleware `resolveTenant` (header `X-Tenant-ID`, subdomínio ou tenant padrão) com escopo `tenant_id` nas consultas
+- **Isolamento de tenant** — caches por tenant (`cache:key:tenantId`) e proteção contra mass assignment de `tenant_id`/`role`
 
 ---
 
 ## 🗄️ Banco de Dados
 
-O schema PostgreSQL contém **19 tabelas**:
+O schema PostgreSQL contém **24 tabelas** (incluindo Multi-Tenancy & RBAC):
 
 | Tabela | Descrição |
 |---|---|
@@ -116,6 +121,11 @@ O schema PostgreSQL contém **19 tabelas**:
 | `revoked_tokens` | Tokens de sessão invalidados |
 | `refresh_tokens` | Tokens de atualização |
 | `consent_logs` | Registro de consentimentos LGPD |
+| `tenants` | Instituições/entidades (Multi-Tenancy) |
+| `roles` | Papéis RBAC (globais ou por tenant) |
+| `permissions` | Catálogo de permissões granulares |
+| `role_permissions` | Matriz papel ↔ permissão |
+| `user_tenant_roles` | Vínculo usuário ↔ tenant ↔ papel |
 
 ---
 
@@ -282,6 +292,19 @@ A Neva Pro utiliza um sistema de XP (pontos de experiência) para engajar os est
 |---|---|---|
 | `GET` | `/api/user/profile` | Buscar perfil |
 | `POST` | `/api/user/profile` | Atualizar perfil e XP |
+
+### Multi-Tenancy & RBAC
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/tenants` | Lista tenants do usuário autenticado |
+| `POST` | `/api/tenants` | Cria tenant (permissão `tenants:manage`) |
+| `GET` | `/api/tenants/:id` | Detalhes do tenant |
+| `PUT` | `/api/tenants/:id` | Atualiza tenant (`tenants:manage`) |
+| `DELETE` | `/api/tenants/:id` | Desativa tenant (`tenants:manage`) |
+| `GET` | `/api/tenants/:id/roles` | Papéis disponíveis no tenant |
+| `POST` | `/api/tenants/:id/members` | Atribui papel a usuário |
+| `DELETE` | `/api/tenants/:id/members/:userId` | Remove papéis do usuário no tenant |
 
 ### Questões, Simulados, Materiais, Eventos e mais — gerenciados via painel Admin
 

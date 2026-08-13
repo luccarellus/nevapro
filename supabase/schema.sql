@@ -2,12 +2,71 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ============================================================
+-- MULTI-TENANCY & RBAC (criadas antes das tabelas que referenciam tenants)
+-- ============================================================
+
+-- 0.1 TENANTS (instituições/entidades)
+CREATE TABLE IF NOT EXISTS public.tenants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    domain VARCHAR(255) UNIQUE,
+    plan VARCHAR(50) DEFAULT 'free',
+    settings JSONB DEFAULT '{}'::jsonb,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 0.2 ROLES (papéis globais têm tenant_id NULL)
+CREATE TABLE IF NOT EXISTS public.roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    UNIQUE (tenant_id, code)
+);
+
+-- Papéis globais: código único quando tenant_id é NULL
+CREATE UNIQUE INDEX IF NOT EXISTS idx_roles_global_code ON public.roles(code) WHERE tenant_id IS NULL;
+
+-- 0.3 PERMISSIONS
+CREATE TABLE IF NOT EXISTS public.permissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(100) UNIQUE NOT NULL,
+    module VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 0.4 ROLE_PERMISSIONS (matriz papel ↔ permissão)
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+    role_id UUID NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+    permission_id UUID NOT NULL REFERENCES public.permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- 0.5 USER_TENANT_ROLES (vínculo usuário ↔ tenant ↔ papel)
+--     user_id referencia public.users OU public.admin_users (polimórfico).
+CREATE TABLE IF NOT EXISTS public.user_tenant_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    UNIQUE (user_id, tenant_id, role_id)
+);
+
 -- 1. USERS
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'student',
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL,
     city VARCHAR(255),
     school VARCHAR(255),
     gremio VARCHAR(255),
@@ -25,6 +84,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     correct_answers INTEGER DEFAULT 0,
     streak INTEGER DEFAULT 0,
     flash_quiz_completed BOOLEAN DEFAULT false,
+    tri_target_score INTEGER DEFAULT 750,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -35,6 +95,7 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'admin',
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE SET NULL,
     password_hash VARCHAR(255),
     avatar_url TEXT,
     auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -57,6 +118,7 @@ CREATE TABLE IF NOT EXISTS public.materials (
     foco VARCHAR(255),
     url TEXT NOT NULL,
     description TEXT,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
@@ -75,6 +137,7 @@ CREATE TABLE IF NOT EXISTS public.events (
     xp_reward INTEGER DEFAULT 0,
     observation TEXT,
     release_date TIMESTAMP WITH TIME ZONE,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
@@ -92,6 +155,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
     priority VARCHAR(50),
     type VARCHAR(50),
     is_read BOOLEAN DEFAULT false,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -107,6 +171,7 @@ CREATE TABLE IF NOT EXISTS public.questions (
     xp_reward INTEGER DEFAULT 10,
     year INTEGER,
     index INTEGER,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -130,6 +195,7 @@ CREATE TABLE IF NOT EXISTS public.simulados (
     total_questions INTEGER DEFAULT 0,
     duration_minutes INTEGER DEFAULT 60,
     xp_reward INTEGER DEFAULT 0,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -149,6 +215,7 @@ CREATE TABLE IF NOT EXISTS public.answers (
     question_id VARCHAR(255) REFERENCES public.questions(id) ON DELETE CASCADE,
     selected_option_index INTEGER,
     is_correct BOOLEAN,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -167,6 +234,7 @@ CREATE TABLE IF NOT EXISTS public.user_badges (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     badge_id UUID REFERENCES public.badges(id) ON DELETE CASCADE,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     awarded_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -178,6 +246,7 @@ CREATE TABLE IF NOT EXISTS public.user_daily_stats (
     xp_earned INTEGER DEFAULT 0,
     questions_answered INTEGER DEFAULT 0,
     correct_answers INTEGER DEFAULT 0,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     UNIQUE(user_id, date)
 );
@@ -188,6 +257,7 @@ CREATE TABLE IF NOT EXISTS public.xp_logs (
     user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL,
     reason VARCHAR(255),
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
@@ -233,14 +303,41 @@ CREATE TABLE IF NOT EXISTS public.login_attempts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- 18. MURAL
+-- 20. MURAL
 CREATE TABLE IF NOT EXISTS public.mural (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     content TEXT,
     type VARCHAR(50) DEFAULT 'GERAL',
     tag VARCHAR(100),
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 21. USER_STUDY_TASKS (Plano de Estudos)
+CREATE TABLE IF NOT EXISTS public.user_study_tasks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    estimated_time VARCHAR(50),
+    target_tab VARCHAR(50) DEFAULT 'questions',
+    done BOOLEAN DEFAULT false,
+    task_date DATE DEFAULT CURRENT_DATE,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 22. USER_TRI_SCORES (Desempenho TRI)
+CREATE TABLE IF NOT EXISTS public.user_tri_scores (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    estimated_score INTEGER NOT NULL,
+    math_score INTEGER,
+    nature_score INTEGER,
+    humanities_score INTEGER,
+    languages_score INTEGER,
+    tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+    calculated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
 -- INSERIR UM ADMINISTRADOR MASTER PADRÃO
@@ -251,6 +348,87 @@ CREATE TABLE IF NOT EXISTS public.mural (
 -- VALUES ('lucassantos.-@outlook.com', 'Lucas Santos', 'admin', crypt('sua_senha_aqui', gen_salt('bf', 10)))
 -- ON CONFLICT (email) DO NOTHING;
 
+
+-- ============================================================
+-- SEED — Multi-Tenancy & RBAC (idempotente)
+-- ============================================================
+
+-- Tenant da plataforma (backward-compatible com dados atuais)
+INSERT INTO public.tenants (id, name, slug, plan, active)
+VALUES ('00000000-0000-0000-0000-000000000001', 'NevaPro', 'nevapro', 'platform', true)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Catálogo de permissões (matriz do PRD)
+INSERT INTO public.permissions (code, module, description) VALUES
+  ('tenants:manage',              'tenants',      'Criar, editar e desativar tenants (somente super_admin).'),
+  ('tenants:view_settings',       'tenants',      'Visualizar configurações do tenant.'),
+  ('users:manage_admins',         'users',        'Gerenciar administradores de tenants (somente super_admin).'),
+  ('users:manage_teachers',       'users',        'Gerenciar professores do tenant.'),
+  ('users:manage_students',       'users',        'Gerenciar alunos do tenant (criar, editar, desativar).'),
+  ('users:view_self',             'users',        'Visualizar o próprio perfil.'),
+  ('questions:create',            'questions',    'Criar questões no banco de questões.'),
+  ('questions:delete',            'questions',    'Excluir questões (administrativo).'),
+  ('questions:answer',            'questions',    'Responder questões.'),
+  ('simulados:publish',           'simulados',    'Publicar e gerenciar simulados.'),
+  ('simulados:take',              'simulados',    'Realizar simulados.'),
+  ('materials:upload',            'materials',    'Enviar e gerenciar materiais didáticos.'),
+  ('mural:post',                  'mural',        'Publicar avisos no mural do tenant.'),
+  ('analytics:tenant_summary',    'analytics',    'Acessar relatórios consolidados do tenant.'),
+  ('analytics:own_performance',   'analytics',    'Acessar o próprio desempenho e TRI.')
+ON CONFLICT (code) DO NOTHING;
+
+-- Papéis padrão (globais — tenant_id NULL)
+INSERT INTO public.roles (id, tenant_id, code, name, description) VALUES
+  ('10000000-0000-0000-0000-000000000001', NULL, 'super_admin',  'Super Administrador',  'Controle total da plataforma, todos os tenants e banco global de questões.'),
+  ('10000000-0000-0000-0000-000000000002', NULL, 'tenant_admin',  'Administrador do Tenant', 'Diretor/coordenador pedagógico da instituição. Gerencia professores, alunos e conteúdo do tenant.'),
+  ('10000000-0000-0000-0000-000000000003', NULL, 'teacher',       'Professor',            'Professor/tutor do tenant. Cria conteúdo, simulados e acompanha desempenho.'),
+  ('10000000-0000-0000-0000-000000000004', NULL, 'student',       'Estudante',            'Aluno do tenant. Resolve questões/simulados e acumula XP.')
+ON CONFLICT (tenant_id, code) WHERE tenant_id IS NULL DO NOTHING;
+
+-- Matriz de permissões por papel (role_permissions)
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.code IN (
+  'tenants:manage','tenants:view_settings','users:manage_admins','users:manage_teachers',
+  'users:manage_students','users:view_self','questions:create','questions:delete',
+  'questions:answer','simulados:publish','simulados:take','materials:upload',
+  'mural:post','analytics:tenant_summary','analytics:own_performance'
+)
+WHERE r.code = 'super_admin'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.code IN (
+  'tenants:view_settings','users:manage_teachers','users:manage_students','users:view_self',
+  'questions:create','questions:delete','questions:answer','simulados:publish',
+  'simulados:take','materials:upload','mural:post','analytics:tenant_summary',
+  'analytics:own_performance'
+)
+WHERE r.code = 'tenant_admin'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.code IN (
+  'users:manage_students','users:view_self','questions:create','questions:answer',
+  'simulados:publish','simulados:take','materials:upload','mural:post',
+  'analytics:tenant_summary','analytics:own_performance'
+)
+WHERE r.code = 'teacher'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM public.roles r
+JOIN public.permissions p ON p.code IN (
+  'users:view_self','questions:answer','simulados:take','analytics:own_performance'
+)
+WHERE r.code = 'student'
+ON CONFLICT DO NOTHING;
 
 -- ============================================================
 -- ÍNDICES PARA CONSULTAS FREQUENTES E PERFORMANCE
@@ -289,3 +467,25 @@ CREATE INDEX IF NOT EXISTS idx_question_options_question_id ON public.question_o
 
 CREATE INDEX IF NOT EXISTS idx_admin_users_email ON public.admin_users(email);
 CREATE INDEX IF NOT EXISTS idx_admin_users_auth_user_id ON public.admin_users(auth_user_id);
+
+-- Índices de tenant para consultas escopadas
+CREATE INDEX IF NOT EXISTS idx_tenants_slug ON public.tenants(slug);
+CREATE INDEX IF NOT EXISTS idx_tenants_domain ON public.tenants(domain);
+CREATE INDEX IF NOT EXISTS idx_roles_tenant ON public.roles(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_tenant_roles_user ON public.user_tenant_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_tenant_roles_tenant ON public.user_tenant_roles(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_tenant_roles_role ON public.user_tenant_roles(role_id);
+
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON public.users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_materials_tenant ON public.materials(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_events_tenant ON public.events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mural_tenant ON public.mural(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON public.notifications(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_simulados_tenant ON public.simulados(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_questions_tenant ON public.questions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_answers_tenant ON public.answers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_xp_logs_tenant ON public.xp_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_daily_stats_tenant ON public.user_daily_stats(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_badges_tenant ON public.user_badges(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_study_tasks_tenant ON public.user_study_tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_tri_scores_tenant ON public.user_tri_scores(tenant_id);

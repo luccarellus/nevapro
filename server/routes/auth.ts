@@ -6,6 +6,7 @@ import { verifyRecaptcha } from '../middleware/recaptcha';
 import { query } from '../../src/lib/db';
 import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
+import { PLATFORM_TENANT_ID } from '../services/rbacService';
 import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
@@ -156,6 +157,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
           name: safeName || cleanEmail.split('@')[0],
           password_hash: passwordHash,
           role: 'student',
+          tenant_id: PLATFORM_TENANT_ID,
           city: safeCity,
           school: safeSchool,
           gremio: safeGremio,
@@ -168,6 +170,19 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
       .single();
 
     if (error) throw error;
+
+    // Vincula o novo aluno ao papel student no tenant da plataforma (RBAC)
+    try {
+      const { rows } = await query(
+        `INSERT INTO public.user_tenant_roles (user_id, tenant_id, role_id)
+         SELECT $1, $2, id FROM public.roles WHERE code = 'student' AND tenant_id IS NULL
+         ON CONFLICT (user_id, tenant_id, role_id) DO NOTHING`,
+        [newStudentId, PLATFORM_TENANT_ID],
+      );
+      void rows;
+    } catch (rbacErr) {
+      log.error('[Auth] Erro ao vincular papel student:', rbacErr);
+    }
 
     // Enviar e-mail de boas-vindas assincronamente via Resend
     void sendWelcomeEmail(cleanEmail, safeName || cleanEmail.split('@')[0]).catch((emailErr) => {

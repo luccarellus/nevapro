@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, Check, X, ClipboardList, BookOpen, MessageSquare, Calendar as CalendarIcon } from 'lucide-react';
 import Logo from './Logo';
+import TenantSwitcher from './TenantSwitcher';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 
 import { UserProfile } from '../types';
@@ -13,9 +14,10 @@ interface HeaderProps {
   onTabChange?: (tab: string) => void;
   userEmail?: string;
   user?: UserProfile;
+  onSelectTenant?: (tenantId: string) => void;
 }
 
-export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChange, userEmail, user }: HeaderProps) {
+export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChange, userEmail, user, onSelectTenant }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -109,6 +111,14 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
         </div>
         
         <div className="flex items-center gap-2 md:gap-4">
+            {user?.tenants && user.tenants.length > 0 && (
+              <TenantSwitcher
+                tenants={user.tenants}
+                activeTenantId={user.tenantId}
+                onSelectTenant={(id) => onSelectTenant?.(id)}
+              />
+            )}
+
             {/* User Avatar / Badge */}
             {isAdmin && (
               <>

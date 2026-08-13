@@ -24,6 +24,11 @@ import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
 import { sanitizeInput } from './utils/sanitize';
 import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from './services/userCache';
+import { ensurePlatformTenant } from './services/rbacService';
+import { resolveTenant } from './middleware/tenant';
+import { requirePermission } from './middleware/rbac';
+import { PERMISSIONS } from './lib/permissions';
+import { RoleCode } from './lib/permissions';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -43,10 +48,14 @@ import performanceRoutes from './routes/performance';
 import cronRoutes from './routes/cron';
 import clientLogRoutes from './routes/clientLogs';
 import webhookRoutes from './routes/webhooks';
+import tenantRoutes from './routes/tenants';
 
 
 // Validate critical environment variables before starting
 validateEnv();
+
+// Garante o tenant da plataforma no boot (Multi-Tenancy backward-compatible)
+void ensurePlatformTenant();
 
 export const app = express();
 
@@ -159,6 +168,7 @@ app.use('/api/study-plans', studyPlanRoutes);
 app.use('/api/performance', performanceRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/client-logs', rateLimiter(30, 60_000), clientLogRoutes);
+app.use('/api/tenants', tenantRoutes);
 
 // ===== Image Proxy =====
 app.get('/api/imagem', async (req, res) => {
