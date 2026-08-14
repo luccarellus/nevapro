@@ -88,7 +88,7 @@ export default function App() {
     }
   };
 
-  const isUnderMaintenance = import.meta.env.VITE_MAINTENANCE_MODE !== 'false';
+  const isUnderMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
   useEffect(() => {
     if (isUnderMaintenance) {
