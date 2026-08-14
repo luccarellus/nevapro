@@ -11,7 +11,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro # Caminho SSL Certbot
+      - ./certbot/conf:/etc/letsencrypt:ro # Certificados emitidos pelo container certbot
+      - ./certbot/www:/var/www/certbot:ro # Webroot para validação ACME
     networks:
       - neva_network
     depends_on:
@@ -19,30 +20,84 @@ services:
         condition: service_healthy
     restart: always
 
-  # Backend NestJS (Múltiplas instâncias)
+  # Certbot (Let's Encrypt) — emite e renova os certificados SSL.
+  # Executado sob demanda: docker compose run --rm certbot certonly|renew
+  certbot:
+    image: certbot/certbot:latest
+    container_name: neva_certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    networks:
+      - neva_network
+    restart: "no"
+
+  # Backend Express (serve API + frontend estático). Escale com: --scale api=N
   api:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # Variáveis embutidas no bundle do frontend durante o vite build
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
+        GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     image: neva-api:latest
-    deploy:
-      replicas: 3
-      restart_policy:
-        condition: on-failure
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
       - NODE_ENV=production
+      # Redis do próprio docker-compose (sobrescreve qualquer REDIS_URL do .env)
+      - REDIS_URL=redis://redis:6379
     networks:
       - neva_network
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
     expose:
       - "3000"
+    restart: always
+
+  # Redis self-hosted (cache, rate-limit e sessões)
+  redis:
+    image: redis:7-alpine
+    container_name: neva_redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - neva_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  # Cron jobs (substitui o Vercel Cron): /api/cron/cleanup e /api/cron/backup
+  cron:
+    build:
+      context: ./cron
+    environment:
+      - CRON_SECRET=${CRON_SECRET}
+      - API_URL=http://api:3000
+    networks:
+      - neva_network
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
 
 networks:
   neva_network:
     driver: bridge
+
+volumes:
+  redis_data:

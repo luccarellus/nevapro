@@ -15,7 +15,7 @@ const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
   { vars: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], purpose: 'Supabase Auth/Storage admin' },
   { vars: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'], purpose: 'Supabase Auth login' },
   { vars: ['B2_ENDPOINT', 'B2_KEY_ID', 'B2_APPLICATION_KEY', 'B2_BUCKET_NAME'], purpose: 'Backblaze B2 file storage' },
-  { vars: ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'], purpose: 'Redis caching (via Upstash)' },
+  { vars: ['REDIS_URL'], purpose: 'Redis caching (self-hosted — VPS via docker-compose)' },
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },
   { vars: ['GEMINI_API_KEY'], purpose: 'Gemini AI API' },
   { vars: ['RESEND_API_KEY', 'RESEND_FROM_EMAIL'], purpose: 'Resend (envio de e‑mails de redefinição de senha)' },

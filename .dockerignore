@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.log
+uploads
+scripts
+api/index.js
+api/index.js.map
+.DS_Store
+coverage
+.vscode
+docs
+certbot

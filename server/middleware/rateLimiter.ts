@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger';
-import { isUpstashRedisConfigured, runRedisPipeline } from '../services/cache';
+import { isRedisConfigured, runRedisPipeline } from '../services/cache';
 
 const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
 const RATE_LIMITER_MAX_ENTRIES = 10_000;
@@ -36,7 +36,7 @@ setInterval(() => {
 /**
  * Rate Limiter — hybrid Redis + in-memory fallback.
  * 
- * Uses Upstash Redis when available (scales horizontally across instances).
+ * Uses Redis (self-hosted via REDIS_URL) quando disponível.
  * Falls back to in-memory Map when Redis is unavailable.
  * 
  * @param limit Maximum number of requests allowed within the window
@@ -50,7 +50,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
     const windowKey = Math.floor(now / windowMs);
 
     // Try Redis first
-    if (isUpstashRedisConfigured()) {
+    if (isRedisConfigured()) {
       const redisKey = `ratelimit:${ip}:${path}:${windowKey}`;
       const ttlSeconds = Math.ceil(windowMs / 1000);
 

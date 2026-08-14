@@ -8,6 +8,9 @@ coverage/
 !.env.example
 uploads/
 crop.ps1
+
+# Certificados SSL emitidos pelo container certbot (contém chaves privadas)
+certbot/
 public/icon-512.png.bak
 
 # Scripts temporários de migração/refatoração

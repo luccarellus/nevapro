@@ -20,6 +20,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { verifyRecaptcha } from './middleware/recaptcha';
 import { requireAuth } from './middleware/auth';
 import pool from '../src/lib/db';
+import { closeRedisClient } from './services/redisClient';
 import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
 import { sanitizeInput } from './utils/sanitize';
@@ -471,8 +472,8 @@ export const startServer = () => {
     log.info(`[Server] ${signal} recebido. Encerrando graciosamente...`);
     server.close(async () => {
       try {
-        await pool.end();
-        log.info('[Server] Pool do Postgres fechado. Processo encerrado.');
+        await Promise.allSettled([pool.end(), closeRedisClient()]);
+        log.info('[Server] Pool do Postgres e Redis encerrados. Processo finalizado.');
         process.exit(0);
       } catch (shutdownErr) {
         log.error('[Server] Erro ao fechar pool:', shutdownErr);

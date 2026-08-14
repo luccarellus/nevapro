@@ -43,8 +43,9 @@ nevapro/
 │   ├── types/           # Tipos e interfaces TypeScript
 │   └── utils/           # Funções utilitárias (XP, cálculos)
 ├── nginx/               # Configuração do Nginx (proxy reverso)
+├── cron/                # Container de cron jobs (cleanup/backup diários)
 ├── schema.sql           # Schema completo do banco de dados
-├── docker-compose.yml   # Orquestração de containers
+├── docker-compose.yml   # Orquestração de containers (nginx + api + redis + cron)
 ├── Dockerfile           # Build multi-stage da aplicação
 └── vite.config.ts       # Configuração do bundler Vite
 ```
@@ -70,7 +71,8 @@ nevapro/
 
 **Infraestrutura**
 
-- **Docker + Docker Compose** com 3 réplicas da API
+- **Docker + Docker Compose** (nginx + api + redis + cron)
+- **Redis** self-hosted para cache, rate-limit e sessões
 - **Nginx** como reverse proxy e load balancer
 - **Let's Encrypt / Certbot** para HTTPS
 - **Node.js 20** (Alpine)
@@ -189,7 +191,29 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 - A primeira autenticação do admin sincroniza `admin_users.auth_user_id` automaticamente.
 - O login e a troca de senha do admin dependem exclusivamente do Supabase Auth.
 
-### Deploy na Vercel
+### Deploy na VPS (Docker Compose + Redis)
+
+1. Copie e preencha o `.env` (veja o `.env.example`):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edite `nginx/conf.d/default.conf` e troque `seu-dominio.com` pelo domínio real.
+
+3. Suba os serviços (nginx + api + redis + cron):
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. Emita o certificado SSL (primeira vez) e renove via cron no host.
+   Veja o passo a passo completo em [`PRODUCTION.md`](PRODUCTION.md).
+
+> O container `cron` substitui o Vercel Cron: executa diariamente
+> `/api/cron/cleanup` (03:00 UTC) e `/api/cron/backup` (04:00 UTC).
+
+### Deploy na Vercel (opcional / staging)
 
 Configure estas variáveis no painel da Vercel:
 
@@ -199,12 +223,14 @@ FRONTEND_URL="https://seu-dominio.vercel.app"
 DATABASE_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
 DISABLE_DB_SSL="false"
-SUPABASE_URL="https://gsbsfckiqqejifwystit.supabase.co"
+SUPABASE_URL="https://[PROJECT_REF].supabase.co"
 SUPABASE_ANON_KEY="[anon key]"
 SUPABASE_SERVICE_ROLE_KEY="[service role key]"
 JWT_SECRET="[seu-secret]"
-SESSION_SECRET="[seu-secret]"
 ```
+
+> O cache em ambiente Vercel fica sem Redis (fallback em memória por instância).
+> O Redis self-hosted é usado no deploy da VPS.
 
 ### 4. Configure o banco de dados
 
@@ -231,11 +257,11 @@ O servidor ficará disponível em `http://localhost:3000`.
 ### Produção com Docker Compose
 
 ```bash
-# Build e deploy com 3 réplicas da API
-docker-compose up -d --build --scale api=3
+# Build e subir todos os serviços (nginx + api + redis + cron)
+docker compose up -d --build
 
 # Verificar status dos containers
-docker-compose ps
+docker compose ps
 
 # Remover imagens antigas após deploy
 docker image prune -f
@@ -244,7 +270,9 @@ docker image prune -f
 ### Estrutura Docker
 
 - **`neva_nginx`** — Reverse proxy na porta 80/443, SSL via Certbot
-- **`neva-api`** — Backend Node.js com 3 réplicas para alta disponibilidade
+- **`neva-api`** — Backend Express (API + frontend estático), escalável com `--scale api=N`
+- **`neva_redis`** — Redis self-hosted com persistência (cache, rate-limit, sessões)
+- **`cron`** — Dispara os jobs diários de cleanup e backup (substitui o Vercel Cron)
 - Rede interna `neva_network` isolando os serviços
 
 ---
