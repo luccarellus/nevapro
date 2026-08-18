@@ -1,59 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { query } from '../../src/lib/db.js';
 import { log } from '../utils/logger';
 import { getB2Client } from '../services/b2Client';
 
 
-let supabaseAdminClient: ReturnType<typeof createClient> | null = null;
-let supabaseAnonClient: ReturnType<typeof createClient> | null = null;
-
-
-export function getSupabaseAdminClient(): ReturnType<typeof createClient> | any {
-  if (supabaseAdminClient) return supabaseAdminClient;
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios para Auth/Storage.');
-  }
-
-  supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  return supabaseAdminClient;
-}
-
-export function getSupabaseAnonClient() {
-  if (supabaseAnonClient) return supabaseAnonClient;
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !anonKey) {
-    throw new Error('SUPABASE_URL e SUPABASE_ANON_KEY são obrigatórios para login com Supabase Auth.');
-  }
-
-  supabaseAnonClient = createClient(supabaseUrl, anonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-  return supabaseAnonClient;
-}
-
 function sanitizeIdentifier(name: string): string {
   if (!name) return name;
-  // Permite estritamente apenas caracteres alfanuméricos e sublinhados
   if (!/^[a-zA-Z0-9_]+$/.test(name)) {
     throw new Error(`Identificador de banco de dados inválido ou inseguro: ${name}`);
   }
@@ -62,11 +14,9 @@ function sanitizeIdentifier(name: string): string {
 
 function sanitizeSelectCols(cols: string): string {
   if (!cols) return '*';
-  // Divide as colunas por vírgula e valida cada uma individualmente
   const parts = cols.split(',');
   for (let part of parts) {
     part = part.trim();
-    // Cada coluna deve conter apenas caracteres alfanuméricos, sublinhados, asterisco e parênteses
     if (!/^[a-zA-Z0-9_*\\(\\)]+$/.test(part)) {
       throw new Error(`Coluna de select insegura detectada: ${part}`);
     }
@@ -85,6 +35,10 @@ class PostgresQueryBuilder {
   private limitVal: number | null = null;
   private orderCol: string | null = null;
   private orderAsc: boolean = true;
+  private orConditions: { col: string; val: any }[] = [];
+  private isNotNullCol: string | null = null;
+  private notEqCol: string | null = null;
+  private notEqVal: any = null;
 
   constructor(table: string) {
     this.tableName = table;
@@ -143,6 +97,43 @@ class PostgresQueryBuilder {
     return this;
   }
 
+  /** WHERE col IS NOT NULL */
+  not(col: string, op: 'is', val: any) {
+    if (op === 'is') {
+      if (val === null) {
+        this.isNotNullCol = col;
+      }
+    }
+    return this;
+  }
+
+  /** WHERE col != val */
+  neq(col: string, val: any) {
+    this.notEqCol = col;
+    this.notEqVal = val;
+    return this;
+  }
+
+  /**
+   * Supabase-style .or() — e.g. `.or('tenant_id.is.null,tenant_id.eq.xxx')`
+   * Translates to: (tenant_id IS NULL OR tenant_id = $n)
+   */
+  or(condition: string) {
+    const parts = condition.split(',');
+    for (const part of parts) {
+      const match = part.trim().match(/^(\w+)\.(is|eq)\.(.+)$/);
+      if (match) {
+        const [, col, op, val] = match;
+        if (op === 'is' && val === 'null') {
+          this.orConditions.push({ col, val: null });
+        } else if (op === 'eq') {
+          this.orConditions.push({ col, val });
+        }
+      }
+    }
+    return this;
+  }
+
   async execute() {
     let sql = '';
     const params: any[] = [];
@@ -152,15 +143,49 @@ class PostgresQueryBuilder {
 
     if (this.action === 'select') {
       sql = `SELECT ${safeSelectCols} FROM ${safeTable}`;
-      if (this.whereCols.length > 0) {
-        const whereClause = this.whereCols.map((c, i) => {
-           const cleanCol = c.replace('__gte', '').replace('__lte', '');
-           const safeCol = sanitizeIdentifier(cleanCol);
-           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
-           return `${safeCol} ${op} $${i+1}`;
-        }).join(' AND ');
-        sql += ` WHERE ${whereClause}`;
-        params.push(...this.whereVals);
+      if (this.whereCols.length > 0 || this.isNotNullCol || this.notEqCol || this.orConditions.length > 0) {
+        const conditions: string[] = [];
+        let paramIdx = 1;
+
+        for (const c of this.whereCols) {
+          const cleanCol = c.replace('__gte', '').replace('__lte', '');
+          const safeCol = sanitizeIdentifier(cleanCol);
+          const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+          conditions.push(`${safeCol} ${op} $${paramIdx}`);
+          params.push(this.whereVals[this.whereCols.indexOf(c)]);
+          paramIdx++;
+        }
+
+        if (this.isNotNullCol) {
+          const safeCol = sanitizeIdentifier(this.isNotNullCol);
+          conditions.push(`${safeCol} IS NOT NULL`);
+        }
+
+        if (this.notEqCol) {
+          const safeCol = sanitizeIdentifier(this.notEqCol);
+          conditions.push(`${safeCol} != $${paramIdx}`);
+          params.push(this.notEqVal);
+          paramIdx++;
+        }
+
+        if (this.orConditions.length > 0) {
+          const orParts: string[] = [];
+          for (const { col, val } of this.orConditions) {
+            const safeCol = sanitizeIdentifier(col);
+            if (val === null) {
+              orParts.push(`${safeCol} IS NULL`);
+            } else {
+              orParts.push(`${safeCol} = $${paramIdx}`);
+              params.push(val);
+              paramIdx++;
+            }
+          }
+          conditions.push(`(${orParts.join(' OR ')})`);
+        }
+
+        if (conditions.length > 0) {
+          sql += ` WHERE ${conditions.join(' AND ')}`;
+        }
       }
       if (this.orderCol) {
         const safeOrderCol = sanitizeIdentifier(this.orderCol);
@@ -244,29 +269,6 @@ class PostgresQueryBuilder {
 export const dbAdmin = {
   from(table: string) {
     return new PostgresQueryBuilder(table);
-  },
-  auth: {
-    admin: {
-      async listUsers(params?: { page?: number; perPage?: number }) {
-        try {
-          const { data, error } = await getSupabaseAdminClient().auth.admin.listUsers({
-            page: params?.page,
-            perPage: params?.perPage,
-          });
-          return { data, error };
-        } catch (error: any) {
-          return { data: { users: [] }, error };
-        }
-      },
-      async deleteUser(id: string, shouldSoftDelete = false) {
-        const { data, error } = await getSupabaseAdminClient().auth.admin.deleteUser(id, shouldSoftDelete);
-        return { data, error };
-      },
-      async updateUserById(id: string, data: any) {
-        const result = await getSupabaseAdminClient().auth.admin.updateUserById(id, data);
-        return result;
-      }
-    }
   },
   storage: {
     from(bucket: string) {

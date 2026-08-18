@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { resolveTenant } from '../middleware/tenant';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { log } from '../utils/logger';
 import { cacheGet, cacheSet } from '../services/cache';
@@ -19,7 +19,7 @@ router.get('/', resolveTenant, async (req, res: Response) => {
       return;
     }
 
-    let builder = getSupabaseAdminClient()
+    let builder = dbAdmin
       .from('users')
       .select('name, city, xp, level, avatar_url')
       .not('role', 'is', null)

@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, AuthenticatedUser } from '../types';
-import { dbAdmin, getSupabaseAdminClient, getSupabaseAnonClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
@@ -12,32 +12,48 @@ import { ADMIN_ROLE_CODES } from '../lib/permissions';
 import bcrypt from 'bcryptjs';
 
 const STUDENT_SESSION_TTL_SECONDS = 24 * 60 * 60;
+const ADMIN_SESSION_TTL_SECONDS = 24 * 60 * 60;
 
-const getStudentSessionSecret = (): string | null =>
+const getSessionSecret = (): string | null =>
   process.env.JWT_SECRET || null;
 
-const createStudentSessionToken = (user: AuthenticatedUser): string => {
-  const secret = getStudentSessionSecret();
+/**
+ * Creates a signed session token for a user (admin or student).
+ * Format: role_prefix.payload_base64url.signature_hmac
+ */
+const createSessionToken = (user: AuthenticatedUser): string => {
+  const secret = getSessionSecret();
   if (!secret) {
-    throw new Error('JWT_SECRET é obrigatório para assinar sessões de alunos.');
+    throw new Error('JWT_SECRET é obrigatório para assinar sessões.');
   }
+
+  const prefix = user.role === 'admin' ? 'adm' : 'st';
+  const ttl = user.role === 'admin' ? ADMIN_SESSION_TTL_SECONDS : STUDENT_SESSION_TTL_SECONDS;
 
   const payload = Buffer.from(JSON.stringify({
     userId: user.userId,
     email: user.email,
-    role: 'student',
-    exp: Math.floor(Date.now() / 1000) + STUDENT_SESSION_TTL_SECONDS,
+    role: user.role,
+    exp: Math.floor(Date.now() / 1000) + ttl,
   })).toString('base64url');
   const signature = createHmac('sha256', secret).update(payload).digest('base64url');
-  return `st.${payload}.${signature}`;
+  return `${prefix}.${payload}.${signature}`;
 };
 
-const verifyStudentSessionToken = (token: string): AuthenticatedUser | null => {
-  if (!token.startsWith('st.')) return null;
+/**
+ * Verifies a signed session token.
+ * Returns the authenticated user or null if invalid/expired.
+ */
+const verifySessionToken = (token: string): AuthenticatedUser | null => {
+  const secret = getSessionSecret();
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
 
-  const secret = getStudentSessionSecret();
-  const [, payload, signature] = token.split('.');
+  const [prefix, payload, signature] = parts;
   if (!secret || !payload || !signature) return null;
+
+  // Accept both legacy 'st.' prefix and 'adm.' prefix
+  if (prefix !== 'st' && prefix !== 'adm') return null;
 
   const expected = createHmac('sha256', secret).update(payload).digest();
   const received = Buffer.from(signature, 'base64url');
@@ -51,17 +67,15 @@ const verifyStudentSessionToken = (token: string): AuthenticatedUser | null => {
       exp?: number;
     };
     if (
-      !decoded.userId ||
-      !decoded.email ||
-      decoded.role !== 'student' ||
-      !decoded.exp ||
-      decoded.exp <= Math.floor(Date.now() / 1000)
+      !decoded.userId || !decoded.email ||
+      (decoded.role !== 'admin' && decoded.role !== 'student') ||
+      !decoded.exp || decoded.exp <= Math.floor(Date.now() / 1000)
     ) return null;
 
     return {
       userId: decoded.userId,
       email: decoded.email,
-      role: 'student',
+      role: decoded.role as 'admin' | 'student',
     };
   } catch {
     return null;
@@ -78,48 +92,44 @@ declare global {
 }
 
 /**
- * Verifies a session token (Supabase Auth for admin, cached session for student).
+ * Verifies a session token (HMAC-signed for both admin and student).
  */
-const verifySupabaseSession = async (token: string): Promise<AuthenticatedUser | null> => {
+const verifySession = async (token: string): Promise<AuthenticatedUser | null> => {
   try {
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const cachedUser = await getUserCache<AuthenticatedUser>(userCacheKeys.auth(tokenHash));
     if (cachedUser) return cachedUser;
 
-    const studentUser = verifyStudentSessionToken(token);
-    if (studentUser) {
-      await setUserCache(userCacheKeys.auth(tokenHash), studentUser, STUDENT_SESSION_TTL_SECONDS);
-      return studentUser;
+    const user = verifySessionToken(token);
+    if (!user) return null;
+
+    if (user.role === 'student') {
+      await setUserCache(userCacheKeys.auth(tokenHash), user, STUDENT_SESSION_TTL_SECONDS);
+      return user;
     }
 
-    // Check if token is a Supabase Auth token (for Admin)
-    const { data: userData } = await getSupabaseAdminClient().auth.getUser(token).catch(() => ({ data: null }));
-    if (userData?.user?.email) {
-      const email = userData.user.email.toLowerCase().trim();
-      const { data: adminRow } = await getSupabaseAdminClient()
-        .from('admin_users')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
+    // Admin: load RBAC context
+    const { data: adminRow } = await dbAdmin
+      .from('admin_users')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle();
 
-      if (adminRow) {
-        // Carrega o contexto RBAC (papéis, permissões, tenants)
-        const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
-        const authenticatedUser: AuthenticatedUser = {
-          userId: adminRow.id,
-          email,
-          role: 'admin',
-          authUserId: userData.user.id,
-          roles: rbacContext.roles,
-          permissions: rbacContext.permissions,
-          tenants: rbacContext.tenants,
-          tenantId: rbacContext.defaultTenantId || undefined,
-          isAdmin: rbacContext.isAdmin,
-        };
-        (authenticatedUser as any).rbacContext = rbacContext;
-        await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
-        return authenticatedUser;
-      }
+    if (adminRow) {
+      const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
+      const authenticatedUser: AuthenticatedUser = {
+        userId: adminRow.id,
+        email: user.email,
+        role: 'admin',
+        roles: rbacContext.roles,
+        permissions: rbacContext.permissions,
+        tenants: rbacContext.tenants,
+        tenantId: rbacContext.defaultTenantId || undefined,
+        isAdmin: rbacContext.isAdmin,
+      };
+      (authenticatedUser as any).rbacContext = rbacContext;
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+      return authenticatedUser;
     }
 
     return null;
@@ -138,7 +148,7 @@ export const requireAuth = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    let token: string | undefined = req.cookies?.sb_session_token;
+    let token: string | undefined = req.cookies?.session_token;
 
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.substring(7);
@@ -149,10 +159,9 @@ export const requireAuth = async (
       return;
     }
 
-    const user = await verifySupabaseSession(token);
+    const user = await verifySession(token);
     if (user) {
       req.user = user;
-      // Anexa o contexto RBAC (se carregado na sessão) para os middlewares de autorização
       const rbacContext = (user as any).rbacContext as import('../services/rbacService').RbacContext | undefined;
       if (rbacContext) {
         (req as any).rbacContext = rbacContext;
@@ -178,7 +187,6 @@ export const requireAuth = async (
 
 /**
  * Middleware: Requires the authenticated user to have admin role (RBAC-aware).
- * Aceita super_admin, tenant_admin e o legado role === 'admin'.
  * Must be used AFTER requireAuth.
  */
 export const requireAdmin = async (
@@ -199,75 +207,44 @@ export const requireAdmin = async (
 };
 
 /**
- * Creates or ensures admin_users record for a Supabase Auth user.
- * Auto-links auth_user_id to admin_users table.
- */
-export const ensureAdminUser = async (email: string, authUserId: string): Promise<void> => {
-  try {
-    const { data: existing } = await getSupabaseAdminClient()
-      .from('admin_users')
-      .select('id, auth_user_id')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (existing) {
-      if (!existing.auth_user_id || existing.auth_user_id !== authUserId) {
-        await query(
-          'UPDATE public.admin_users SET auth_user_id = $1, updated_at = NOW() WHERE email = $2',
-          [authUserId, email],
-        );
-      }
-    } else {
-      const name = email.split('@')[0];
-      await getSupabaseAdminClient().from('admin_users').insert([
-        {
-          email,
-          name,
-          role: 'admin',
-          auth_user_id: authUserId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
-    }
-  } catch (err) {
-    log.error('[ensureAdminUser] Error:', err);
-  }
-};
-
-/**
  * Unified login:
- * - Admin users: Authenticate via Supabase Auth (auth.users + admin_users).
- * - Students: Authenticate via DB public.users password_hash (bcrypt). NEVER registered in Supabase Auth!
+ * - Admin users: Authenticate via admin_users table (bcrypt password_hash).
+ * - Students: Authenticate via public.users table (bcrypt password_hash).
  */
 export const authenticateUser = async (email: string, password: string) => {
   const cleanEmail = email.toLowerCase().trim();
 
   // 1. Check if user is an Admin
-  const { data: adminRow } = await getSupabaseAdminClient()
+  const { data: adminRow } = await dbAdmin
     .from('admin_users')
     .select('*')
     .eq('email', cleanEmail)
     .maybeSingle();
 
   if (adminRow) {
-    const supabase = getSupabaseAnonClient();
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    });
-
-    if (authError || !authData.user || !authData.session) {
+    if (!adminRow.password_hash) {
       return { error: 'E-mail ou senha inválidos.' };
     }
 
-    const authUserId = authData.user.id;
-    if (adminRow.auth_user_id !== authUserId) {
-      await ensureAdminUser(cleanEmail, authUserId);
+    const passwordIsValid = await bcrypt.compare(password, adminRow.password_hash).catch(() => false);
+    if (!passwordIsValid) {
+      return { error: 'E-mail ou senha inválidos.' };
     }
 
-    // Carrega o contexto RBAC (papéis, permissões, tenants)
     const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
+
+    const authenticatedUser: AuthenticatedUser = {
+      userId: adminRow.id,
+      email: cleanEmail,
+      role: 'admin',
+      roles: rbacContext.roles,
+      permissions: rbacContext.permissions,
+      tenants: rbacContext.tenants,
+      tenantId: rbacContext.defaultTenantId || undefined,
+      isAdmin: rbacContext.isAdmin,
+    };
+
+    const sessionToken = createSessionToken(authenticatedUser);
 
     return {
       user: {
@@ -283,12 +260,14 @@ export const authenticateUser = async (email: string, password: string) => {
         tenantId: rbacContext.defaultTenantId || undefined,
         isAdmin: rbacContext.isAdmin,
       },
-      session: authData.session,
+      session: {
+        access_token: sessionToken,
+      },
     };
   }
 
   // 2. Check if user is a Student (public.users)
-  const { data: studentRow } = await getSupabaseAdminClient()
+  const { data: studentRow } = await dbAdmin
     .from('users')
     .select('*')
     .eq('email', cleanEmail)
@@ -304,7 +283,6 @@ export const authenticateUser = async (email: string, password: string) => {
       return { error: 'E-mail ou senha inválidos.' };
     }
 
-    // Carrega o contexto RBAC (papéis, permissões, tenants)
     const rbacContext = await getUserRbacContext(studentRow.id, 'student');
 
     const authenticatedUser: AuthenticatedUser = {
@@ -318,11 +296,9 @@ export const authenticateUser = async (email: string, password: string) => {
       isAdmin: rbacContext.isAdmin,
     };
 
-    // Generate student session token & cache it
-    const sessionToken = createStudentSessionToken(authenticatedUser);
+    const sessionToken = createSessionToken(authenticatedUser);
     const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
 
-    // Cache student session for 24 hours
     const sessionCacheValue: any = { ...authenticatedUser, rbacContext };
     await setUserCache(userCacheKeys.auth(tokenHash), sessionCacheValue, STUDENT_SESSION_TTL_SECONDS);
 

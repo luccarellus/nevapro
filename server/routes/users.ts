@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
 import { verifyRecaptcha } from '../middleware/recaptcha';
-import { getSupabaseAdminClient, dbAdmin } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { normalizeEmail } from '../utils/sanitize';
 import { log } from '../utils/logger';
@@ -34,7 +34,7 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
       return;
     }
     // Check admin
-    const { data: adminData } = await getSupabaseAdminClient()
+    const { data: adminData } = await dbAdmin
       .from('admin_users')
       .select('*')
       .eq('email', cleanEmail)
@@ -48,7 +48,7 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
     }
 
     // Check student
-    const { data, error } = await getSupabaseAdminClient()
+    const { data, error } = await dbAdmin
       .from('users')
       .select('*')
       .eq('email', cleanEmail)
@@ -98,7 +98,7 @@ router.post(
       delete updateData.tenant_id;
     }
 
-    const { data: adminExists } = await getSupabaseAdminClient()
+    const { data: adminExists } = await dbAdmin
       .from('admin_users')
       .select('id')
       .eq('email', email)
@@ -144,7 +144,7 @@ router.post(
     let oldLevel = 1;
 
     try {
-      const { data: oldUser } = await getSupabaseAdminClient()
+      const { data: oldUser } = await dbAdmin
         .from(targetTable)
         .select('id, xp, level')
         .eq('email', email)
@@ -162,8 +162,6 @@ router.post(
     }
 
     // Flash quiz protection - atomic guard (eliminates TOCTOU race condition)
-    // Only 1 concurrent request can set flash_quiz_completed from NULL/false to true.
-    // PostgreSQL MVCC ensures the second request affects 0 rows and is blocked.
     if (isFlashQuizUpdate && userId) {
       const { rows: locked } = await query(
         `UPDATE ${targetTable}
@@ -175,30 +173,28 @@ router.post(
       );
 
       if (locked.length === 0) {
-        // Atomic lock failed → quiz was already completed by another request
         log.info(`[Flash Quiz] Atomic guard blocked duplicate XP for ${email}`);
         dbUpdate.xp = oldXp;
         dbUpdate.level = oldLevel;
         xpDiff = 0;
       }
-      // flash_quiz_completed already set by the atomic UPDATE above
       dbUpdate.flash_quiz_completed = true;
     }
 
     try {
-      const { data, error } = await getSupabaseAdminClient()
+      const { data, error } = await dbAdmin
         .from(targetTable)
         .update(dbUpdate)
         .eq('email', email)
-        .select()
+        .select('*')
         .single();
 
-      if (error && error.code === 'PGRST116') {
+      if (error && error.message === 'No rows found') {
         // Row not found — try insert
-        const { data: insData } = await getSupabaseAdminClient()
+        const { data: insData } = await dbAdmin
           .from(targetTable)
-          .insert([{ ...dbUpdate, id: crypto.randomUUID(), created_at: new Date().toISOString() }])
-          .select()
+          .insert({ ...dbUpdate, id: crypto.randomUUID(), created_at: new Date().toISOString() })
+          .select('*')
           .single();
 
         if (insData) {
@@ -214,9 +210,9 @@ router.post(
       // XP log entry
       if (userId && xpDiff > 0) {
         const reason = updateData.xpReason || (isFlashQuizUpdate ? 'Flash Quiz: Maranhão' : 'Conclusão de Simulado / Atividade');
-        await getSupabaseAdminClient()
+        await dbAdmin
           .from('xp_logs')
-          .insert([{ user_id: userId, amount: xpDiff, reason, created_at: new Date().toISOString() }]);
+          .insert({ user_id: userId, amount: xpDiff, reason, created_at: new Date().toISOString() });
       }
 
       await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
@@ -243,10 +239,8 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-
     // Fetch avatar before deletion to clean up B2
-    const { data: userData } = await supabase.from('users').select('id, avatar_url').eq('email', email).maybeSingle();
+    const { data: userData } = await dbAdmin.from('users').select('id, avatar_url').eq('email', email).maybeSingle();
     if (userData?.id) {
       const userId = userData.id;
 
@@ -259,17 +253,17 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
         }
       }
 
-      await supabase.from('xp_logs').delete().eq('user_id', userId);
-      await supabase.from('answers').delete().eq('user_id', userId);
-      await supabase.from('notifications').delete().eq('user_id', userId);
-      await supabase.from('users').delete().eq('email', email);
+      await dbAdmin.from('xp_logs').delete().eq('user_id', userId);
+      await dbAdmin.from('answers').delete().eq('user_id', userId);
+      await dbAdmin.from('notifications').delete().eq('user_id', userId);
+      await dbAdmin.from('users').delete().eq('email', email);
     }
 
     // Clean up admin data
-    const { rows: adminRows } = await import('../../src/lib/db').then((m) =>
-      m.query('SELECT auth_user_id, avatar_url FROM public.admin_users WHERE email = $1 LIMIT 1', [email]),
+    const { rows: adminRows } = await query(
+      'SELECT id, avatar_url FROM public.admin_users WHERE email = $1 LIMIT 1',
+      [email],
     );
-    const authUserId = adminRows[0]?.auth_user_id;
 
     // Delete admin avatar from B2 if stored there
     const adminAvatarUrl = adminRows[0]?.avatar_url as string | undefined;
@@ -280,12 +274,7 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
       }
     }
 
-    await supabase.from('admin_users').delete().eq('email', email);
-
-    // Delete from Supabase Auth
-    if (authUserId) {
-      await supabase.auth.admin.deleteUser(authUserId);
-    }
+    await dbAdmin.from('admin_users').delete().eq('email', email);
 
     await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
     await invalidateUserCache(email, userData?.id);
@@ -311,8 +300,7 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
       res.json(cachedStats);
       return;
     }
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+    const { data: user } = await dbAdmin.from('users').select('id').eq('email', email).maybeSingle();
     if (!user) {
       res.json({ weekly: [], summary: { average: 0, best: 0, total: 0 } });
       return;
@@ -321,7 +309,7 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const { data: logs } = await supabase
+    const { data: logs } = await dbAdmin
       .from('xp_logs')
       .select('*')
       .eq('user_id', user.id)
@@ -354,7 +342,7 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const average = Math.round(total / 7);
 
     // Check flash quiz status
-    const { data: lastQuizLog } = await supabase
+    const { data: lastQuizLog } = await dbAdmin
       .from('xp_logs')
       .select('created_at')
       .eq('user_id', user.id)

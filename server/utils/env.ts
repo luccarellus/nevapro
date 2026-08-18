@@ -6,14 +6,10 @@
 
 const REQUIRED_VARS: string[] = [
   'DATABASE_URL',
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
   'JWT_SECRET',
 ];
 
 const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
-  { vars: ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'], purpose: 'Supabase Auth/Storage admin' },
-  { vars: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'], purpose: 'Supabase Auth login' },
   { vars: ['B2_ENDPOINT', 'B2_KEY_ID', 'B2_APPLICATION_KEY', 'B2_BUCKET_NAME'], purpose: 'Backblaze B2 file storage' },
   { vars: ['REDIS_URL'], purpose: 'Redis caching (self-hosted — VPS via docker-compose)' },
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },

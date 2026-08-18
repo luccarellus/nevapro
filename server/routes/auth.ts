@@ -4,7 +4,7 @@ import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, authenticateUser } from '../middleware/auth';
 import { verifyRecaptcha } from '../middleware/recaptcha';
 import { query } from '../../src/lib/db';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { PLATFORM_TENANT_ID } from '../services/rbacService';
 import { log } from '../utils/logger';
@@ -84,9 +84,9 @@ router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: Aut
     // Clear login attempts on success
     await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
 
-    // Store Supabase session token in cookie
+    // Store session token in cookie
     if (result.session?.access_token) {
-      res.cookie('sb_session_token', result.session.access_token, {
+      res.cookie('session_token', result.session.access_token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -133,7 +133,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
     }
 
     // Check existing student
-    const { data: existing } = await getSupabaseAdminClient()
+    const { data: existing } = await dbAdmin
       .from('users')
       .select('email')
       .eq('email', cleanEmail)
@@ -143,43 +143,39 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
       return;
     }
 
-    const supabaseAdmin = getSupabaseAdminClient();
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(password, 10);
     const newStudentId = crypto.randomUUID();
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await dbAdmin
       .from('users')
-      .insert([
-        {
-          id: newStudentId,
-          email: cleanEmail,
-          name: safeName || cleanEmail.split('@')[0],
-          password_hash: passwordHash,
-          role: 'student',
-          tenant_id: PLATFORM_TENANT_ID,
-          city: safeCity,
-          school: safeSchool,
-          gremio: safeGremio,
-          xp: 0,
-          level: 1,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
+      .insert({
+        id: newStudentId,
+        email: cleanEmail,
+        name: safeName || cleanEmail.split('@')[0],
+        password_hash: passwordHash,
+        role: 'student',
+        tenant_id: PLATFORM_TENANT_ID,
+        city: safeCity,
+        school: safeSchool,
+        gremio: safeGremio,
+        xp: 0,
+        level: 1,
+        created_at: new Date().toISOString(),
+      })
+      .select('*')
       .single();
 
     if (error) throw error;
 
     // Vincula o novo aluno ao papel student no tenant da plataforma (RBAC)
     try {
-      const { rows } = await query(
+      await query(
         `INSERT INTO public.user_tenant_roles (user_id, tenant_id, role_id)
          SELECT $1, $2, id FROM public.roles WHERE code = 'student' AND tenant_id IS NULL
          ON CONFLICT (user_id, tenant_id, role_id) DO NOTHING`,
         [newStudentId, PLATFORM_TENANT_ID],
       );
-      void rows;
     } catch (rbacErr) {
       log.error('[Auth] Erro ao vincular papel student:', rbacErr);
     }
@@ -190,7 +186,6 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
     });
 
     const userObj = {
-
       ...data,
       id: data.id,
       role: 'student' as const,
@@ -205,7 +200,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
     if (loginResult.error || !loginResult.session?.access_token) {
       throw new Error('Conta criada, mas não foi possível iniciar a sessão.');
     }
-    res.cookie('sb_session_token', loginResult.session.access_token, {
+    res.cookie('session_token', loginResult.session.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -233,25 +228,37 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
 
   try {
     const appUrl = process.env.APP_URL || 'https://neva.pro';
-    const supabase = getSupabaseAdminClient();
 
     // Check if Admin
-    const { data: adminRow } = await supabase
+    const { data: adminRow } = await dbAdmin
       .from('admin_users')
       .select('name')
       .eq('email', cleanEmail)
       .maybeSingle();
 
     if (adminRow) {
-      const { data, error } = await supabase.auth.admin.generateLink({
-        type: 'recovery',
-        email: cleanEmail,
-        options: { redirectTo: `${appUrl}/reset-password` },
-      });
+      // For admins: generate a password reset token stored in password_reset_tokens table
+      const resetToken = crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
 
-      if (data?.properties?.action_link) {
-        await sendPasswordResetEmail(cleanEmail, adminRow.name || cleanEmail.split('@')[0], data.properties.action_link);
-      }
+      // Delete old tokens for this email
+      await query(
+        `DELETE FROM public.password_reset_tokens WHERE user_id IN (
+           SELECT id FROM public.admin_users WHERE email = $1
+         )`,
+        [cleanEmail],
+      );
+
+      // Insert new token
+      await query(
+        `INSERT INTO public.password_reset_tokens (id, user_id, token, expires_at, created_at)
+         SELECT gen_random_uuid(), id, $1, $2, NOW()
+         FROM public.admin_users WHERE email = $3`,
+        [resetToken, expiresAt, cleanEmail],
+      );
+
+      const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
+      await sendPasswordResetEmail(cleanEmail, adminRow.name || cleanEmail.split('@')[0], resetLink);
       res.json({
         success: true,
         message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
@@ -260,7 +267,7 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
     }
 
     // Check Student
-    const { data: studentRow } = await supabase
+    const { data: studentRow } = await dbAdmin
       .from('users')
       .select('id, name')
       .eq('email', cleanEmail)
@@ -270,13 +277,12 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
       const resetToken = crypto.randomUUID().replace(/-/g, '');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
 
-      await supabase.from('password_reset_tokens').delete().eq('user_id', studentRow.id);
-      await supabase.from('password_reset_tokens').insert([{
-        user_id: studentRow.id,
-        token: resetToken,
-        expires_at: expiresAt,
-        created_at: new Date().toISOString(),
-      }]);
+      await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [studentRow.id]);
+      await query(
+        `INSERT INTO public.password_reset_tokens (id, user_id, token, expires_at, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
+        [studentRow.id, resetToken, expiresAt],
+      );
 
       const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
       await sendPasswordResetEmail(cleanEmail, studentRow.name || cleanEmail.split('@')[0], resetLink);
@@ -300,7 +306,7 @@ router.post(
   rateLimiter(3, 60_000),
   verifyRecaptcha(),
   async (req: AuthenticatedRequest, res: Response) => {
-    const { password, access_token, token, email } = req.body;
+    const { password, token, email } = req.body;
 
     if (!password || password.length < 6) {
       res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
@@ -308,53 +314,39 @@ router.post(
     }
 
     try {
-      const supabase = getSupabaseAdminClient();
+      // Student/Admin via DB token (unified flow — both use password_reset_tokens)
+      if (token) {
+        const { rows: tokenRows } = await query(
+          `SELECT prt.user_id, prt.expires_at,
+                  CASE WHEN au.id IS NOT NULL THEN 'admin' ELSE 'student' END AS user_type
+           FROM public.password_reset_tokens prt
+           LEFT JOIN public.admin_users au ON au.id = prt.user_id
+           LEFT JOIN public.users u ON u.id = prt.user_id
+           WHERE prt.token = $1`,
+          [token],
+        );
 
-      // Admin via Supabase Auth access_token
-      if (access_token) {
-        const { data: userData, error: userError } = await supabase.auth.getUser(access_token);
-        if (userError || !userData?.user) {
+        if (tokenRows.length === 0) {
           res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
           return;
         }
 
-        const { error: updateError } = await supabase.auth.admin.updateUserById(userData.user.id, {
-          password,
-        });
-
-        if (updateError) {
-          res.status(400).json({ error: updateError.message || 'Erro ao redefinir senha.' });
-          return;
-        }
-
-        res.json({ success: true, message: 'Senha redefinida com sucesso.' });
-        return;
-      }
-
-      // Student via DB token
-      if (token) {
-        const { data: tokenRow } = await supabase
-          .from('password_reset_tokens')
-          .select('user_id, expires_at')
-          .eq('token', token)
-          .maybeSingle();
-
-        if (!tokenRow || new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        const tokenRow = tokenRows[0];
+        if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
           res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
           return;
         }
 
         const bcrypt = await import('bcryptjs');
         const newHash = await bcrypt.hash(password, 10);
+        const targetTable = tokenRow.user_type === 'admin' ? 'admin_users' : 'users';
 
-        const { error: updateErr } = await supabase
-          .from('users')
-          .update({ password_hash: newHash, updated_at: new Date().toISOString() })
-          .eq('id', tokenRow.user_id);
+        await query(
+          `UPDATE public.${targetTable} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+          [newHash, tokenRow.user_id],
+        );
 
-        if (updateErr) throw updateErr;
-
-        await supabase.from('password_reset_tokens').delete().eq('user_id', tokenRow.user_id);
+        await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [tokenRow.user_id]);
 
         res.json({ success: true, message: 'Senha redefinida com sucesso.' });
         return;
@@ -371,19 +363,8 @@ router.post(
 
 // ============= LOGOUT =============
 router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
-  // Revoke Supabase session
-  try {
-    const sbToken = req.cookies?.sb_session_token;
-    if (sbToken) {
-      const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
-      await getSupabaseAnonClient().auth.signOut();
-    }
-  } catch {
-    // Fallback: apenas limpa o cookie mesmo se o signOut falhar
-  }
-
   // Clear session cookie
-  res.clearCookie('sb_session_token', {
+  res.clearCookie('session_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -413,41 +394,45 @@ router.post(
     }
 
     try {
-      const supabase = getSupabaseAdminClient();
       const bcrypt = await import('bcryptjs');
 
       // 1. Check Admin user
-      const { data: adminRow } = await supabase
+      const { data: adminRow } = await dbAdmin
         .from('admin_users')
-        .select('auth_user_id')
+        .select('id')
         .eq('email', cleanEmail)
         .maybeSingle();
 
       if (adminRow) {
-        const { getSupabaseAnonClient } = await import('../lib/dbQueryBuilder');
-        const { error: authError } = await getSupabaseAnonClient().auth.signInWithPassword({
-          email: cleanEmail,
-          password: currentPassword,
-        });
+        const { data: fullAdmin } = await dbAdmin
+          .from('admin_users')
+          .select('password_hash')
+          .eq('email', cleanEmail)
+          .maybeSingle();
 
-        if (authError) {
+        if (!fullAdmin?.password_hash) {
           res.status(401).json({ error: 'Senha atual incorreta.' });
           return;
         }
 
-        const targetAuthUserId = adminRow?.auth_user_id || req.user?.authUserId;
-        if (targetAuthUserId) {
-          await supabase.auth.admin.updateUserById(targetAuthUserId, {
-            password: newPassword,
-          });
+        const isValidCurrent = await bcrypt.compare(currentPassword, fullAdmin.password_hash).catch(() => false);
+        if (!isValidCurrent) {
+          res.status(401).json({ error: 'Senha atual incorreta.' });
+          return;
         }
+
+        const newHash = await bcrypt.hash(newPassword, 10);
+        await query(
+          'UPDATE public.admin_users SET password_hash = $1, updated_at = NOW() WHERE email = $2',
+          [newHash, cleanEmail],
+        );
 
         res.json({ success: true, message: 'Senha atualizada com sucesso.' });
         return;
       }
 
       // 2. Check Student user
-      const { data: studentRow } = await supabase
+      const { data: studentRow } = await dbAdmin
         .from('users')
         .select('id, password_hash')
         .eq('email', cleanEmail)
@@ -465,7 +450,7 @@ router.post(
       }
 
       const newHash = await bcrypt.hash(newPassword, 10);
-      const { error: updateErr } = await supabase
+      const { error: updateErr } = await dbAdmin
         .from('users')
         .update({ password_hash: newHash, updated_at: new Date().toISOString() })
         .eq('email', cleanEmail);

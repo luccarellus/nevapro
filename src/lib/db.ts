@@ -5,9 +5,6 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const connectionString = process.env.DATABASE_URL;
-const isSupabaseDatabase =
-  !!connectionString &&
-  /supabase/i.test(connectionString);
 
 const getSslConfig = () => {
   if (process.env.DISABLE_DB_SSL === 'true') {
@@ -15,7 +12,7 @@ const getSslConfig = () => {
   }
 
   const isProd = process.env.NODE_ENV === 'production';
-  if (!isProd && !isSupabaseDatabase && !process.env.DB_CA_CERT) {
+  if (!isProd && !process.env.DB_CA_CERT) {
     return undefined;
   }
 
@@ -32,7 +29,6 @@ const getSslConfig = () => {
 
   // Se DB_SSL_REJECT_UNAUTHORIZED for 'true', exige validação estrita do certificado.
   // Se DB_SSL_REJECT_UNAUTHORIZED for 'false' ou NODE_TLS_REJECT_UNAUTHORIZED === '0', desativa validação.
-  // Caso contrário, se nenhum certificado CA customizado for fornecido, desativa a rejeição por padrão para aceitar cadeias de SSL em nuvem/Supabase.
   let rejectUnauthorized = false;
 
   if (process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true') {
@@ -65,7 +61,6 @@ export const query = async (text: string, params?: any[]) => {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
-  // console.log('executed query', { text, duration, rows: res.rowCount });
   return res;
 };
 
@@ -86,4 +81,3 @@ export const runMigrationQuery = async (text: string, params?: any[]) => {
 };
 
 export default pool;
-

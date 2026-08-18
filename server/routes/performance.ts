@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { normalizeEmail } from '../utils/sanitize';
 import { query } from '../../src/lib/db';
@@ -20,8 +20,7 @@ router.get('/tri-scores', requireAuth, async (req: AuthenticatedRequest, res: Re
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id, tri_target_score, xp, answered_questions, correct_answers')
       .eq('email', email)
@@ -38,7 +37,7 @@ router.get('/tri-scores', requireAuth, async (req: AuthenticatedRequest, res: Re
     }
 
     // Fetch TRI score history
-    const { data: scores } = await supabase
+    const { data: scores } = await dbAdmin
       .from('user_tri_scores')
       .select('*')
       .eq('user_id', user.id)
@@ -114,8 +113,7 @@ router.get('/subject-mastery', requireAuth, async (req: AuthenticatedRequest, re
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -155,7 +153,6 @@ router.get('/subject-mastery', requireAuth, async (req: AuthenticatedRequest, re
       else if (percentage >= 50) level = 'medium';
       else level = 'critical';
 
-      // Map ENEM subject names to categories
       const subjectLower = (row.subject || '').toLowerCase();
       let category = 'Geral';
       if (subjectLower.includes('matem') || subjectLower.includes('tecno')) {
@@ -195,14 +192,11 @@ router.get('/subject-mastery', requireAuth, async (req: AuthenticatedRequest, re
 
     const evolutionRes = await query(evolutionQuery, [user.id]);
 
-    // Format evolution data into labeled buckets
     const evolution = evolutionRes.rows.map((row: any, index: number) => ({
       label: index === evolutionRes.rows.length - 1 ? 'Hoje' : new Date(row.day).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
       precision: Math.round(parseFloat(row.running_accuracy) || 0),
       day: row.day,
     }));
-
-    // No synthetic data — chart will show empty or single point as-is
 
     res.json({ subjects, evolution });
   } catch (err) {
@@ -221,8 +215,7 @@ router.post('/calculate-tri', rateLimiter(5, 60_000), requireAuth, async (req: A
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -233,7 +226,6 @@ router.post('/calculate-tri', rateLimiter(5, 60_000), requireAuth, async (req: A
       return;
     }
 
-    // Fetch user's latest answer per question (to get current state, not history)
     const answersQuery = `
       WITH latest_answers AS (
         SELECT DISTINCT ON (a.question_id) a.question_id, a.is_correct, a.created_at
@@ -264,17 +256,14 @@ router.post('/calculate-tri', rateLimiter(5, 60_000), requireAuth, async (req: A
       return;
     }
 
-    // Map to the format expected by triCalculator
     const items = answersRes.rows.map((row: any) => ({
       isCorrect: Boolean(row.is_correct),
       difficulty: row.difficulty || 'médio',
       subject: row.subject || 'Geral',
     }));
 
-    // Calculate TRI using IRT 3PL
     const result = calculateFullTri(items);
 
-    // Map per-subject scores to ENEM area names
     const subjectNameMap: Record<string, string> = {
       mathematics: 'math_score',
       nature: 'nature_score',
@@ -294,11 +283,10 @@ router.post('/calculate-tri', rateLimiter(5, 60_000), requireAuth, async (req: A
       }
     }
 
-    // Persist to user_tri_scores
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await dbAdmin
       .from('user_tri_scores')
-      .insert([dbInsert])
-      .select()
+      .insert(dbInsert)
+      .select('*')
       .single();
 
     if (insertError) throw insertError;

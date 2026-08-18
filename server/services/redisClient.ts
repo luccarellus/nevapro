@@ -14,17 +14,34 @@ let client: Redis | null = null;
 let connectPromise: Promise<boolean> | null = null;
 
 export function getRedisClient(): Redis | null {
+  const host = process.env.REDIS_HOST;
+  const port = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379;
+  const password = process.env.REDIS_PASSWORD;
+  const username = process.env.REDIS_USERNAME || 'default';
   const url = process.env.REDIS_URL;
-  if (!url) return null;
+
+  if (!url && !host) return null;
   if (client) return client;
 
-  client = new Redis(url, {
+  const redisOptions = {
     lazyConnect: true,
     connectTimeout: 5_000,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
-    retryStrategy: (times) => Math.min(times * 500, 3_000),
-  });
+    retryStrategy: (times: number) => Math.min(times * 500, 3_000),
+  };
+
+  if (url) {
+    client = new Redis(url, redisOptions);
+  } else {
+    client = new Redis({
+      host,
+      port,
+      password: password || undefined,
+      username: username || undefined,
+      ...redisOptions,
+    });
+  }
 
   client.on('error', (err) => {
     log.warn('[Redis] Erro de conexão:', err?.message);

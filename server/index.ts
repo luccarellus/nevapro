@@ -21,7 +21,7 @@ import { verifyRecaptcha } from './middleware/recaptcha';
 import { requireAuth } from './middleware/auth';
 import pool from '../src/lib/db';
 import { closeRedisClient } from './services/redisClient';
-import { getSupabaseAdminClient, dbAdmin } from './lib/dbQueryBuilder';
+import { dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
 import { sanitizeInput } from './utils/sanitize';
 import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from './services/userCache';

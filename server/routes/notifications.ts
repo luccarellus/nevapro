@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
@@ -25,7 +25,6 @@ const getRequestUserId = (req: AuthenticatedRequest, email: string): Promise<str
 
 /**
  * Helper: marca uma notificação global como lida para um usuário.
- * Usa INSERT ... ON CONFLICT DO NOTHING para evitar duplicatas.
  */
 async function markGlobalNotificationAsRead(notificationId: string, userId: string): Promise<void> {
   await query(
@@ -96,7 +95,7 @@ router.post('/read-all', requireAuth, async (req: AuthenticatedRequest, res: Res
     }
 
     // 1. Marca notificações do usuário como lidas
-    await getSupabaseAdminClient()
+    await dbAdmin
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', userId)
@@ -125,7 +124,7 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
   try {
     const { id } = req.params;
 
-    const { data: notif } = await getSupabaseAdminClient()
+    const { data: notif } = await dbAdmin
       .from('notifications')
       .select('user_id')
       .eq('id', id)
@@ -148,7 +147,7 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
       await markGlobalNotificationAsRead(id, userId);
     } else {
       // Notificação do usuário — usa is_read diretamente
-      const { error } = await getSupabaseAdminClient()
+      const { error } = await dbAdmin
         .from('notifications')
         .update({ is_read: true })
         .eq('id', id);

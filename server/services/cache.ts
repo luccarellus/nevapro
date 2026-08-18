@@ -13,7 +13,7 @@ import { getRedisClient, waitForRedisReady } from './redisClient';
 
 /** Returns whether Redis (REDIS_URL) is configured. */
 export const isRedisConfigured = (): boolean => {
-  return Boolean(process.env.REDIS_URL);
+  return Boolean(process.env.REDIS_URL || process.env.REDIS_HOST);
 };
 
 /**

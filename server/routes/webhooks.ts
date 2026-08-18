@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { normalizeEmail, sanitizeInput } from '../utils/sanitize';
 import { log } from '../utils/logger';
 import { rateLimiter } from '../middleware/rateLimiter';
@@ -43,23 +43,20 @@ router.post('/eventease', rateLimiter(30, 60_000), async (req: Request, res: Res
     const safeSchool = sanitizeInput(school);
     const safeGremio = sanitizeInput(gremio);
 
-    const supabaseAdmin = getSupabaseAdminClient();
-
     // 2. Verificar se o e-mail já existe na tabela de alunos
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
+    const { data: existingUser, error: fetchError } = await dbAdmin
       .from('users')
       .select('id, email')
       .eq('email', cleanEmail)
       .maybeSingle();
 
     if (fetchError) {
-      log.error('[Webhook EventEase] Erro ao buscar usuário no Supabase:', fetchError);
+      log.error('[Webhook EventEase] Erro ao buscar usuário:', fetchError);
       res.status(500).json({ error: 'Erro ao verificar existência de usuário.' });
       return;
     }
 
     if (existingUser) {
-      // Idempotência: Retorna sucesso caso o usuário já esteja cadastrado no NevaPro
       res.status(200).json({
         success: true,
         message: 'Usuário já cadastrado no NevaPro.',
@@ -74,29 +71,27 @@ router.post('/eventease', rateLimiter(30, 60_000), async (req: Request, res: Res
     const newUserId = crypto.randomUUID();
 
     // 4. Cadastrar aluno no banco
-    const { data: newUser, error: insertError } = await supabaseAdmin
+    const { data: newUser, error: insertError } = await dbAdmin
       .from('users')
-      .insert([
-        {
-          id: newUserId,
-          email: cleanEmail,
-          name: safeName,
-          password_hash: passwordHash,
-          role: 'student',
-          tenant_id: PLATFORM_TENANT_ID,
-          city: safeCity,
-          school: safeSchool,
-          gremio: safeGremio,
-          xp: 0,
-          level: 1,
-          created_at: new Date().toISOString(),
-        },
-      ])
+      .insert({
+        id: newUserId,
+        email: cleanEmail,
+        name: safeName,
+        password_hash: passwordHash,
+        role: 'student',
+        tenant_id: PLATFORM_TENANT_ID,
+        city: safeCity,
+        school: safeSchool,
+        gremio: safeGremio,
+        xp: 0,
+        level: 1,
+        created_at: new Date().toISOString(),
+      })
       .select('id, email, name')
       .single();
 
     if (insertError) {
-      log.error('[Webhook EventEase] Erro ao cadastrar aluno no Supabase:', insertError);
+      log.error('[Webhook EventEase] Erro ao cadastrar aluno:', insertError);
       res.status(500).json({ error: 'Erro ao criar conta no NevaPro.' });
       return;
     }

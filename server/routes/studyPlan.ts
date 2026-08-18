@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { normalizeEmail } from '../utils/sanitize';
 
@@ -19,8 +19,7 @@ router.get('/tasks', requireAuth, resolveTenant, async (req: AuthenticatedReques
   }
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id, answered_questions')
       .eq('email', email)
@@ -34,7 +33,7 @@ router.get('/tasks', requireAuth, resolveTenant, async (req: AuthenticatedReques
     const taskDate = (req.query.date as string) || new Date().toISOString().split('T')[0];
 
     // Fetch tasks for this date
-    const { data: tasks } = await supabase
+    const { data: tasks } = await dbAdmin
       .from('user_study_tasks')
       .select('*')
       .eq('user_id', user.id)
@@ -76,12 +75,12 @@ router.get('/tasks', requireAuth, resolveTenant, async (req: AuthenticatedReques
           },
         ];
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('user_study_tasks')
-      .insert(defaults.map((t) => ({ ...t, tenant_id: req.tenantId || null })))
-      .select();
+        const { data: inserted, error: insertError } = await dbAdmin
+          .from('user_study_tasks')
+          .insert(defaults.map((t) => ({ ...t, tenant_id: req.tenantId || null })))
+          .select('*');
 
-    if (insertError) throw insertError;
+        if (insertError) throw insertError;
 
         res.json({
           tasks: inserted || defaults,
@@ -113,8 +112,7 @@ router.post('/tasks', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
   const email = normalizeEmail(req.user?.email || '');
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -131,9 +129,9 @@ router.post('/tasks', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await dbAdmin
       .from('user_study_tasks')
-      .insert([{
+      .insert({
         user_id: user.id,
         title,
         estimated_time: estimated_time || '30 min',
@@ -142,8 +140,8 @@ router.post('/tasks', rateLimiter(10, 60_000), requireAuth, async (req: Authenti
         task_date: task_date || new Date().toISOString().split('T')[0],
         tenant_id: req.tenantId || null,
         created_at: new Date().toISOString(),
-      }])
-      .select()
+      })
+      .select('*')
       .single();
 
     if (error) throw error;
@@ -160,8 +158,7 @@ router.put('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Authe
   const { id } = req.params;
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -173,7 +170,7 @@ router.put('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Authe
     }
 
     // Verify ownership
-    const { data: existing } = await supabase
+    const { data: existing } = await dbAdmin
       .from('user_study_tasks')
       .select('user_id')
       .eq('id', id)
@@ -200,11 +197,11 @@ router.put('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Authe
       return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await dbAdmin
       .from('user_study_tasks')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*')
       .single();
 
     if (error) throw error;
@@ -221,8 +218,7 @@ router.delete('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Au
   const { id } = req.params;
 
   try {
-    const supabase = getSupabaseAdminClient();
-    const { data: user } = await supabase
+    const { data: user } = await dbAdmin
       .from('users')
       .select('id')
       .eq('email', email)
@@ -233,7 +229,7 @@ router.delete('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Au
       return;
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await dbAdmin
       .from('user_study_tasks')
       .select('user_id')
       .eq('id', id)
@@ -244,7 +240,7 @@ router.delete('/tasks/:id', rateLimiter(10, 60_000), requireAuth, async (req: Au
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await dbAdmin
       .from('user_study_tasks')
       .delete()
       .eq('id', id);

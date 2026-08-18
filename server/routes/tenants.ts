@@ -16,7 +16,7 @@ import { AuthenticatedRequest } from '../types';
 import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
 import { requirePermission } from '../middleware/rbac';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { normalizeEmail } from '../utils/sanitize';
@@ -34,9 +34,8 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res: Response) =>
       res.status(403).json({ error: 'Contexto de autorização indisponível.' });
       return;
     }
-    // super_admin vê todos os tenants; demais veem apenas os vinculados
     if (ctx.isSuperAdmin) {
-      const { data, error } = await getSupabaseAdminClient()
+      const { data, error } = await dbAdmin
         .from('tenants')
         .select('id, name, slug, domain, plan, active, created_at')
         .order('name', { ascending: true });
@@ -64,9 +63,9 @@ router.post(
       return;
     }
     try {
-      const { data, error } = await getSupabaseAdminClient()
+      const { data, error } = await dbAdmin
         .from('tenants')
-        .insert([{
+        .insert({
           name,
           slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
           domain: domain || null,
@@ -74,8 +73,8 @@ router.post(
           active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        }])
-        .select()
+        })
+        .select('*')
         .single();
       if (error) throw error;
       res.status(201).json(data);
@@ -99,7 +98,7 @@ router.get('/:id', requireAuth, resolveTenant, async (req: AuthenticatedRequest,
       return;
     }
 
-    const { data, error } = await getSupabaseAdminClient()
+    const { data, error } = await dbAdmin
       .from('tenants')
       .select('*')
       .eq('id', tenantId)
@@ -134,11 +133,11 @@ router.put(
       if (settings !== undefined) updates.settings = settings;
       if (active !== undefined) updates.active = Boolean(active);
 
-      const { data, error } = await getSupabaseAdminClient()
+      const { data, error } = await dbAdmin
         .from('tenants')
         .update(updates)
         .eq('id', tenantId)
-        .select()
+        .select('*')
         .single();
       if (error) throw error;
       res.json(data);
@@ -163,11 +162,11 @@ router.delete(
       return;
     }
     try {
-      const { data, error } = await getSupabaseAdminClient()
+      const { data, error } = await dbAdmin
         .from('tenants')
         .update({ active: false, updated_at: new Date().toISOString() })
         .eq('id', tenantId)
-        .select()
+        .select('*')
         .single();
       if (error) throw error;
       res.json({ success: true, data });
@@ -188,7 +187,7 @@ router.get('/:id/roles', requireAuth, resolveTenant, async (req: AuthenticatedRe
       res.status(403).json({ error: 'Acesso negado.' });
       return;
     }
-    const { data, error } = await getSupabaseAdminClient()
+    const { data, error } = await dbAdmin
       .from('roles')
       .select('id, code, name, description, tenant_id')
       .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
@@ -225,7 +224,6 @@ router.post(
       return;
     }
 
-    // Guarda granular: apenas super_admin gerencia admins; apenas admin/teacher gerencia students
     const ctx = (req as any).rbacContext;
     const targetRole = role as RoleCode;
     const permissionMap: Record<RoleCode, PermissionCode> = {
@@ -244,14 +242,14 @@ router.post(
       const cleanEmail = normalizeEmail(email);
 
       // Localiza o usuário (admin_users ou users)
-      const { data: adminUser } = await getSupabaseAdminClient()
+      const { data: adminUser } = await dbAdmin
         .from('admin_users')
         .select('id')
         .eq('email', cleanEmail)
         .maybeSingle();
       const { data: studentUser } = adminUser
         ? { data: null }
-        : await getSupabaseAdminClient().from('users').select('id').eq('email', cleanEmail).maybeSingle();
+        : await dbAdmin.from('users').select('id').eq('email', cleanEmail).maybeSingle();
 
       const userId = adminUser?.id || studentUser?.id;
       if (!userId) {

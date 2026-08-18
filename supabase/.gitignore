@@ -1,7 +1,0 @@
-# Local Supabase CLI artifacts
-.temp/
-.branches/
-
-# Local function env files
-functions/.env
-functions/**/.env

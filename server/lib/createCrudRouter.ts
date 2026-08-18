@@ -2,23 +2,6 @@
  * CRUD Router Factory
  *
  * Eliminates the ~90% duplicated CRUD pattern across events, materials, and mural routes.
- *
- * Instead of repeating:
- *   GET    /         → cache → select → map → cache → response
- *   POST   /         → validate → insert → cacheInvalidate → notification → response
- *   PUT    /:id      → validate → update → cacheInvalidate → response
- *   DELETE /:id      → delete → cacheInvalidate → response
- *   GET    /:id      → maybeSingle → response
- *
- * Usage:
- *   const router = createCrudRouter<RowType>({
- *     table: 'materials',
- *     cacheKey: CACHE_KEYS.MATERIALS,
- *     validate: validateMaterialInput,
- *     notificationType: 'material',
- *     mapRow: (row) => ({ id: row.id, title: row.title, ... }),
- *   });
- *   export default router;
  */
 
 import { Router, Response } from 'express';
@@ -26,7 +9,7 @@ import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, requireAdmin } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
 import { requirePermission } from '../middleware/rbac';
-import { getSupabaseAdminClient } from '../lib/dbQueryBuilder';
+import { dbAdmin } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { cacheInvalidate, cacheGet, cacheSet } from '../services/cache';
 import { addNotification } from '../services/notification';
@@ -38,7 +21,7 @@ type ValidationFn = (body: unknown, partial?: boolean) => { data: Row } | { erro
 type RowMapper = (row: Row) => Record<string, unknown>;
 
 interface CrudRouterOptions {
-  /** Supabase table name (e.g. 'materials', 'events', 'mural') */
+  /** Table name (e.g. 'materials', 'events', 'mural') */
   table: string;
   /** Cache key for the list endpoint */
   cacheKey: string;
@@ -58,35 +41,19 @@ interface CrudRouterOptions {
   orderBy?: string;
   /** Optional: sort direction (default: false = descending) */
   orderAsc?: boolean;
-  /**
-   * Optional: maps validation field names (camelCase) to DB column names (snake_case).
-   * E.g. { questionsCount: 'questions_count', xpReward: 'xp_reward' }
-   */
+  /** Optional: maps validation field names (camelCase) to DB column names (snake_case). */
   fieldMap?: Record<string, string>;
-  /**
-   * Optional: default values for DB fields when not provided in request.
-   * E.g. { questions_count: 0, xp_reward: 0 }
-   */
+  /** Optional: default values for DB fields when not provided in request. */
   defaults?: Record<string, unknown>;
-  /**
-   * Optional: async callback executed BEFORE deleting a row.
-   * Useful for cleaning up associated resources (e.g. deleting files from B2).
-   * Receives the id of the item being deleted.
-   */
+  /** Optional: async callback executed BEFORE deleting a row. */
   onBeforeDelete?: (id: string) => Promise<void>;
 }
 
-/**
- * Maps camelCase field names to snake_case DB columns.
- * Only renames fields that exist in both the source and the mapping.
- * Does NOT overwrite existing target keys (preserves original field precedence).
- */
 function mapFieldNames(data: Row, fieldMap?: Record<string, string>): Row {
   if (!fieldMap) return data;
   const result: Row = { ...data };
   for (const [camel, snake] of Object.entries(fieldMap)) {
     if (camel in result && camel !== snake) {
-      // Only set if the target key doesn't already exist in original data
       if (!(snake in data)) {
         result[snake] = result[camel];
       }
@@ -98,8 +65,6 @@ function mapFieldNames(data: Row, fieldMap?: Record<string, string>): Row {
 
 function createRowMapper(options: CrudRouterOptions): RowMapper {
   if (options.mapRow) return options.mapRow;
-
-  // Default: pass through with underscore→camelCase conversion for known fields
   return (row: Row) => {
     const mapped: Record<string, unknown> = { ...row };
     const fieldMap: Record<string, string> = {
@@ -118,7 +83,7 @@ function createRowMapper(options: CrudRouterOptions): RowMapper {
 }
 
 /**
- * Creates a fully wired CRUD router for a Supabase table.
+ * Creates a fully wired CRUD router for a database table.
  */
 export function createCrudRouter(options: CrudRouterOptions): Router {
   const router = Router();
@@ -132,7 +97,6 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       const tenantScoped = options.tenantScoped !== false;
       const tenantId = req.tenantId;
 
-      // Cache por tenant para garantir isolamento
       const cacheKey = tenantScoped && tenantId ? `${options.cacheKey}:${tenantId}` : options.cacheKey;
       const cached = await cacheGet<unknown[]>(cacheKey);
       if (cached) {
@@ -140,7 +104,7 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         return;
       }
 
-      let builder = getSupabaseAdminClient().from(options.table).select('*');
+      let builder = dbAdmin.from(options.table).select('*');
       if (tenantScoped && tenantId) {
         builder = builder.eq('tenant_id', tenantId);
       }
@@ -170,7 +134,6 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         return;
       }
 
-      // Map camelCase fields to snake_case DB columns
       const insertData: Row = {
         ...options.defaults,
         ...mapFieldNames(validation.data, options.fieldMap),
@@ -178,30 +141,26 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         updated_at: new Date().toISOString(),
       };
 
-      // Escopo de tenant: associa o registro ao tenant ativo da requisição
       if (options.tenantScoped !== false && req.tenantId && !insertData.tenant_id) {
         insertData.tenant_id = req.tenantId;
       }
 
-      // Handle table-specific date columns
       if (options.table === 'materials') {
         insertData.uploaded_at = new Date().toISOString();
       }
 
-      const { data: result, error } = await getSupabaseAdminClient()
+      const { data: result, error } = await dbAdmin
         .from(options.table)
-        .insert([insertData])
-        .select()
+        .insert(insertData)
+        .select('*')
         .single();
 
       if (error) throw error;
 
-      // Invalidate caches (incluindo o do tenant)
       const invalidateKeys = [options.cacheKey, ...(options.extraInvalidateKeys || [])];
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
 
-      // Send notification (escopada ao tenant ativo da requisição)
       const title = (result.title as string) || validation.data.title as string || 'Novo item';
       await addNotification(
         `Novo ${options.notificationType}`,
@@ -232,12 +191,11 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         updated_at: new Date().toISOString(),
       };
 
-      // Escopo de tenant no update: só atualiza registros do tenant ativo
-      let builder = getSupabaseAdminClient().from(options.table).update(updates);
+      let builder = dbAdmin.from(options.table).update(updates);
       if (options.tenantScoped !== false && req.tenantId) {
         builder = builder.eq('tenant_id', req.tenantId);
       }
-      const { data, error } = await builder.eq('id', id).select().single();
+      const { data, error } = await builder.eq('id', id).select('*').single();
 
       if (error) throw error;
       const invalidateKeys = [options.cacheKey];
@@ -255,12 +213,11 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
     try {
       const { id } = req.params;
 
-      // Run pre-delete cleanup (e.g. B2 file deletion)
       if (options.onBeforeDelete) {
         await options.onBeforeDelete(id);
       }
 
-      let builder = getSupabaseAdminClient().from(options.table).delete();
+      let builder = dbAdmin.from(options.table).delete();
       if (options.tenantScoped !== false && req.tenantId) {
         builder = builder.eq('tenant_id', req.tenantId);
       }
@@ -281,7 +238,7 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   router.get('/:id', resolveTenant, async (req, res: Response) => {
     try {
       const { id } = req.params;
-      let builder = getSupabaseAdminClient().from(options.table).select('*');
+      let builder = dbAdmin.from(options.table).select('*');
       if (options.tenantScoped !== false && req.tenantId) {
         builder = builder.eq('tenant_id', req.tenantId);
       }
