@@ -217,11 +217,17 @@ export const authenticateUser = async (email: string, password: string) => {
   // Single query: try admin first, then student — avoids N+1 sequential lookups
   const { rows } = await query(
     `SELECT 'admin' AS user_type, au.id, au.email, au.name, au.password_hash,
-            au.avatar_url, au.answered_questions, au.correct_answers, au.tenant_id
+            au.avatar_url, au.answered_questions, au.correct_answers, au.tenant_id,
+            au.xp, au.level, au.streak, au.flash_quiz_completed,
+            NULL::varchar AS city, NULL::varchar AS school, NULL::varchar AS gremio,
+            0 AS points, 0 AS rank
      FROM public.admin_users au WHERE au.email = $1
      UNION ALL
      SELECT 'student' AS user_type, u.id, u.email, u.name, u.password_hash,
-            u.avatar_url, u.answered_questions, u.correct_answers, u.tenant_id
+            u.avatar_url, u.answered_questions, u.correct_answers, u.tenant_id,
+            u.xp, u.level, u.streak, u.flash_quiz_completed,
+            u.city, u.school, u.gremio,
+            u.points, u.rank
      FROM public.users u WHERE u.email = $1
      LIMIT 1`,
     [cleanEmail],

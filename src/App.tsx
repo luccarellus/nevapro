@@ -201,21 +201,32 @@ export default function App() {
     });
   };
   
-  const handleLogin = async (loggedUser: UserProfile) => {
+  const handleLogin = (loggedUser: UserProfile) => {
     invalidateRequestCache();
+    
+    // Calcula a progressão de nível imediatamente com os dados do login
+    const { nextLevelXp, currentLevelMinXp } = calculateLevelAndProgression(loggedUser.xp || 0);
+    const userWithProgression: UserProfile = { ...loggedUser, nextLevelXp, currentLevelMinXp };
+
     setIsLoggedIn(true);
-    setUser(loggedUser);
+    setUser(userWithProgression);
+
+    if (userWithProgression.tenantId && !localStorage.getItem('neva_active_tenant')) {
+      localStorage.setItem('neva_active_tenant', userWithProgression.tenantId);
+    }
     
     // Persiste a sessão local para ambos os perfis (aluno e admin)
-    localStorage.setItem('neva_student_session', JSON.stringify(loggedUser));
+    localStorage.setItem('neva_student_session', JSON.stringify(userWithProgression));
 
     if (loggedUser.role === 'admin') {
       setActiveTab('admin');
+    } else {
+      setActiveTab('dashboard');
     }
 
-    // Carrega e calcula imediatamente os dados corretos de interação e progresso do banco
+    // Sincroniza em segundo plano sem bloquear a transição de tela
     if (loggedUser.email) {
-      await fetchUser(loggedUser.email);
+      void fetchUser(loggedUser.email);
     }
   };
 
