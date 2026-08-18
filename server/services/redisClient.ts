@@ -25,10 +25,11 @@ export function getRedisClient(): Redis | null {
 
   const redisOptions = {
     lazyConnect: true,
-    connectTimeout: 5_000,
+    connectTimeout: 2_000,
+    commandTimeout: 1_000,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
-    retryStrategy: (times: number) => Math.min(times * 500, 3_000),
+    retryStrategy: (times: number) => (times > 3 ? null : Math.min(times * 300, 1_000)),
   };
 
   if (url) {
@@ -47,7 +48,7 @@ export function getRedisClient(): Redis | null {
     log.warn('[Redis] Erro de conexão:', err?.message);
   });
   client.on('connect', () => {
-    log.info('[Redis] Conectado ao Redis local');
+    log.info('[Redis] Conectado ao Redis');
   });
   client.on('close', () => {
     log.warn('[Redis] Conexão com Redis encerrada');
@@ -65,12 +66,15 @@ export function getRedisClient(): Redis | null {
 
 /**
  * Aguarda o Redis ficar pronto (status 'ready').
- * Returns false rapidamente se o Redis estiver indisponível (nunca trava).
+ * Retorna false IMEDIATAMENTE se o status não for ready/connecting (nunca trava a requisição).
  */
-export async function waitForRedisReady(timeoutMs = 1_000): Promise<boolean> {
+export async function waitForRedisReady(timeoutMs = 300): Promise<boolean> {
   const current = getRedisClient();
   if (!current) return false;
   if (current.status === 'ready') return true;
+  if (current.status !== 'connecting' && current.status !== 'connect') {
+    return false;
+  }
   if (!connectPromise) return false;
 
   try {
