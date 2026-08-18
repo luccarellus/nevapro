@@ -127,15 +127,33 @@ export async function getUserRbacContext(userId: string, source: 'student' | 'ad
   if (!userId) return empty;
 
   try {
-    // 1. Papéis vinculados ao usuário (globais + por tenant)
-    const { rows: roleRows } = await query(
-      `SELECT r.code AS code, r.tenant_id AS tenant_id
-       FROM public.user_tenant_roles utr
-       JOIN public.roles r ON r.id = utr.role_id
-       WHERE utr.user_id = $1`,
-      [userId],
-    );
+    // Parallelize all 3 RBAC queries for speed
+    const table = source === 'admin' ? 'admin_users' : 'users';
+    const [roleResult, tenantResult, defaultResult] = await Promise.all([
+      // 1. Papéis vinculados ao usuário (globais + por tenant)
+      query(
+        `SELECT r.code AS code, r.tenant_id AS tenant_id
+         FROM public.user_tenant_roles utr
+         JOIN public.roles r ON r.id = utr.role_id
+         WHERE utr.user_id = $1`,
+        [userId],
+      ),
+      // 2. Tenants vinculados
+      query(
+        `SELECT DISTINCT t.id, t.slug, t.name, t.plan
+         FROM public.user_tenant_roles utr
+         JOIN public.tenants t ON t.id = utr.tenant_id
+         WHERE utr.user_id = $1 AND t.active = true`,
+        [userId],
+      ),
+      // 3. Tenant padrão (coluna tenant_id da tabela de origem)
+      query(
+        `SELECT tenant_id FROM public.${table} WHERE id = $1 LIMIT 1`,
+        [userId],
+      ),
+    ]);
 
+    const roleRows = roleResult.rows;
     const roles = normalizeRoles(roleRows.map((r: any) => r.code));
     const rolesInTenant = new Set<RoleCode>();
 
@@ -143,28 +161,14 @@ export async function getUserRbacContext(userId: string, source: 'student' | 'ad
       if (row.tenant_id == null && isRoleCode(row.code)) rolesInTenant.add(row.code);
     }
 
-    // 2. Tenants vinculados
-    const { rows: tenantRows } = await query(
-      `SELECT DISTINCT t.id, t.slug, t.name, t.plan
-       FROM public.user_tenant_roles utr
-       JOIN public.tenants t ON t.id = utr.tenant_id
-       WHERE utr.user_id = $1 AND t.active = true`,
-      [userId],
-    );
-    const tenants: TenantInfo[] = tenantRows.map((t: any) => ({
+    const tenants: TenantInfo[] = tenantResult.rows.map((t: any) => ({
       id: t.id,
       slug: t.slug,
       name: t.name,
       plan: t.plan,
     }));
 
-    // 3. Tenant padrão (coluna tenant_id da tabela de origem)
-    const table = source === 'admin' ? 'admin_users' : 'users';
-    const { rows: defaultRows } = await query(
-      `SELECT tenant_id FROM public.${table} WHERE id = $1 LIMIT 1`,
-      [userId],
-    );
-    const defaultTenantId = (defaultRows[0]?.tenant_id as string) || null;
+    const defaultTenantId = (defaultResult.rows[0]?.tenant_id as string) || null;
 
     // 4. Papéis globais valem em qualquer tenant
     const isSuperAdmin = roles.includes('super_admin');

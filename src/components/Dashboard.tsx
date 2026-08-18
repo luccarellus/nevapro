@@ -42,6 +42,8 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   const [dailyChallengeDone, setDailyChallengeDone] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [selectedWrongCity, setSelectedWrongCity] = useState<string | null>(null);
+  const [selectedCorrectCity, setSelectedCorrectCity] = useState<string | null>(null);
+  const [isAnsweringQuiz, setIsAnsweringQuiz] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [rankingTab, setRankingTab] = useState<'geral' | 'local'>('geral');
   const [recentMaterials, setRecentMaterials] = useState<any[]>([]);
@@ -98,18 +100,69 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   const answeredQuestions = user?.answeredQuestions || 0;
   const correctAnswers = user?.correctAnswers || 0;
 
+  const fireConfetti = () => {
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        zIndex: 99999,
+        colors: ['#00b094', '#00ffd5', '#fbbf24', '#ffffff'],
+      });
+      setTimeout(() => {
+        confetti({
+          particleCount: 40,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0.1, y: 0.7 },
+          zIndex: 99999,
+          colors: ['#00b094', '#00ffd5', '#fbbf24'],
+        });
+        confetti({
+          particleCount: 40,
+          angle: 120,
+          spread: 55,
+          origin: { x: 0.9, y: 0.7 },
+          zIndex: 99999,
+          colors: ['#00b094', '#00ffd5', '#fbbf24'],
+        });
+      }, 200);
+    } catch (e) {
+      console.warn('Erro ao disparar confetes:', e);
+    }
+  };
+
   const handleQuizComplete = () => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#00b094', '#00ffd5', '#ffffff']
-    });
+    fireConfetti();
     setDailyChallengeDone(true);
     setSecondsLeft(0);
     setShowQuiz(false);
     if (onEarnXp) {
       onEarnXp(50, 0, 0, true, 'Flash Quiz: Maranhão');
+    }
+  };
+
+  const handleOptionClick = (option: string, answer: string) => {
+    if (isAnsweringQuiz || dailyChallengeDone) return;
+
+    setIsAnsweringQuiz(true);
+
+    if (option === answer) {
+      setSelectedCorrectCity(option);
+      fireConfetti();
+
+      // Aguarda 900ms para o usuário ver o feedback de acerto antes de trocar para a tela final
+      setTimeout(() => {
+        handleQuizComplete();
+        setIsAnsweringQuiz(false);
+        setSelectedCorrectCity(null);
+      }, 900);
+    } else {
+      setSelectedWrongCity(option);
+      setTimeout(() => {
+        setSelectedWrongCity(null);
+        setIsAnsweringQuiz(false);
+      }, 900);
     }
   };
 
@@ -316,29 +369,34 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                           <p className="text-text-main font-bold text-base md:text-lg mb-6 leading-tight">{quizQuest.question}</p>
                           {quizQuest.options.map((option) => {
                             const isWrong = selectedWrongCity === option;
+                            const isCorrect = selectedCorrectCity === option;
                             return (
                               <motion.button 
                                 key={option}
-                                animate={isWrong ? { x: [-10, 10, -10, 10, 0] } : {}}
-                                transition={{ duration: 0.4 }}
-                                onClick={() => {
-                                  if (option === quizQuest.answer) {
-                                    handleQuizComplete();
-                                  } else {
-                                    setSelectedWrongCity(option);
-                                    setTimeout(() => {
-                                      setSelectedWrongCity(null);
-                                    }, 1200);
-                                  }
-                                }}
-                                className={`w-full text-left p-4 rounded-2xl border transition-all text-xs font-bold flex justify-between items-center group/btn relative ${
+                                disabled={isAnsweringQuiz || dailyChallengeDone}
+                                animate={
                                   isWrong 
-                                  ? 'border-red-500 bg-red-500/10 text-red-500' 
-                                  : 'border-border-color bg-bg-card/50 hover:border-brand-primary hover:bg-brand-primary/5 text-text-main'
+                                    ? { x: [-8, 8, -6, 6, -3, 3, 0] } 
+                                    : isCorrect 
+                                      ? { scale: [1, 1.03, 1], transition: { duration: 0.3 } } 
+                                      : {}
+                                }
+                                transition={{ duration: 0.4 }}
+                                onClick={() => handleOptionClick(option, quizQuest.answer)}
+                                className={`w-full text-left p-4 rounded-2xl border transition-all text-xs font-bold flex justify-between items-center group/btn relative ${
+                                  isCorrect 
+                                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/50 shadow-lg shadow-emerald-500/20' 
+                                    : isWrong 
+                                    ? 'border-red-500 bg-red-500/10 text-red-500 ring-2 ring-red-500/40' 
+                                    : 'border-border-color bg-bg-card/50 hover:border-brand-primary hover:bg-brand-primary/5 text-text-main disabled:opacity-60 disabled:cursor-not-allowed'
                                 }`}
                               >
                                 <span>{option}</span>
-                                {isWrong ? (
+                                {isCorrect ? (
+                                  <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1.5 animate-pulse">
+                                    <CheckCircle2 size={14} className="text-emerald-400" /> Correto! +50 XP ✨
+                                  </span>
+                                ) : isWrong ? (
                                   <span className="text-[10px] font-bold text-red-500 flex items-center gap-1">Incorreto ❌</span>
                                 ) : (
                                   <ArrowRight size={12} className="opacity-0 group-hover/btn:opacity-100 -translate-x-2 group-hover/btn:translate-x-0 transition-all text-brand-primary" />
@@ -352,19 +410,29 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
                   );
                 })()
               ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div className="w-20 h-20 bg-brand-primary/20 rounded-full flex items-center justify-center text-brand-primary mb-6 animate-bounce">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  className="flex flex-col items-center justify-center py-10 text-center"
+                >
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0, 1.2, 1] }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="w-20 h-20 bg-brand-primary/20 rounded-full flex items-center justify-center text-brand-primary mb-6 ring-4 ring-brand-primary/20 shadow-lg shadow-brand-primary/10"
+                  >
                     <CheckCircle2 size={40} />
-                  </div>
+                  </motion.div>
                   <h3 className="text-2xl font-black text-text-main mb-2">Desafio concluído!</h3>
                   <p className="text-text-secondary text-sm font-medium">+50 XP adicionados ao seu perfil.</p>
                   <button 
                     disabled
-                    className="mt-8 bg-text-main/5 text-text-secondary font-bold text-[10px] px-8 py-4 rounded-2xl cursor-not-allowed"
+                    className="mt-8 bg-text-main/5 text-text-secondary font-bold text-[10px] px-8 py-4 rounded-2xl cursor-not-allowed border border-border-color/30"
                   >
                     Desafio concluído
                   </button>
-                </div>
+                </motion.div>
               )}
             </div>
             

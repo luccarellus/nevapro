@@ -214,116 +214,75 @@ export const requireAdmin = async (
 export const authenticateUser = async (email: string, password: string) => {
   const cleanEmail = email.toLowerCase().trim();
 
-  // 1. Check if user is an Admin
-  const { data: adminRow } = await dbAdmin
-    .from('admin_users')
-    .select('*')
-    .eq('email', cleanEmail)
-    .maybeSingle();
+  // Single query: try admin first, then student — avoids N+1 sequential lookups
+  const { rows } = await query(
+    `SELECT 'admin' AS user_type, au.id, au.email, au.name, au.password_hash,
+            au.avatar_url, au.answered_questions, au.correct_answers, au.tenant_id
+     FROM public.admin_users au WHERE au.email = $1
+     UNION ALL
+     SELECT 'student' AS user_type, u.id, u.email, u.name, u.password_hash,
+            u.avatar_url, u.answered_questions, u.correct_answers, u.tenant_id
+     FROM public.users u WHERE u.email = $1
+     LIMIT 1`,
+    [cleanEmail],
+  );
 
-  if (adminRow) {
-    if (!adminRow.password_hash) {
-      return { error: 'E-mail ou senha inválidos.' };
-    }
-
-    const passwordIsValid = await bcrypt.compare(password, adminRow.password_hash).catch(() => false);
-    if (!passwordIsValid) {
-      return { error: 'E-mail ou senha inválidos.' };
-    }
-
-    const rbacContext = await getUserRbacContext(adminRow.id, 'admin');
-
-    const authenticatedUser: AuthenticatedUser = {
-      userId: adminRow.id,
-      email: cleanEmail,
-      role: 'admin',
-      roles: rbacContext.roles,
-      permissions: rbacContext.permissions,
-      tenants: rbacContext.tenants,
-      tenantId: rbacContext.defaultTenantId || undefined,
-      isAdmin: rbacContext.isAdmin,
-    };
-
-    const sessionToken = createSessionToken(authenticatedUser);
-
-    return {
-      user: {
-        ...adminRow,
-        id: adminRow.id,
-        role: 'admin',
-        answeredQuestions: adminRow.answered_questions || 0,
-        correctAnswers: adminRow.correct_answers || 0,
-        avatarUrl: resolveStoredFileUrl(adminRow.avatar_url),
-        roles: rbacContext.roles,
-        permissions: rbacContext.permissions,
-        tenants: rbacContext.tenants,
-        tenantId: rbacContext.defaultTenantId || undefined,
-        isAdmin: rbacContext.isAdmin,
-      },
-      session: {
-        access_token: sessionToken,
-      },
-    };
+  if (rows.length === 0) {
+    return { error: 'E-mail ou senha inválidos.' };
   }
 
-  // 2. Check if user is a Student (public.users)
-  const { data: studentRow } = await dbAdmin
-    .from('users')
-    .select('*')
-    .eq('email', cleanEmail)
-    .maybeSingle();
+  const userRow = rows[0];
+  const userType = userRow.user_type as 'admin' | 'student';
 
-  if (studentRow) {
-    if (!studentRow.password_hash) {
-      return { error: 'E-mail ou senha inválidos.' };
-    }
+  if (!userRow.password_hash) {
+    return { error: 'E-mail ou senha inválidos.' };
+  }
 
-    const passwordIsValid = await bcrypt.compare(password, studentRow.password_hash).catch(() => false);
-    if (!passwordIsValid) {
-      return { error: 'E-mail ou senha inválidos.' };
-    }
+  const passwordIsValid = await bcrypt.compare(password, userRow.password_hash).catch(() => false);
+  if (!passwordIsValid) {
+    return { error: 'E-mail ou senha inválidos.' };
+  }
 
-    const rbacContext = await getUserRbacContext(studentRow.id, 'student');
+  const rbacContext = await getUserRbacContext(userRow.id, userType);
 
-    const authenticatedUser: AuthenticatedUser = {
-      userId: studentRow.id,
-      email: cleanEmail,
-      role: 'student',
-      roles: rbacContext.roles,
-      permissions: rbacContext.permissions,
-      tenants: rbacContext.tenants,
-      tenantId: rbacContext.defaultTenantId || undefined,
-      isAdmin: rbacContext.isAdmin,
-    };
+  const authenticatedUser: AuthenticatedUser = {
+    userId: userRow.id,
+    email: cleanEmail,
+    role: userType,
+    roles: rbacContext.roles,
+    permissions: rbacContext.permissions,
+    tenants: rbacContext.tenants,
+    tenantId: rbacContext.defaultTenantId || undefined,
+    isAdmin: rbacContext.isAdmin,
+  };
 
-    const sessionToken = createSessionToken(authenticatedUser);
+  const sessionToken = createSessionToken(authenticatedUser);
+
+  // Cache student sessions for full TTL; admin sessions shorter (loaded fresh each time for RBAC)
+  if (userType === 'student') {
     const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
-
     const sessionCacheValue: any = { ...authenticatedUser, rbacContext };
     await setUserCache(userCacheKeys.auth(tokenHash), sessionCacheValue, STUDENT_SESSION_TTL_SECONDS);
-
-    return {
-      user: {
-        ...studentRow,
-        id: studentRow.id,
-        role: 'student',
-        answeredQuestions: studentRow.answered_questions || studentRow.answeredQuestions || 0,
-        correctAnswers: studentRow.correct_answers || studentRow.correctAnswers || 0,
-        avatarUrl: resolveStoredFileUrl(studentRow.avatar_url || studentRow.avatarUrl || studentRow.avatar),
-        showInLeaderboard: studentRow.show_in_leaderboard !== false,
-        languagePreference: studentRow.language_preference || 'ingles',
-        flashQuizCompleted: !!studentRow.flash_quiz_completed,
-        roles: rbacContext.roles,
-        permissions: rbacContext.permissions,
-        tenants: rbacContext.tenants,
-        tenantId: rbacContext.defaultTenantId || undefined,
-        isAdmin: rbacContext.isAdmin,
-      },
-      session: {
-        access_token: sessionToken,
-      },
-    };
   }
 
-  return { error: 'E-mail ou senha inválidos.' };
+  return {
+    user: {
+      ...userRow,
+      role: userType,
+      answeredQuestions: userRow.answered_questions || 0,
+      correctAnswers: userRow.correct_answers || 0,
+      avatarUrl: resolveStoredFileUrl(userRow.avatar_url),
+      showInLeaderboard: userRow.show_in_leaderboard !== false,
+      languagePreference: userRow.language_preference || 'ingles',
+      flashQuizCompleted: !!userRow.flash_quiz_completed,
+      roles: rbacContext.roles,
+      permissions: rbacContext.permissions,
+      tenants: rbacContext.tenants,
+      tenantId: rbacContext.defaultTenantId || undefined,
+      isAdmin: rbacContext.isAdmin,
+    },
+    session: {
+      access_token: sessionToken,
+    },
+  };
 };

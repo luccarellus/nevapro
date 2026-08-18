@@ -63,11 +63,15 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
         response: token,
       });
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
       const response = await fetch(VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         log.error('[reCAPTCHA] Erro HTTP na verificação:', response.status);
@@ -111,6 +115,10 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
       next();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('abort') || errorMessage.includes('Timeout')) {
+        log.warn('[reCAPTCHA] Timeout na verificação — permitindo requisição para não bloquear usuário');
+        return next();
+      }
       log.error('[reCAPTCHA] Erro na verificação:', errorMessage);
       res.status(500).json({ error: 'Erro interno ao verificar reCAPTCHA.' });
     }

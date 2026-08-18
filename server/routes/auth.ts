@@ -25,30 +25,33 @@ router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: Aut
 
   const cleanEmail = normalizeEmail(email);
 
-  // Brute force lock check
   try {
-    const { rows: attemptRows } = await query(
-      'SELECT attempts, lock_until FROM public.login_attempts WHERE email = $1',
-      [cleanEmail],
-    );
-    if (attemptRows.length > 0) {
-      const attempt = attemptRows[0];
-      if (attempt.lock_until && Date.now() < new Date(attempt.lock_until).getTime()) {
-        const waitTime = Math.ceil(
-          (new Date(attempt.lock_until).getTime() - Date.now()) / 60000,
-        );
-        res.status(429).json({
-          error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${waitTime} minutos.`,
-        });
-        return;
+    // Brute force lock check + authentication in parallel
+    const [lockCheck, authResult] = await Promise.allSettled([
+      query('SELECT attempts, lock_until FROM public.login_attempts WHERE email = $1', [cleanEmail]),
+      authenticateUser(cleanEmail, password),
+    ]);
+
+    // Check brute force lock (non-blocking — if query fails, proceed with login)
+    if (lockCheck.status === 'fulfilled') {
+      const attemptRows = lockCheck.value.rows;
+      if (attemptRows.length > 0) {
+        const attempt = attemptRows[0];
+        if (attempt.lock_until && Date.now() < new Date(attempt.lock_until).getTime()) {
+          const waitTime = Math.ceil(
+            (new Date(attempt.lock_until).getTime() - Date.now()) / 60000,
+          );
+          res.status(429).json({
+            error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${waitTime} minutos.`,
+          });
+          return;
+        }
       }
     }
-  } catch (err) {
-    log.error('[Auth Lock Check] Erro:', err);
-  }
 
-  try {
-    const result = await authenticateUser(cleanEmail, password);
+    const result = authResult.status === 'fulfilled'
+      ? authResult.value
+      : { error: 'Falha na autenticação.' };
     
     if (result.error) {
       // Increment failed attempts

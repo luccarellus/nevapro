@@ -55,6 +55,12 @@ const ssl = getSslConfig();
 const pool = new Pool({
   connectionString,
   ssl,
+  max: 20,
+  min: 2,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 10_000,
+  application_name: 'nevapro-server',
 });
 
 export const query = async (text: string, params?: any[]) => {
