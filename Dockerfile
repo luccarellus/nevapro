@@ -24,6 +24,9 @@ RUN npm run build
 FROM node:20-alpine
 
 WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
 # curl: healthcheck do container. postgresql-client: permite pg_dump nativo nos backups
 # (se indisponível, o backup usa o fallback Node.js interno).
 RUN apk add --no-cache curl postgresql-client

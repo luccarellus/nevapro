@@ -34,7 +34,7 @@ export default defineConfig(({mode}) => {
       port: 3000,
       host: '0.0.0.0',
       hmr: false,
-      allowedHosts: true,
+      allowedHosts: ['nevapro-app-prod.mo1m2d.easypanel.host', 'localhost'],
     },
   };
 });

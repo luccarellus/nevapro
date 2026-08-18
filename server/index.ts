@@ -4,6 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import * as dotenv from 'dotenv';
 import multer from 'multer';
 
@@ -413,8 +414,18 @@ app.post('/api/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, veri
   }
 });
 
-// ===== Vite Dev Middleware (HMR) =====
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+// ===== Frontend Serving (SPA & Static Files) =====
+const distPath = path.resolve('dist');
+const indexPath = path.join(distPath, 'index.html');
+
+if (fs.existsSync(indexPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(indexPath);
+  });
+  log.info(`[Server] Serving static frontend from ${distPath}`);
+} else if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   (async () => {
     try {
       const { createServer: createViteServer } = await import('vite');
@@ -425,16 +436,6 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
       log.warn('[Vite] Dev middleware not available, running without HMR');
     }
   })();
-}
-
-// ===== Static Files (production only) =====
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.resolve('dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api')) return;
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
 }
 
 // ===== Centralized Error Handler =====
