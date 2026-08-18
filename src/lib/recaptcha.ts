@@ -21,7 +21,7 @@ export function isRecaptchaEnabled(): boolean {
  * Injects the Google reCAPTCHA v3 script into <head>.
  * Safe to call multiple times — the script is only added once.
  */
-function loadRecaptchaScript(): Promise<void> {
+export function preloadRecaptcha(): Promise<void> {
   if (scriptLoaded) return Promise.resolve();
   if (scriptLoading) return scriptLoading;
 
@@ -69,7 +69,7 @@ export async function executeRecaptcha(action: string): Promise<string> {
     return '';
   }
 
-  await loadRecaptchaScript();
+  await preloadRecaptcha();
 
   return new Promise<string>((resolve, reject) => {
     const timeout = setTimeout(() => {

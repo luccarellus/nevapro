@@ -64,7 +64,7 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
       });
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
+      const timeout = setTimeout(() => controller.abort(), 1500);
       const response = await fetch(VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

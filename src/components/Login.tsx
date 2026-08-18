@@ -6,6 +6,7 @@ import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import Spinner from './Spinner';
 import cidadesEscolasData from '../data/cidades_escolas.json';
+import { preloadRecaptcha } from '../lib/recaptcha';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -40,8 +41,9 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [city]);
 
-  // Load remembered email on mount
+  // Load remembered email on mount & preload reCAPTCHA script
   useEffect(() => {
+    void preloadRecaptcha().catch(() => {});
     const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
       setEmail(savedEmail);
