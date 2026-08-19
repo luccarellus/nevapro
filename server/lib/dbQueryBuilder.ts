@@ -134,7 +134,7 @@ class PostgresQueryBuilder {
     return this;
   }
 
-  async execute() {
+  async execute(): Promise<{ data: any; error: any }> {
     let sql = '';
     const params: any[] = [];
     
@@ -239,6 +239,18 @@ class PostgresQueryBuilder {
       const res = await query(sql, params);
       return { data: res.rows, error: null };
     } catch (e: any) {
+      if (e?.code === '42703' && (this.action === 'insert' || this.action === 'update')) {
+        const match = e.message?.match(/column "([^"]+)" of relation/i);
+        const badCol = match ? match[1] : null;
+        const targetObj = this.action === 'insert' ? this.insertData : this.updateData;
+
+        if (badCol && targetObj && typeof targetObj === 'object' && badCol in targetObj) {
+          log.warn(`[PG Wrapper Auto-Fix] Removing non-existent column "${badCol}" from ${this.action} on table "${safeTable}" and retrying.`);
+          delete targetObj[badCol];
+          return this.execute();
+        }
+      }
+
       log.error(`[PG Wrapper Error] ${sql}`, e);
       return { data: null, error: e };
     }

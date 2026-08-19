@@ -160,8 +160,10 @@ export default function AdminDashboard({
       }
       setIsSuccess(true); fetchData();
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
-    } catch (error) { console.error('Failed to save notice:', error); }
-    finally { setIsLoading(false); }
+    } catch (error: any) {
+      console.error('Failed to save notice:', error);
+      alert(`Erro ao salvar recado: ${error?.message || 'Falha ao salvar recado'}`);
+    } finally { setIsLoading(false); }
   };
 
   const handleSaveEvent = async () => {
@@ -174,8 +176,10 @@ export default function AdminDashboard({
       else { await eventService.addEvento(payload); }
       setIsSuccess(true); fetchData();
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
-    } catch (error) { console.error('Failed to save event:', error); }
-    finally { setIsLoading(false); }
+    } catch (error: any) {
+      console.error('Failed to save event:', error);
+      alert(`Erro ao salvar evento: ${error?.message || 'Falha ao salvar evento'}`);
+    } finally { setIsLoading(false); }
   };
 
   const handleSaveMaterial = async () => {
@@ -191,8 +195,10 @@ export default function AdminDashboard({
       else { await materialService.addMaterial(payload); }
       setIsSuccess(true); fetchData();
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
-    } catch (error) { console.error('Failed to save material:', error); }
-    finally { setIsLoading(false); }
+    } catch (error: any) {
+      console.error('Failed to save material:', error);
+      alert(`Erro ao salvar material: ${error?.message || 'Falha ao salvar material'}`);
+    } finally { setIsLoading(false); }
   };
 
   const handleDeleteEvent = (id: string, e: React.MouseEvent) => {

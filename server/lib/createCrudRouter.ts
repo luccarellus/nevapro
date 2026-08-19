@@ -115,9 +115,9 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       const mapped = (data || []).map((row: Row) => mapRow(row));
       await cacheSet(cacheKey, mapped);
       res.json(mapped);
-    } catch (err) {
+    } catch (err: any) {
       log.error(`[${options.table} List] Error:`, err);
-      res.status(500).json({ error: 'Failed to fetch data' });
+      res.status(500).json({ error: err?.message || 'Failed to fetch data' });
     }
   });
 
@@ -170,9 +170,9 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       );
 
       res.status(201).json(mapRow(result));
-    } catch (err) {
+    } catch (err: any) {
       log.error(`[${options.table} Create] Error:`, err);
-      res.status(500).json({ error: 'Failed to create' });
+      res.status(500).json({ error: err?.message || 'Failed to create' });
     }
   });
 
@@ -202,9 +202,9 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
       res.json(data);
-    } catch (err) {
+    } catch (err: any) {
       log.error(`[${options.table} Update] Error:`, err);
-      res.status(500).json({ error: 'Failed to update' });
+      res.status(500).json({ error: err?.message || 'Failed to update' });
     }
   });
 
@@ -228,9 +228,9 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
       res.json({ success: true });
-    } catch (err) {
+    } catch (err: any) {
       log.error(`[${options.table} Delete] Error:`, err);
-      res.status(500).json({ error: 'Failed to delete' });
+      res.status(500).json({ error: err?.message || 'Failed to delete' });
     }
   });
 

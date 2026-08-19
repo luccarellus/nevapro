@@ -64,7 +64,7 @@ export function validateMuralInput(body: unknown, partial = false): Result<Row> 
   if (!objectBody(body)) return { error: 'Corpo da requisição inválido.' };
   const result = readFields(body, [
     ['title', 255, !partial], ['content', 10000, !partial], ['type', 50, false],
-    ['category', 50, false], ['tag', 100, false],
+    ['category', 50, false], ['tag', 100, false], ['sender', 255, false],
   ]);
   if ('error' in result) return result;
   if (partial && Object.keys(result.data).length === 0) return { error: 'Nenhum campo válido foi informado.' };
