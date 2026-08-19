@@ -310,12 +310,12 @@ export default function AdminDashboard({
         {showModal && (
           <div className="fixed inset-0 z-[100]">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={handleCloseModal} className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-default" />
+              onClick={handleCloseModal} className="absolute inset-0 bg-black/60 backdrop-blur-xs cursor-default" />
             <motion.div initial={{ opacity: 0, scale: 0.98, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: 20 }} transition={{ type: 'spring', duration: 0.4 }}
-              className="absolute inset-4 md:inset-auto md:top-[5vh] md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-lg max-h-[90vh] overflow-y-auto bg-bg-sidebar border border-border-color rounded-[32px] p-8 shadow-2xl shadow-black/30">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black text-text-main">
+              className="absolute inset-4 md:inset-auto md:top-[8vh] md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-lg max-h-[85vh] overflow-y-auto bg-bg-sidebar border border-border-color rounded-2xl md:rounded-3xl p-6 md:p-8 shadow-2xl">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-color">
+                <h3 className="text-base font-black text-text-main">
                   {showModal === 'evento' ? (editingId ? 'Editar Evento' : 'Novo Evento') :
                    showModal === 'material' ? (editingId ? 'Editar Material' : 'Novo Material') :
                    (editingId ? 'Editar Recado' : 'Novo Recado')}
@@ -327,148 +327,148 @@ export default function AdminDashboard({
               </div>
 
               {showModal === 'evento' && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título do evento</label>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Título do evento</label>
                     <input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Aulão no Cinema" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all font-sans" placeholder="Ex: Aulão de Matemática" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Data de liberação</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Data de liberação</label>
                     <input type="datetime-local" value={eventForm.releaseDate}
                       onChange={(e) => setEventForm({...eventForm, releaseDate: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all [color-scheme:dark]" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all [color-scheme:dark]" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">XP de Participação</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">XP de Participação</label>
                     <input type="number" value={eventForm.xpReward}
                       onChange={(e) => setEventForm({...eventForm, xpReward: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all font-sans" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Categoria</label>
                     <div className="relative">
                       <select value={eventForm.category} onChange={(e) => setEventForm({...eventForm, category: e.target.value})}
-                        className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
+                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
                         <option value="Evento">Evento</option><option value="Aulão">Aulão</option>
                         <option value="Simulado">Simulado</option><option value="Entrega">Entrega</option>
                       </select>
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Observação</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Observação</label>
                     <textarea value={eventForm.observation} onChange={(e) => setEventForm({...eventForm, observation: e.target.value})}
-                      rows={4} className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all resize-none"
+                      rows={3} className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all resize-none"
                       placeholder="Ex: Liberar somente para os alunos do 3º ano" />
                   </div>
-                  <div className="flex gap-4 pt-4">
+                  <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveEvent} disabled={isLoading}
-                      className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
+                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Evento Atualizado' : 'Evento Salvo') : (editingId ? 'Atualizar evento' : 'Salvar evento')}
                     </button>
                     <button onClick={() => setEventForm({ title: '', releaseDate: '', xpReward: '20', category: 'Evento', observation: '' })}
-                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-8 py-4 rounded-xl font-black tracking-wide text-[11px] transition-all border border-border-color">Limpar</button>
+                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-6 py-3 rounded-xl font-bold text-xs transition-all border border-border-color cursor-pointer">Limpar</button>
                   </div>
                 </div>
               )}
 
               {showModal === 'recado' && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Título</label>
                     <input value={muralForm.title} onChange={(e) => setMuralForm({...muralForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Simulado aberto para inscrição" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all font-sans" placeholder="Ex: Simulado aberto para inscrição" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Categoria</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Categoria</label>
                     <div className="relative">
                       <select value={muralForm.category} onChange={(e) => setMuralForm({...muralForm, category: e.target.value})}
-                        className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
+                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
                         <option value="importante">Aviso oficial</option><option value="estudos">Estudos</option><option value="apoio">Apoio</option>
                       </select>
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Etiqueta</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Etiqueta</label>
                     <input value={muralForm.tag} onChange={(e) => setMuralForm({...muralForm, tag: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all font-sans" placeholder="Ex: Aviso, Prazo, Destaque" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all font-sans" placeholder="Ex: Aviso, Prazo, Destaque" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Texto</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Texto</label>
                     <textarea value={muralForm.content} onChange={(e) => setMuralForm({...muralForm, content: e.target.value})}
-                      rows={4} className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all resize-none"
+                      rows={3} className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all resize-none"
                       placeholder="Escreva o comunicado de forma curta, clara e objetiva." />
                   </div>
-                  <div className="flex gap-4 pt-4">
+                  <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveMural} disabled={isLoading}
-                      className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
+                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Recado Atualizado' : 'Recado Salvo') : (editingId ? 'Atualizar recado' : 'Salvar recado')}
                     </button>
                     <button onClick={() => setMuralForm({ title: '', category: 'importante', tag: '', content: '' })}
-                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-8 py-4 rounded-xl font-black tracking-wide text-[11px] transition-all border border-border-color">Limpar</button>
+                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-6 py-3 rounded-xl font-bold text-xs transition-all border border-border-color cursor-pointer">Limpar</button>
                   </div>
                 </div>
               )}
 
               {showModal === 'material' && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Título</label>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Título</label>
                     <input value={materialForm.title} onChange={(e) => setMaterialForm({...materialForm, title: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all" placeholder="Ex: Lista de revisão" />
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all" placeholder="Ex: Lista de revisão" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Tipo</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Tipo</label>
                     <div className="relative">
                       <select value={materialForm.type} onChange={(e) => setMaterialForm({...materialForm, type: e.target.value})}
-                        className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
+                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
                         <option value="pdf">PDF</option><option value="video">VÍDEO</option><option value="link">LINK EXTERNO</option>
                       </select>
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Foco</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Foco</label>
                     <div className="relative">
                       <select value={materialForm.foco} onChange={(e) => setMaterialForm({...materialForm, foco: e.target.value})}
-                        className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all appearance-none">
+                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
                         <option value="Turmas Gerais">Turmas Gerais</option><option value="Medicina">Medicina</option>
                         <option value="Exatas">Exatas</option><option value="Humanas">Humanas</option>
                       </select>
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={16} /></div>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Link / arquivo</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Link / arquivo</label>
                     <input value={materialForm.url} onChange={(e) => setMaterialForm({...materialForm, url: e.target.value})}
-                      className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all mb-3" placeholder="link ou arquivo" />
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                      <div className="flex-1 bg-bg-main border border-border-color rounded-2xl px-4 py-3 flex items-center gap-3 overflow-hidden w-full">
+                      className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all mb-2" placeholder="URL externa" />
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="flex-1 bg-bg-main/50 border border-border-color rounded-xl px-3 py-2 flex items-center gap-3 overflow-hidden w-full">
                         <input type="file" id="file-upload" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                         <label htmlFor="file-upload"
-                          className="bg-bg-sidebar border border-border-color text-text-main px-4 py-1.5 rounded-lg text-[10px] font-black tracking-wide cursor-pointer hover:bg-bg-card transition-all shrink-0">Escolher arquivo</label>
-                        <span className="text-[10px] font-bold text-text-secondary truncate opacity-50">{selectedFile ? selectedFile.name : 'Nenhum arquivo escolhido'}</span>
+                          className="bg-bg-sidebar border border-border-color text-text-main px-3 py-1 rounded-lg text-[10px] font-bold tracking-wide cursor-pointer hover:bg-bg-card transition-all shrink-0">Escolher arquivo</label>
+                        <span className="text-[10px] font-semibold text-text-secondary truncate opacity-60">{selectedFile ? selectedFile.name : 'Nenhum arquivo escolhido'}</span>
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-text-secondary tracking-wide ml-1 opacity-50">Descrição</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Descrição</label>
                     <textarea value={materialForm.description} onChange={(e) => setMaterialForm({...materialForm, description: e.target.value})}
-                      rows={4} className="w-full bg-bg-main border border-border-color rounded-2xl px-6 py-4 text-text-main font-bold text-sm focus:outline-none focus:border-brand-primary/50 transition-all resize-none"
+                      rows={3} className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all resize-none"
                       placeholder="Resumo do conteúdo e instruções de uso." />
                   </div>
-                  <div className="flex gap-4 pt-4">
+                  <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveMaterial} disabled={isLoading}
-                      className="flex-1 bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-[11px] tracking-wide transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                      {isLoading ? <Spinner size={16} className="text-white" /> : isSuccess ? <CheckCircle2 size={16} /> : null}
+                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
+                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Material Atualizado' : 'Material Salvo') : (editingId ? 'Atualizar Material' : 'Salvar Material')}
                     </button>
                     <button onClick={() => { setMaterialForm({ title: '', type: 'pdf', foco: 'ENEM geral', url: '', description: '' }); setSelectedFile(null); }}
-                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-8 py-4 rounded-xl font-black tracking-wide text-[11px] transition-all border border-border-color">Limpar</button>
+                      className="bg-text-main/5 hover:bg-text-main/10 text-text-secondary px-6 py-3 rounded-xl font-bold text-xs transition-all border border-border-color cursor-pointer">Limpar</button>
                   </div>
                 </div>
               )}
@@ -481,24 +481,24 @@ export default function AdminDashboard({
         {deleteConfirm && (
           <div className="fixed inset-0 z-[110]">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDeleteConfirm(null)} className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-default" />
+              onClick={() => setDeleteConfirm(null)} className="absolute inset-0 bg-black/60 backdrop-blur-xs cursor-default" />
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-bg-sidebar border border-border-color rounded-[24px] p-8 shadow-2xl">
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-bg-sidebar border border-border-color rounded-2xl p-6 shadow-2xl">
               <div className="text-center">
-                <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4"><Trash2 size={24} className="text-red-500" /></div>
-                <h3 className="text-lg font-black text-text-main mb-2">
+                <div className="w-10 h-10 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center mx-auto mb-3"><Trash2 size={20} className="text-red-400" /></div>
+                <h3 className="text-base font-black text-text-main mb-1">
                   Excluir {deleteConfirm.type === 'evento' ? 'evento' : deleteConfirm.type === 'material' ? 'material' : 'recado'}
                 </h3>
-                <p className="text-sm text-text-secondary font-medium mb-6">
-                  Tem certeza que deseja excluir <strong className="text-text-main">{deleteConfirm.title}</strong>? Esta ação não pode ser desfeita.
+                <p className="text-xs text-text-secondary font-medium mb-5 opacity-80">
+                  Tem certeza que deseja excluir <strong className="text-text-main font-bold">{deleteConfirm.title}</strong>? Esta ação não pode ser desfeita.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-2.5">
                   <button onClick={() => setDeleteConfirm(null)}
-                    className="flex-1 bg-text-main/10 hover:bg-text-main/20 text-text-main py-3.5 rounded-xl font-black text-[10px] tracking-wider transition-all cursor-pointer">Cancelar</button>
+                    className="flex-1 bg-text-main/5 hover:bg-text-main/10 text-text-main py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer border border-border-color">Cancelar</button>
                   <button onClick={handleConfirmDelete} disabled={isLoading}
-                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3.5 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
                     {isLoading ? <Spinner size={14} className="text-white" /> : <Trash2 size={14} />}
-                    Confirmar exclusão</button>
+                    Excluir</button>
                 </div>
               </div>
             </motion.div>

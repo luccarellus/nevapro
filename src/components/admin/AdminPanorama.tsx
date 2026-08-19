@@ -109,17 +109,17 @@ export default function AdminPanorama({
       {/* Header Title Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-600/20 flex items-center justify-center text-blue-500 shrink-0 shadow-sm">
-            <ShieldCheck size={22} />
+          <div className="w-10 h-10 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0">
+            <ShieldCheck size={20} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-text-main tracking-tight leading-none mb-1.5 flex items-center gap-2">Painel BackOffice</h1>
-            <p className="text-xs text-text-secondary font-medium">Visao geral de alunos, engajamento e conteudos do projeto.</p>
+            <h1 className="text-2xl font-black text-text-main tracking-tight leading-none mb-1 flex items-center gap-2">Painel BackOffice</h1>
+            <p className="text-xs text-text-secondary font-medium">Visão geral de alunos, engajamento e conteúdos do projeto.</p>
           </div>
         </div>
         <button
           onClick={onNavigateToAlunos}
-          className="bg-bg-card border border-border-color hover:bg-bg-sidebar text-text-main px-6 py-3 rounded-2xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+          className="bg-bg-card border border-border-color hover:bg-bg-sidebar text-text-main px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
         >
           <Users size={15} />
           Ver alunos
@@ -129,165 +129,104 @@ export default function AdminPanorama({
       {/* Row 1: Config + Hall da Fama */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
         {/* Config Column */}
-        <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
+        <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
           <div>
-            <h3 className="text-base font-black text-text-main mb-1.5 font-sans">Configuração do Portal e Recompensas</h3>
+            <h3 className="text-base font-black text-text-main mb-1 font-sans">Configuração do Portal e Recompensas</h3>
             <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
             <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
               <button onClick={() => onOpenModal('material')}
-                className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-black text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-bg-main transition-all cursor-pointer">
-                <Library size={14} className="text-blue-500" />
+                className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-bold text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/5 transition-all cursor-pointer">
+                <Library size={14} className="opacity-70" />
                 Material / Biblioteca
               </button>
               <button onClick={() => onOpenModal('recado')}
-                className="flex-1 bg-brand-primary/10 border border-brand-primary/20 py-2.5 rounded-lg text-xs font-black text-brand-primary flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer">
-                <Megaphone size={14} />
+                className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-bold text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/5 transition-all cursor-pointer">
+                <Megaphone size={14} className="opacity-70" />
                 Mural / Avisos
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
+              <div className="rounded-xl border border-border-color bg-bg-main/50 p-3.5">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-text-secondary uppercase">Materiais</span>
-                  <span className="text-lg font-black text-text-main">{materials.length}</span>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Materiais</span>
+                  <span className="text-base font-black text-text-main">{materials.length}</span>
                 </div>
                 <div className="space-y-1.5">
                   {recentMaterials.length > 0 ? recentMaterials.map(item => (
-                    <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
+                    <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-semibold">
                       <span className="text-text-main truncate">{item.title}</span>
-                      <span className="text-text-secondary shrink-0">{formatShortDate(item.uploadedAt || '')}</span>
+                      <span className="text-text-secondary shrink-0 opacity-60">{formatShortDate(item.uploadedAt || '')}</span>
                     </div>
                   )) : (
-                    <span className="text-[10px] font-bold text-text-secondary">Nenhum material cadastrado</span>
+                    <span className="text-[10px] font-medium text-text-secondary opacity-60">Nenhum material</span>
                   )}
                 </div>
               </div>
-              <div className="rounded-xl border border-border-color bg-bg-main/70 p-3">
+              <div className="rounded-xl border border-border-color bg-bg-main/50 p-3.5">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-text-secondary uppercase">Recados</span>
-                  <span className="text-lg font-black text-text-main">{recados.length}</span>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Recados</span>
+                  <span className="text-base font-black text-text-main">{recados.length}</span>
                 </div>
                 <div className="space-y-1.5">
                   {recentRecados.length > 0 ? recentRecados.map(item => (
-                    <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-bold">
+                    <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] font-semibold">
                       <span className="text-text-main truncate">{item.title}</span>
-                      <span className="text-text-secondary shrink-0">{formatShortDate(item.date)}</span>
+                      <span className="text-text-secondary shrink-0 opacity-60">{formatShortDate(item.date)}</span>
                     </div>
                   )) : (
-                    <span className="text-[10px] font-bold text-text-secondary">Nenhum recado cadastrado</span>
+                    <span className="text-[10px] font-medium text-text-secondary opacity-60">Nenhum recado</span>
                   )}
                 </div>
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-text-secondary leading-relaxed font-semibold opacity-70">
-            Conteudos mais recentes do portal e recompensas ficam refletidos aqui automaticamente.
+          <p className="text-[11px] text-text-secondary leading-relaxed font-medium opacity-60 mt-4">
+            Conteúdos mais recentes do portal e recompensas ficam refletidos aqui automaticamente.
           </p>
         </div>
 
         {/* Hall da Fama */}
-        <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px] transition-colors duration-300">
+        <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px] transition-colors duration-300">
           <div>
-            <div className="flex flex-col items-center mb-6 text-center">
-              <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-2xl flex items-center justify-center mb-3 shadow-lg shadow-yellow-500/5 shrink-0">
-                <Trophy size={24} className="text-yellow-500" />
-              </div>
-              <h3 className="text-lg font-black text-text-main leading-none font-sans mb-1">Hall da Fama</h3>
-              <p className="text-[10px] text-text-secondary font-bold opacity-60">Os estudantes que mais se engajaram nessa jornada de estudos.</p>
-            </div>
-
-            {/* Podium */}
-            <div className="flex justify-center items-end gap-3 mb-6 px-4 h-48">
-              {/* Rank 2 */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end">
-                <div className="w-full bg-gradient-to-t from-text-secondary/5 to-text-secondary/20 border border-border-color rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[60%]">
-                  <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
-                    <div className="relative">
-                      <div className="w-9 h-9 rounded-full bg-bg-main border border-border-color flex items-center justify-center font-black text-text-secondary text-xs shadow-lg">
-                        {displayRanking[1]?.name?.charAt(0) || '?'}
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-text-secondary text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">2</div>
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                    <span className="text-xl font-black text-text-secondary/10">2º</span>
-                  </div>
-                  <div className="z-10 text-center px-1 mb-1">
-                    <span className="text-[9px] font-black text-text-secondary">{(displayRanking[1]?.xp || 0).toLocaleString()} XP</span>
-                  </div>
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-color">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-text-main/5 text-text-main border border-border-color rounded-xl flex items-center justify-center shrink-0">
+                  <Trophy size={18} />
                 </div>
-                <p className="text-[9px] font-black mt-2 text-center text-text-secondary truncate w-full px-1">{displayRanking[1]?.name || '---'}</p>
-              </div>
-
-              {/* Rank 1 */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end">
-                <div className="w-full bg-gradient-to-t from-yellow-500/10 to-yellow-600/30 border border-yellow-500/40 rounded-t-[20px] relative flex flex-col items-center justify-end pb-4 pt-10 h-[80%] shadow-[0_0_20px_rgba(234,179,8,0.1)]">
-                  <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
-                    <div className="relative">
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                        <Crown size={16} className="text-yellow-500 drop-shadow-[0_2px_4px_rgba(234,179,8,0.3)]" />
-                      </div>
-                      <div className="w-11 h-11 rounded-full bg-bg-main border border-yellow-500 flex items-center justify-center font-black text-yellow-600 text-sm shadow-xl">
-                        {displayRanking[0]?.name?.charAt(0) || '?'}
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-yellow-500 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">1</div>
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                    <span className="text-2xl font-black text-yellow-500/10">1º</span>
-                  </div>
-                  <div className="z-10 text-center px-1 mb-1">
-                    <span className="text-[9px] font-black text-yellow-500">🏆 {(displayRanking[0]?.xp || 0).toLocaleString()} XP</span>
-                  </div>
+                <div>
+                  <h3 className="text-base font-black text-text-main leading-none mb-1 font-sans">Hall da Fama</h3>
+                  <p className="text-[11px] text-text-secondary font-medium opacity-60">Estudantes com maior engajamento acumulado</p>
                 </div>
-                <p className="text-[10px] font-black mt-2 text-center text-text-main truncate w-full px-1">{displayRanking[0]?.name || '---'}</p>
               </div>
-
-              {/* Rank 3 */}
-              <div className="flex-1 flex flex-col items-center h-full justify-end">
-                <div className="w-full bg-gradient-to-t from-amber-600/5 to-amber-800/20 border border-amber-800/30 rounded-t-[16px] relative flex flex-col items-center justify-end pb-3 pt-8 h-[50%]">
-                  <div className="absolute top-0 -translate-y-1/2 flex flex-col items-center">
-                    <div className="relative">
-                      <div className="w-9 h-9 rounded-full bg-bg-main border border-amber-700 flex items-center justify-center font-black text-amber-700 text-xs shadow-lg">
-                        {displayRanking[2]?.name?.charAt(0) || '?'}
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-700 text-white font-extrabold text-[9px] flex items-center justify-center border border-bg-card">3</div>
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                    <span className="text-lg font-black text-amber-600/10">3º</span>
-                  </div>
-                  <div className="z-10 text-center px-1 mb-1">
-                    <span className="text-[9px] font-black text-amber-600">{(displayRanking[2]?.xp || 0).toLocaleString()} XP</span>
-                  </div>
-                </div>
-                <p className="text-[9px] font-black mt-2 text-center text-text-secondary truncate w-full px-1">{displayRanking[2]?.name || '---'}</p>
-              </div>
+              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider bg-text-main/5 px-2.5 py-1 rounded-lg border border-border-color">Top Alunos</span>
             </div>
 
             {/* Ranking list */}
-            <div className="bg-bg-main/40 border border-border-color rounded-2xl overflow-hidden mt-4">
+            <div className="space-y-2">
               {topStudents.map((entry, index) => (
-                <div key={entry.id || index} className="flex items-center justify-between p-3 border-b border-border-color last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className={`w-4 font-black text-xs text-center ${
-                      index === 0 ? 'text-yellow-500' : index === 1 ? 'text-text-secondary' : index === 2 ? 'text-amber-600' : 'text-text-secondary opacity-50'
+                <div key={entry.id || index} className="flex items-center justify-between p-3 rounded-xl border border-border-color/60 bg-bg-main/30 hover:bg-text-main/[0.02] transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`w-6 h-6 rounded-lg font-black text-[11px] flex items-center justify-center border ${
+                      index === 0 ? 'bg-text-main text-bg-main border-text-main' :
+                      index === 1 ? 'bg-text-main/10 text-text-main border-border-color' :
+                      index === 2 ? 'bg-text-main/5 text-text-secondary border-border-color' :
+                      'bg-transparent text-text-secondary opacity-50 border-transparent'
                     }`}>{index + 1}</span>
-                    <div className="w-8 h-8 rounded-xl bg-bg-main border border-border-color flex items-center justify-center font-black text-text-secondary text-xs">
+                    <div className="w-8 h-8 rounded-lg bg-text-main/5 border border-border-color flex items-center justify-center font-bold text-text-main text-xs shrink-0">
                       {entry.name?.charAt(0) || '?'}
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-text-main truncate">{entry.name}</div>
-                      <div className="text-[9px] font-bold text-text-secondary opacity-50">Nível {calculateLevelAndProgression(entry.xp || 0).level}</div>
+                      <div className="text-[10px] font-medium text-text-secondary opacity-60">Nível {calculateLevelAndProgression(entry.xp || 0).level} • {entry.school || 'Escola N/A'}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black text-text-main">{entry.xp} XP</span>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-black text-text-main">{(entry.xp || 0).toLocaleString()} XP</span>
                   </div>
                 </div>
               ))}
               {topStudents.length === 0 && (
-                <div className="h-24 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">Nenhum aluno cadastrado</div>
+                <div className="h-24 flex items-center justify-center text-[10px] font-medium text-text-secondary opacity-50">Nenhum aluno cadastrado</div>
               )}
             </div>
           </div>
@@ -296,57 +235,57 @@ export default function AdminPanorama({
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
+        <div className="bg-bg-card border border-border-color rounded-2xl p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
+              <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
               <span className="text-2xl font-black text-text-main leading-none block">{averageXp.toLocaleString()} XP</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0"><Library size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Library size={18} /></div>
           </div>
-          <div className="text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color">
+          <div className="text-[10px] font-medium text-text-secondary opacity-60 pt-4 border-t border-border-color">
             <span>Média de engajamento dos alunos</span>
           </div>
         </div>
 
-        <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
+        <div className="bg-bg-card border border-border-color rounded-2xl p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
+              <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
               <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0"><Users size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Users size={18} /></div>
           </div>
           <div className="flex justify-between items-center pt-4 border-t border-border-color">
-            <span className="text-[10px] font-bold text-text-secondary opacity-60">{schoolRanking.length} no total - 0 novas em 30d</span>
-            <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">+ 100.0%</span>
+            <span className="text-[10px] font-medium text-text-secondary opacity-60">{schoolRanking.length} ativas</span>
+            <span className="bg-text-main/5 border border-border-color text-text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">+100% ativas</span>
           </div>
         </div>
 
-        <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
+        <div className="bg-bg-card border border-border-color rounded-2xl p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
+              <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
               <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()} XP</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-500 shrink-0"><Trophy size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Trophy size={18} /></div>
           </div>
           <div className="flex justify-between items-center pt-4 border-t border-border-color">
-            <span className="text-[10px] font-bold text-text-secondary opacity-60">{activeStudentsCount} alunos com XP - {xpGrantingEvents.length} eventos com XP</span>
-            <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
+            <span className="text-[10px] font-medium text-text-secondary opacity-60">{activeStudentsCount} alunos com XP</span>
+            <span className="bg-text-main/5 border border-border-color text-text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
           </div>
         </div>
 
-        <div className="bg-bg-card border border-border-color rounded-[20px] p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
+        <div className="bg-bg-card border border-border-color rounded-2xl p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-black text-text-secondary uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
+              <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
               <span className="text-2xl font-black text-text-main leading-none block">{recados.length}</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0"><Megaphone size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Megaphone size={18} /></div>
           </div>
-          <div className="text-[10px] font-bold text-text-secondary opacity-60 pt-4 border-t border-border-color">
-            <span>Ações acadêmicas pendentes</span>
+          <div className="text-[10px] font-medium text-text-secondary opacity-60 pt-4 border-t border-border-color">
+            <span>Comunicados ativos no sistema</span>
           </div>
         </div>
       </div>
@@ -354,7 +293,7 @@ export default function AdminPanorama({
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
         {/* Growth Chart */}
-        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Evolução de alunos</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
@@ -364,27 +303,27 @@ export default function AdminPanorama({
               <AreaChart data={studentGrowth} margin={{ top: 10, right: 8, left: -24, bottom: 0 }}>
                 <defs>
                   <linearGradient id="studentGrowthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="0%" stopColor="var(--color-text-main, #64748b)" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="var(--color-text-main, #64748b)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid vertical={false} stroke="rgba(100,116,139,0.12)" strokeDasharray="3 3" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
                 <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} domain={[0, 'dataMax + 1']} />
                 <Tooltip
-                  cursor={{ stroke: 'rgba(59,130,246,0.25)', strokeDasharray: '3 3' }}
+                  cursor={{ stroke: 'rgba(100,116,139,0.2)', strokeDasharray: '3 3' }}
                   contentStyle={{ background: '#121f32', border: '1px solid #25334a', borderRadius: 12, fontSize: 11 }}
                   labelStyle={{ color: '#94a3b8', textTransform: 'uppercase' }}
-                  itemStyle={{ color: '#60a5fa' }}
+                  itemStyle={{ color: '#cbd5e1' }}
                   formatter={(value) => [Number(value), 'Novos alunos']}
                 />
                 <Area
                   type="monotone"
                   dataKey="students"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
+                  stroke="#64748b"
+                  strokeWidth={2}
                   fill="url(#studentGrowthGradient)"
-                  activeDot={{ r: 4, fill: '#3b82f6', stroke: '#121f32', strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: '#64748b', stroke: '#121f32', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -392,7 +331,7 @@ export default function AdminPanorama({
         </div>
 
         {/* Engagement Distribution */}
-        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Distribuição de engajamento</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Status atual das contas</p>
@@ -400,18 +339,18 @@ export default function AdminPanorama({
           <div className="flex justify-center items-center h-52 mt-4">
             <svg width="160" height="160" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="#f97316" strokeWidth="12" strokeDasharray="52.78 188.49" strokeDashoffset="-135.71" transform="rotate(-90 50 50)" strokeLinecap="round" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="#3b82f6" strokeWidth="12" strokeDasharray="135.71 188.49" strokeDashoffset="0" transform="rotate(-90 50 50)" strokeLinecap="round" />
+              <circle cx="50" cy="50" r="30" fill="none" stroke="#64748b" strokeWidth="12" strokeDasharray="52.78 188.49" strokeDashoffset="-135.71" transform="rotate(-90 50 50)" strokeLinecap="round" />
+              <circle cx="50" cy="50" r="30" fill="none" stroke="#38bdf8" strokeWidth="12" strokeDasharray="135.71 188.49" strokeDashoffset="0" transform="rotate(-90 50 50)" strokeLinecap="round" />
             </svg>
           </div>
           <div className="flex justify-center gap-6 text-[10px] font-bold text-text-secondary opacity-80 mt-4 border-t border-border-color pt-3">
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-[#f97316] rounded-full shrink-0" />
-              <span>Aguardando atividade</span>
+              <span className="w-2.5 h-2.5 bg-[#64748b] rounded-full shrink-0" />
+              <span>Sem atividade recente</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-[#3b82f6] rounded-full shrink-0" />
-              <span>Avaliação</span>
+              <span className="w-2.5 h-2.5 bg-[#38bdf8] rounded-full shrink-0" />
+              <span>Ativos</span>
             </div>
           </div>
         </div>
@@ -419,7 +358,7 @@ export default function AdminPanorama({
 
       {/* Content Volume + At-Risk Students */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Volume de conteúdos criados</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
@@ -436,7 +375,7 @@ export default function AdminPanorama({
               <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
                 <span className="text-[9px] font-black text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">{item.count}</span>
                 <div className="w-full bg-bg-main border border-border-color rounded-t-lg h-36 flex items-end overflow-hidden">
-                  <div style={{ height: item.height }} className="w-full bg-blue-600 rounded-t-lg transition-all group-hover:bg-blue-500" />
+                  <div style={{ height: item.height }} className="w-full bg-text-main/20 rounded-t-lg transition-all group-hover:bg-text-main/40" />
                 </div>
                 <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mt-1">{item.month}</span>
               </div>
@@ -444,35 +383,35 @@ export default function AdminPanorama({
           </div>
         </div>
 
-        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-[24px] p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Alunos em alerta</h3>
-            <p className="text-[10px] text-text-secondary font-medium opacity-60">Sem interacao registrada ha mais de 30 dias</p>
+            <p className="text-[10px] text-text-secondary font-medium opacity-60">Sem interação registrada há mais de 30 dias</p>
           </div>
           <div className="space-y-4 my-4 overflow-y-auto max-h-56 pr-1">
             {atRiskStudents.slice(0, 4).map((student) => (
               <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color last:border-0 last:pb-0">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0 animate-pulse" />
+                  <span className="text-[9px] font-bold text-text-secondary bg-text-main/10 px-2 py-0.5 rounded-full border border-border-color shrink-0">Inativo</span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-text-main font-black text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
-                    <div className="text-[9px] font-semibold text-text-secondary opacity-60 mt-0.5 truncate">
+                    <div className="text-text-main font-bold text-xs truncate uppercase tracking-tight">{student.name || 'Sem nome'}</div>
+                    <div className="text-[9px] font-medium text-text-secondary opacity-60 mt-0.5 truncate">
                       {student.school || 'Escola não informada'} • {student.city || 'MA'}
                     </div>
                   </div>
                 </div>
                 <button onClick={() => { onNavigateToAlunos(); onSetSearchTerm(student.name || ''); }}
-                  className="text-blue-500 hover:text-blue-400 transition-colors font-black text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer">
+                  className="text-text-main hover:underline transition-colors font-bold text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-0.5 cursor-pointer">
                   Ver aluno
                 </button>
               </div>
             ))}
             {atRiskStudents.length === 0 && (
-              <div className="h-40 flex items-center justify-center text-[10px] font-black text-text-secondary opacity-50">Nenhum aluno em alerta</div>
+              <div className="h-40 flex items-center justify-center text-[10px] font-medium text-text-secondary opacity-50">Nenhum aluno em alerta</div>
             )}
           </div>
           <div className="border-t border-border-color pt-3">
-            <span className="text-[9px] font-bold text-text-secondary opacity-50">Total de {atRiskStudents.length} alunos sem interacao nos ultimos 30 dias.</span>
+            <span className="text-[9px] font-medium text-text-secondary opacity-50">Total de {atRiskStudents.length} alunos sem interação nos últimos 30 dias.</span>
           </div>
         </div>
       </div>

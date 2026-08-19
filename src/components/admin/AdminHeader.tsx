@@ -134,7 +134,7 @@ export default function AdminHeader({
           >
             <div className="p-5 border-b border-border-color bg-text-main/[0.03]">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm overflow-hidden">
+                <div className="w-11 h-11 rounded-xl bg-text-main/10 text-text-main flex items-center justify-center font-black text-sm overflow-hidden border border-border-color">
                   {adminAvatarUrl ? (
                     <img src={adminAvatarUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -201,13 +201,13 @@ export default function AdminHeader({
         onClick={() => setShowAdminPreferences((current) => !current)}
         className={`w-full flex items-center gap-3 border rounded-xl px-3 py-2.5 text-text-main transition-all cursor-pointer ${
           showAdminPreferences
-            ? 'bg-blue-600/15 border-blue-500/30'
+            ? 'bg-text-main/15 border-text-main/30'
             : 'bg-text-main/5 hover:bg-text-main/10 border-border-color'
         }`}
         title="Abrir preferencias do admin"
         aria-label="Abrir preferencias do admin"
       >
-        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xs text-white overflow-hidden">
+        <div className="w-8 h-8 rounded-lg bg-text-main/10 text-text-main border border-border-color flex items-center justify-center font-black text-xs overflow-hidden">
           {adminAvatarUrl ? (
             <img src={adminAvatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
@@ -231,9 +231,9 @@ export default function AdminHeader({
           <Logo className="h-12 justify-center" />
         </div>
 
-        <div className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 rounded-xl flex items-center gap-2 mb-8">
-          <ShieldCheck size={14} className="text-yellow-500" />
-          <span className="text-[10px] font-black tracking-wide text-yellow-500">Super-admin Neva Pro</span>
+        <div className="bg-text-main/5 border border-border-color px-3.5 py-2 rounded-xl flex items-center gap-2 mb-8">
+          <ShieldCheck size={14} className="text-text-main opacity-80" />
+          <span className="text-[10px] font-bold tracking-wider text-text-secondary uppercase">Super-admin Neva Pro</span>
         </div>
 
         <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide uppercase mb-3 px-2">Navegacao</div>
@@ -302,9 +302,9 @@ export default function AdminHeader({
               transition={{ type: 'tween', duration: 0.3 }}
               className="md:hidden fixed inset-y-0 left-0 w-72 bg-bg-sidebar border-r border-border-color flex flex-col z-[60] mt-16 p-6"
             >
-              <div className="bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 rounded-xl flex items-center gap-2 mb-6">
-                <ShieldCheck size={14} className="text-yellow-500" />
-                <span className="text-[10px] font-black tracking-wide text-yellow-500">Super-admin Neva Pro</span>
+              <div className="bg-text-main/5 border border-border-color px-3.5 py-2 rounded-xl flex items-center gap-2 mb-6">
+                <ShieldCheck size={14} className="text-text-main opacity-80" />
+                <span className="text-[10px] font-bold tracking-wider text-text-secondary uppercase">Super-admin Neva Pro</span>
               </div>
               <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide uppercase mb-3">Navegacao</div>
               {renderNav(() => setIsSidebarOpen(false))}

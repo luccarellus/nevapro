@@ -142,37 +142,37 @@ export default function AdminAlunos({
       <div className="lg:col-span-12">
         <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-8 md:p-12 relative overflow-hidden">
           {/* Header */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
             <div className="flex-1">
-              <h3 className="text-2xl font-black text-text-main tracking-tight">Estudantes Ativos</h3>
-              <p className="text-sm text-text-secondary font-medium mt-1">Gestão da rede de alunos vinculados ao projeto.</p>
+              <h3 className="text-xl font-black text-text-main tracking-tight">Estudantes Ativos</h3>
+              <p className="text-xs text-text-secondary font-medium mt-0.5">Gestão da rede de alunos vinculados ao projeto.</p>
             </div>
             <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
               {/* Search */}
               <div className="relative w-full md:w-72 shrink-0">
-                <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none text-brand-primary opacity-40">
-                  <Users size={18} />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary opacity-40">
+                  <Users size={16} />
                 </div>
                 <input
                   id="searchTerm"
                   title="Buscar aluno"
                   value={searchTerm}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full bg-bg-main/40 border border-border-color rounded-2xl pl-14 pr-6 py-4 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all font-sans backdrop-blur-md"
+                  className="w-full bg-bg-main/50 border border-border-color rounded-xl pl-11 pr-4 py-2.5 text-xs font-bold text-text-main placeholder:opacity-40 focus:outline-none focus:border-text-main/30 transition-all font-sans"
                   placeholder="Buscar por nome ou email..."
                 />
               </div>
               {/* Quick Filters */}
               <div className="flex flex-wrap items-center gap-2 text-xs w-full md:w-auto">
-                <span className="text-text-secondary font-bold mr-1">Ver:</span>
+                <span className="text-text-secondary font-semibold mr-1 opacity-60">Ver:</span>
                 {(['all', 'top10', 'new', 'inactive'] as const).map((type) => (
                   <button
                     key={type}
                     onClick={() => onFilterTypeChange(type)}
-                    className={`px-3.5 py-2 rounded-xl border transition-all cursor-pointer font-bold ${
+                    className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-xs font-bold ${
                       filterType === type
-                        ? 'bg-brand-primary text-white border-brand-primary/30 shadow-md shadow-brand-primary/10'
-                        : 'bg-bg-sidebar/40 text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar/60'
+                        ? 'bg-text-main text-bg-main border-text-main shadow-sm'
+                        : 'bg-bg-card text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar'
                     }`}
                   >
                     {type === 'all' ? 'Todos' : type === 'top10' ? 'Os 10+' : type === 'new' ? 'Novos' : 'Inativos'}
@@ -183,47 +183,43 @@ export default function AdminAlunos({
           </div>
 
           {/* Stats Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
             {[
               {
                 label: 'ALUNOS ATIVOS',
                 value: studentStats.activeStudents.toLocaleString('pt-BR'),
                 detail: 'Total cadastrados',
                 icon: Users,
-                tone: 'text-brand-primary bg-brand-primary/10 border-brand-primary/25'
               },
               {
-                label: 'MEDIA DE XP',
+                label: 'MÉDIA DE XP',
                 value: `${studentStats.averageXp.toLocaleString('pt-BR')} XP`,
                 detail: 'Por estudante',
                 icon: Trophy,
-                tone: 'text-amber-500 bg-amber-500/10 border-amber-500/25'
               },
               {
-                label: 'CIDADE LIDER',
+                label: 'CIDADE LÍDER',
                 value: studentStats.cityLeader.name,
                 detail: `${studentStats.cityLeader.xp.toLocaleString('pt-BR')} XP`,
                 icon: TrendingUp,
-                tone: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/25'
               },
               {
-                label: 'ESCOLA CAMPEA',
+                label: 'ESCOLA CAMPEÃ',
                 value: studentStats.schoolLeader.name,
                 detail: `${studentStats.schoolLeader.xp.toLocaleString('pt-BR')} XP`,
                 icon: Building2,
-                tone: 'text-purple-500 bg-purple-500/10 border-purple-500/25'
               }
             ].map((stat) => {
               const Icon = stat.icon;
               return (
-                <div key={stat.label} className="flex items-center gap-4 min-w-0">
-                  <div className={`w-12 h-12 rounded-xl border flex items-center justify-center shrink-0 ${stat.tone}`}>
-                    <Icon size={19} />
+                <div key={stat.label} className="flex items-center gap-3.5 min-w-0 bg-bg-main/30 border border-border-color rounded-xl p-3.5">
+                  <div className="w-10 h-10 rounded-lg border border-border-color bg-text-main/5 flex items-center justify-center shrink-0 text-text-main">
+                    <Icon size={18} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-black text-text-secondary tracking-wider opacity-50">{stat.label}</div>
-                    <div className="text-base font-black text-text-main truncate">{stat.value}</div>
-                    <div className="text-[9px] font-black text-brand-primary">{stat.detail}</div>
+                    <div className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">{stat.label}</div>
+                    <div className="text-sm font-black text-text-main truncate">{stat.value}</div>
+                    <div className="text-[9px] font-semibold text-text-secondary opacity-70">{stat.detail}</div>
                   </div>
                 </div>
               );
@@ -299,9 +295,9 @@ export default function AdminAlunos({
                         selectedStudent?.id === student.id ? 'bg-brand-primary/[0.03]' : ''
                       }`}
                     >
-                      <td className="py-6 pl-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
+                      <td className="py-4 pl-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-text-main/5 border border-border-color flex items-center justify-center text-text-main font-bold text-xs shrink-0">
                             {student.avatarUrl || student.avatar ? (
                               <img src={student.avatarUrl || student.avatar} alt="" className="w-full h-full object-cover" />
                             ) : (
@@ -310,46 +306,46 @@ export default function AdminAlunos({
                           </div>
                           <div>
                             <div className="text-text-main font-bold text-sm">{student.name}</div>
-                            <div className="text-text-secondary text-[10px] font-medium">{student.email}</div>
+                            <div className="text-text-secondary text-[11px] font-medium opacity-60">{student.email}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-6">
-                        <span className={`inline-block w-fit px-2 py-0.5 text-[8px] font-black rounded uppercase tracking-wider ${rankInfo.classes}`}>
+                      <td className="py-4">
+                        <span className={`inline-block w-fit px-2 py-0.5 text-[9px] font-semibold rounded uppercase tracking-wider ${rankInfo.classes}`}>
                           {rankInfo.label}
                         </span>
                       </td>
-                      <td className="py-6">
-                        <div className="text-text-main text-xs font-black">{student.city || '-'}</div>
-                        <div className="text-text-secondary text-[9px] font-bold opacity-50">MA</div>
+                      <td className="py-4">
+                        <div className="text-text-main text-xs font-bold">{student.city || '-'}</div>
+                        <div className="text-text-secondary text-[10px] font-medium opacity-50">MA</div>
                       </td>
-                      <td className="py-6">
-                        <div className="text-text-main text-xs font-black truncate max-w-[200px]">{student.school || '-'}</div>
-                        <div className="text-brand-primary text-[10px] font-black truncate max-w-[200px]">{student.gremio || 'Sem gremio'}</div>
+                      <td className="py-4">
+                        <div className="text-text-main text-xs font-bold truncate max-w-[200px]">{student.school || '-'}</div>
+                        <div className="text-text-secondary text-[11px] font-medium opacity-60 truncate max-w-[200px]">{student.gremio || 'Sem grêmio'}</div>
                       </td>
-                      <td className="py-6">
+                      <td className="py-4">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-bg-main rounded-full overflow-hidden max-w-[100px]">
-                            <div className="h-full bg-brand-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+                          <div className="flex-1 h-1.5 bg-bg-main border border-border-color/50 rounded-full overflow-hidden max-w-[100px]">
+                            <div className="h-full bg-text-main/40 rounded-full transition-all" style={{ width: `${progress}%` }} />
                           </div>
-                          <span className="text-[9px] font-black text-text-secondary opacity-50">{(student.xp || 0).toLocaleString('pt-BR')} XP</span>
+                          <span className="text-[10px] font-semibold text-text-secondary opacity-60">{(student.xp || 0).toLocaleString('pt-BR')} XP</span>
                         </div>
                       </td>
-                      <td className="py-6 text-right pr-4">
-                        <span className="text-lg font-black text-text-main">{levelInfo.level}</span>
+                      <td className="py-4 text-right pr-3">
+                        <span className="text-base font-black text-text-main">{levelInfo.level}</span>
                       </td>
                     </tr>
                   );
                 })}
                 {filteredStudents.length === 0 && (
-                  <tr><td colSpan={6} className="py-12 text-center text-[10px] font-black text-text-secondary opacity-50">Nenhum aluno encontrado</td></tr>
+                  <tr><td colSpan={6} className="py-12 text-center text-xs font-medium text-text-secondary opacity-50">Nenhum aluno encontrado</td></tr>
                 )}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Cards */}
-          <div className="lg:hidden space-y-4">
+          <div className="lg:hidden space-y-3">
             {filteredStudents.map((student) => {
               const rankInfo = getStudentRankInfo(student.level || calculateLevelAndProgression(student.xp || 0).level);
               const levelInfo = calculateLevelAndProgression(student.xp || 0);
@@ -357,10 +353,10 @@ export default function AdminAlunos({
                 <div
                   key={student.id}
                   onClick={() => openStudentDrawer(student)}
-                  className="bg-bg-main/50 border border-border-color rounded-2xl p-5 cursor-pointer hover:bg-bg-main/70 transition-all"
+                  className="bg-bg-main/30 border border-border-color rounded-xl p-4 cursor-pointer hover:bg-bg-main/50 transition-all"
                 >
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm shrink-0">
+                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-text-main/5 border border-border-color flex items-center justify-center text-text-main font-bold text-xs shrink-0">
                       {student.avatarUrl || student.avatar ? (
                         <img src={student.avatarUrl || student.avatar} alt="" className="w-full h-full object-cover" />
                       ) : (
@@ -369,20 +365,20 @@ export default function AdminAlunos({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-text-main font-bold text-sm truncate">{student.name}</div>
-                      <div className="text-text-secondary text-[10px] font-medium truncate">{student.email}</div>
+                      <div className="text-text-secondary text-[11px] font-medium truncate opacity-60">{student.email}</div>
                     </div>
-                    <span className={`inline-block px-2 py-0.5 text-[8px] font-black rounded uppercase tracking-wider ${rankInfo.classes}`}>{rankInfo.label}</span>
+                    <span className={`inline-block px-2 py-0.5 text-[9px] font-semibold rounded uppercase tracking-wider ${rankInfo.classes}`}>{rankInfo.label}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-[10px] font-bold">
-                    <div><span className="text-text-secondary opacity-50">XP:</span> <span className="text-text-main">{student.xp || 0}</span></div>
-                    <div><span className="text-text-secondary opacity-50">Nível:</span> <span className="text-text-main">{levelInfo.level}</span></div>
-                    <div className="col-span-2"><span className="text-text-secondary opacity-50">Escola:</span> <span className="text-text-main truncate">{student.school || '-'}</span></div>
+                  <div className="grid grid-cols-2 gap-3 text-xs font-medium">
+                    <div><span className="text-text-secondary opacity-50">XP:</span> <span className="text-text-main font-bold">{student.xp || 0}</span></div>
+                    <div><span className="text-text-secondary opacity-50">Nível:</span> <span className="text-text-main font-bold">{levelInfo.level}</span></div>
+                    <div className="col-span-2"><span className="text-text-secondary opacity-50">Escola:</span> <span className="text-text-main truncate font-bold">{student.school || '-'}</span></div>
                   </div>
                 </div>
               );
             })}
             {filteredStudents.length === 0 && (
-              <div className="py-12 text-center text-[10px] font-black text-text-secondary opacity-50">Nenhum aluno encontrado</div>
+              <div className="py-12 text-center text-xs font-medium text-text-secondary opacity-50">Nenhum aluno encontrado</div>
             )}
           </div>
         </div>
@@ -397,7 +393,7 @@ export default function AdminAlunos({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedStudent(null)}
-              className="fixed inset-0 bg-black/40 z-[80] cursor-default"
+              className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[80] cursor-default"
             />
             <motion.div
               initial={{ x: '100%', opacity: 0 }}
@@ -415,7 +411,7 @@ export default function AdminAlunos({
 
                 {/* Student Header */}
                 <div className="flex items-center gap-5 mb-8 mt-2">
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-2xl shrink-0">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-text-main/5 border border-border-color flex items-center justify-center text-text-main font-black text-xl shrink-0">
                     {currentSelectedStudent.avatarUrl || currentSelectedStudent.avatar ? (
                       <img src={currentSelectedStudent.avatarUrl || currentSelectedStudent.avatar} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -423,32 +419,32 @@ export default function AdminAlunos({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h2 className="text-xl font-black text-text-main truncate">{currentSelectedStudent.name}</h2>
-                    <p className="text-sm font-medium text-text-secondary truncate">{currentSelectedStudent.email}</p>
+                    <h2 className="text-lg font-black text-text-main truncate">{currentSelectedStudent.name}</h2>
+                    <p className="text-xs font-medium text-text-secondary truncate">{currentSelectedStudent.email}</p>
                   </div>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-3 mb-8">
-                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
-                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">Nível Atual</span>
-                    <span className="block text-3xl font-black text-text-main">{calculateLevelAndProgression(currentSelectedStudent.xp || 0).level}</span>
+                  <div className="bg-bg-main/40 border border-border-color rounded-xl p-3.5">
+                    <span className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-1">Nível Atual</span>
+                    <span className="block text-2xl font-black text-text-main">{calculateLevelAndProgression(currentSelectedStudent.xp || 0).level}</span>
                   </div>
-                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
-                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">XP Total</span>
-                    <span className="block text-3xl font-black text-text-main">{(currentSelectedStudent.xp || 0).toLocaleString()}</span>
+                  <div className="bg-bg-main/40 border border-border-color rounded-xl p-3.5">
+                    <span className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-1">XP Total</span>
+                    <span className="block text-2xl font-black text-text-main">{(currentSelectedStudent.xp || 0).toLocaleString()}</span>
                   </div>
-                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
-                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">Respondidas</span>
-                    <span className="block text-3xl font-black text-text-main">{currentSelectedStudent.answeredQuestions || 0}</span>
+                  <div className="bg-bg-main/40 border border-border-color rounded-xl p-3.5">
+                    <span className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-1">Respondidas</span>
+                    <span className="block text-2xl font-black text-text-main">{currentSelectedStudent.answeredQuestions || 0}</span>
                   </div>
-                  <div className="bg-bg-main/50 border border-border-color rounded-2xl p-4">
-                    <span className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-1">Precisao</span>
-                    <span className="block text-3xl font-black text-text-main">
+                  <div className="bg-bg-main/40 border border-border-color rounded-xl p-3.5">
+                    <span className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-1">Precisão</span>
+                    <span className="block text-2xl font-black text-text-main">
                       {currentSelectedStudent.answeredQuestions
                         ? Math.round(((currentSelectedStudent.correctAnswers || 0) / currentSelectedStudent.answeredQuestions) * 100)
                         : 0}
-                      <span className="text-sm text-text-secondary ml-1">%</span>
+                      <span className="text-xs text-text-secondary ml-1">%</span>
                     </span>
                   </div>
                 </div>
@@ -458,7 +454,7 @@ export default function AdminAlunos({
                   {(() => {
                     const info = getStudentRankInfo(currentSelectedStudent.level || calculateLevelAndProgression(currentSelectedStudent.xp || 0).level);
                     return (
-                      <span className={`inline-block px-4 py-2 text-[11px] font-black rounded-xl uppercase tracking-wider ${info.classes}`}>
+                      <span className={`inline-block px-3 py-1.5 text-[10px] font-bold rounded-lg uppercase tracking-wider ${info.classes}`}>
                         {info.label}
                       </span>
                     );
@@ -467,32 +463,32 @@ export default function AdminAlunos({
 
                 {/* Info Cards */}
                 <div className="space-y-3 mb-8">
-                  <div className="bg-bg-main/30 border border-border-color rounded-2xl p-4 flex items-center gap-3">
-                    <UserCircle size={18} className="text-text-secondary opacity-30 shrink-0" />
+                  <div className="bg-bg-main/30 border border-border-color rounded-xl p-3.5 flex items-center gap-3">
+                    <UserCircle size={18} className="text-text-secondary opacity-40 shrink-0" />
                     <div>
-                      <span className="block text-[10px] font-bold text-text-secondary opacity-50">Cidade</span>
-                      <span className="block text-sm font-bold text-text-main">{currentSelectedStudent.city || 'Não informada'}</span>
+                      <span className="block text-[10px] font-bold text-text-secondary opacity-60">Cidade</span>
+                      <span className="block text-xs font-bold text-text-main">{currentSelectedStudent.city || 'Não informada'}</span>
                     </div>
                   </div>
-                  <div className="bg-bg-main/30 border border-border-color rounded-2xl p-4 flex items-center gap-3">
-                    <TrendingUp size={18} className="text-text-secondary opacity-30 shrink-0" />
+                  <div className="bg-bg-main/30 border border-border-color rounded-xl p-3.5 flex items-center gap-3">
+                    <TrendingUp size={18} className="text-text-secondary opacity-40 shrink-0" />
                     <div>
-                      <span className="block text-[10px] font-bold text-text-secondary opacity-50">Escola</span>
-                      <span className="block text-sm font-bold text-text-main">{currentSelectedStudent.school || 'Não informada'}</span>
+                      <span className="block text-[10px] font-bold text-text-secondary opacity-60">Escola</span>
+                      <span className="block text-xs font-bold text-text-main">{currentSelectedStudent.school || 'Não informada'}</span>
                     </div>
                   </div>
-                  <div className="bg-bg-main/30 border border-border-color rounded-2xl p-4 flex items-center gap-3">
-                    <Crown size={18} className="text-text-secondary opacity-30 shrink-0" />
+                  <div className="bg-bg-main/30 border border-border-color rounded-xl p-3.5 flex items-center gap-3">
+                    <Crown size={18} className="text-text-secondary opacity-40 shrink-0" />
                     <div>
-                      <span className="block text-[10px] font-bold text-text-secondary opacity-50">Grêmio</span>
-                      <span className="block text-sm font-bold text-text-main">{currentSelectedStudent.gremio || 'Não informado'}</span>
+                      <span className="block text-[10px] font-bold text-text-secondary opacity-60">Grêmio</span>
+                      <span className="block text-xs font-bold text-text-main">{currentSelectedStudent.gremio || 'Não informado'}</span>
                     </div>
                   </div>
-                  <div className="bg-bg-main/30 border border-border-color rounded-2xl p-4 flex items-center gap-3">
-                    <Clock size={18} className="text-text-secondary opacity-30 shrink-0" />
+                  <div className="bg-bg-main/30 border border-border-color rounded-xl p-3.5 flex items-center gap-3">
+                    <Clock size={18} className="text-text-secondary opacity-40 shrink-0" />
                     <div>
-                      <span className="block text-[10px] font-bold text-text-secondary opacity-50">Última interação</span>
-                      <span className="block text-sm font-bold text-text-main">
+                      <span className="block text-[10px] font-bold text-text-secondary opacity-60">Última interação</span>
+                      <span className="block text-xs font-bold text-text-main">
                         {currentSelectedStudent.updated_at
                           ? new Date(currentSelectedStudent.updated_at).toLocaleDateString('pt-BR')
                           : currentSelectedStudent.created_at
@@ -505,36 +501,36 @@ export default function AdminAlunos({
 
                 {/* Accuracy Management */}
                 <div className="border-t border-border-color pt-6 mb-6">
-                  <h4 className="text-sm font-black text-text-main mb-4">Gerenciar precisao</h4>
+                  <h4 className="text-sm font-black text-text-main mb-4">Gerenciar precisão</h4>
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div>
-                      <label className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-2">Respondidas</label>
+                      <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Respondidas</label>
                       <input
                         type="number"
                         min="0"
                         value={answeredQuestionsInput}
                         onChange={(e) => setAnsweredQuestionsInput(e.target.value)}
-                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-3 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all"
+                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-text-secondary uppercase opacity-50 mb-2">Acertos</label>
+                      <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Acertos</label>
                       <input
                         type="number"
                         min="0"
                         value={correctAnswersInput}
                         onChange={(e) => setCorrectAnswersInput(e.target.value)}
-                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-3 text-sm font-bold text-text-main placeholder:opacity-30 focus:outline-none focus:border-brand-primary/50 transition-all"
+                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
                       />
                     </div>
                   </div>
                   <button
                     onClick={handleUpdateAccuracy}
                     disabled={isUpdatingAccuracy}
-                    className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-3 rounded-xl font-black text-[10px] tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
                   >
-                    {isUpdatingAccuracy ? <Spinner size={14} className="text-white" /> : <CheckCircle2 size={14} />}
-                    Salvar precisao
+                    {isUpdatingAccuracy ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
+                    Salvar precisão
                   </button>
                 </div>
 

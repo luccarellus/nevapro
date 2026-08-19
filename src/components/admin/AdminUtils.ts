@@ -96,12 +96,12 @@ export const getCanonicalSchoolMap = (rawSchools: (string | null | undefined)[])
 };
 
 export const getStudentRankInfo = (level: number) => {
-  if (level >= 15) return { label: '👑 Mestre', classes: 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30' };
-  if (level >= 10) return { label: '💎 Diamante', classes: 'bg-cyan-500/10 text-cyan-500 border border-cyan-500/30' };
-  if (level >= 7) return { label: '✨ Platina', classes: 'bg-purple-500/10 text-purple-500 border border-purple-500/30' };
-  if (level >= 4) return { label: '🏆 Ouro', classes: 'bg-amber-500/10 text-amber-500 border border-amber-500/30' };
-  if (level >= 2) return { label: '🥈 Prata', classes: 'bg-slate-500/10 text-slate-500 border border-slate-500/30' };
-  return { label: '🥉 Bronze', classes: 'bg-orange-600/10 text-orange-600 border border-orange-600/30' };
+  if (level >= 15) return { label: 'Mestre', classes: 'bg-text-main/10 text-text-main border border-border-color font-black' };
+  if (level >= 10) return { label: 'Diamante', classes: 'bg-text-main/10 text-text-main border border-border-color font-bold' };
+  if (level >= 7) return { label: 'Platina', classes: 'bg-text-main/5 text-text-main border border-border-color' };
+  if (level >= 4) return { label: 'Ouro', classes: 'bg-text-main/5 text-text-secondary border border-border-color' };
+  if (level >= 2) return { label: 'Prata', classes: 'bg-text-main/5 text-text-secondary border border-border-color' };
+  return { label: 'Bronze', classes: 'bg-text-main/5 text-text-secondary border border-border-color opacity-80' };
 };
 
 export const formatDateToBR = (dateStr: string): string => {
