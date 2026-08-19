@@ -11,9 +11,10 @@ interface NavigationProps {
   isAdmin?: boolean;
   onLogout?: () => void;
   user?: UserProfile;
+  onTabHover?: (tabId: string) => void;
 }
 
-export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout, user }: NavigationProps) {
+export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout, user, onTabHover }: NavigationProps) {
   const [showMore, setShowMore] = useState(false);
 
   const tabs = [
@@ -68,6 +69,7 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                onMouseEnter={() => onTabHover?.(tab.id)}
                 className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative ${
                   isActive 
                   ? `${tab.color} ${tab.bgColor}` 

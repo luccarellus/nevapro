@@ -14,7 +14,7 @@ import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
-import { invalidateRequestCache } from './lib/requestCache';
+import { invalidateRequestCache, prefetchEndpoint } from './lib/requestCache';
 
 import Spinner from './components/Spinner';
 
@@ -74,6 +74,24 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  // Prefetch adjacent tabs on hover (desktop only)
+  const handleNavHover = (tabId: string) => {
+    if (!isLoggedIn || user.role === 'admin') return;
+    // Prefetch data for likely next destinations
+    const prefetchMap: Record<string, string[]> = {
+      'dashboard': ['/api/bootstrap'],
+      'questions': ['/api/questoes?year=2024&limit=50&offset=0'],
+      'ranking': ['/api/leaderboard'],
+      'materiais': ['/api/materials'],
+      'errors': ['/api/user/errors'],
+      'desempenho': ['/api/performance/tri-scores', '/api/performance/subject-mastery'],
+    };
+    const urls = prefetchMap[tabId];
+    if (urls) {
+      urls.forEach(url => prefetchEndpoint(url));
+    }
+  };
+
   const handleTabChange = (newTab: string) => {
     if (user.role === 'admin') {
       if (['admin', 'privacidade', 'cookies'].includes(newTab)) {
@@ -111,7 +129,19 @@ export default function App() {
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        void fetchUser(parsedUser.email).finally(() => setIsRestoringSession(false));
+        // Immediately show cached user data (instant UI), then verify in background
+        if (parsedUser.email) {
+          setUser(prev => ({ ...prev, ...parsedUser }));
+          setIsLoggedIn(true);
+          // Verify session + prefetch critical data in parallel (non-blocking)
+          Promise.allSettled([
+            fetchUser(parsedUser.email),
+            prefetchEndpoint('/api/bootstrap'),
+            prefetchEndpoint(`/api/notifications?email=${encodeURIComponent(parsedUser.email)}`),
+          ]).finally(() => setIsRestoringSession(false));
+        } else {
+          setIsRestoringSession(false);
+        }
       } catch (e) {
         clearLocalSession();
         setIsRestoringSession(false);
@@ -224,9 +254,14 @@ export default function App() {
       setActiveTab('dashboard');
     }
 
-    // Sincroniza em segundo plano sem bloquear a transição de tela
+    // Prefetch critical data in background (non-blocking)
     if (loggedUser.email) {
-      void fetchUser(loggedUser.email);
+      // Prefetch bootstrap data (dashboard needs this immediately)
+      prefetchEndpoint('/api/bootstrap');
+      // Prefetch user profile (for session sync)
+      prefetchEndpoint(`/api/user/profile?email=${encodeURIComponent(loggedUser.email)}`);
+      // Prefetch notifications (shown in header)
+      prefetchEndpoint(`/api/notifications?email=${encodeURIComponent(loggedUser.email)}`);
     }
   };
 
@@ -436,6 +471,7 @@ export default function App() {
             isAdmin={user.role === 'admin'} 
             onLogout={handleLogout}
             user={user}
+            onTabHover={handleNavHover}
           />
         </>
       )}

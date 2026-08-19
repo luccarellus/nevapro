@@ -11,16 +11,19 @@ export default defineConfig(({mode}) => {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
     build: {
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
           manualChunks(id) {
-            // Vendor chunk para bibliotecas grandes
-            if (id.includes('node_modules/recharts')) return 'vendor-charts';
+            // Vendor chunks - split aggressively for better caching
+            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'vendor-charts';
             if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
-            if (id.includes('node_modules/motion')) return 'vendor-animation';
-            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-') || id.includes('node_modules/rehype-')) return 'vendor-markdown';
+            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) return 'vendor-animation';
+            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-') || id.includes('node_modules/rehype-') || id.includes('node_modules/unified') || id.includes('node_modules/mdast-') || id.includes('node_modules/hast-')) return 'vendor-markdown';
             if (id.includes('node_modules/@sentry')) return 'vendor-sentry';
+            if (id.includes('node_modules/canvas-confetti')) return 'vendor-confetti';
+            // React core - keep together for optimal caching
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'vendor-react';
           },
         },
       },
