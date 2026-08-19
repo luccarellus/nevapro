@@ -19,31 +19,42 @@ router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, re
       res.json(cached);
       return;
     }
-    const { rows } = await query(
-      `WITH target AS (SELECT id, flash_quiz_completed, tenant_id FROM public.users WHERE email = $1 LIMIT 1)
-       SELECT
-         COALESCE((SELECT json_agg(json_build_object(
-           'id', m.id, 'title', m.title, 'subject', m.subject, 'foco', m.foco,
-           'description', m.description, 'url', m.url, 'type', m.type,
-           'uploadedAt', COALESCE(m.uploaded_at, m.created_at)
-         ) ORDER BY m.created_at DESC) FROM public.materials m
-         WHERE ($2::uuid IS NULL OR m.tenant_id = $2)), '[]'::json) AS materials,
-         COALESCE((SELECT json_agg(json_build_object(
-           'name', u.name, 'city', u.city, 'xp', COALESCE(u.xp, 0),
-           'level', COALESCE(u.level, 1), 'avatarUrl', COALESCE(u.avatar_url, '')
-         ) ORDER BY u.xp DESC) FROM (
-           SELECT * FROM public.users
-           WHERE role <> 'admin' AND show_in_leaderboard = true
-             AND ($2::uuid IS NULL OR tenant_id = $2)
-           ORDER BY xp DESC LIMIT 20
-         ) u), '[]'::json) AS leaderboard,
-         COALESCE((SELECT flash_quiz_completed FROM target), false) AS flash_quiz_completed,
-         COALESCE((SELECT json_agg(json_build_object('amount', x.amount, 'createdAt', x.created_at, 'reason', x.reason))
-           FROM public.xp_logs x, target t
-           WHERE x.user_id = t.id AND x.created_at >= NOW() - INTERVAL '7 days'), '[]'::json) AS xp_logs`,
-      [email, tenantId || null],
-    );
-    const row = rows[0] || { materials: [], leaderboard: [], xp_logs: [] };
+    // Run 3 queries in parallel instead of a single heavy CTE
+    const [userRow, materialsResult, leaderboardResult, xpLogsResult] = await Promise.all([
+      query(
+        `SELECT id, flash_quiz_completed FROM public.users WHERE email = $1 LIMIT 1`,
+        [email],
+      ),
+      query(
+        `SELECT id, title, subject, foco, description, url, type, COALESCE(uploaded_at, created_at) AS "uploadedAt"
+         FROM public.materials m
+         WHERE ($1::uuid IS NULL OR m.tenant_id = $1)
+         ORDER BY m.created_at DESC`,
+        [tenantId || null],
+      ),
+      query(
+        `SELECT name, city, xp, level, avatar_url
+         FROM public.users
+         WHERE role <> 'admin' AND show_in_leaderboard = true
+           AND ($1::uuid IS NULL OR tenant_id = $1)
+         ORDER BY xp DESC LIMIT 20`,
+        [tenantId || null],
+      ),
+      query(
+        `SELECT amount, created_at AS "createdAt", reason
+         FROM public.xp_logs x
+         WHERE x.user_id = (SELECT id FROM public.users WHERE email = $1 LIMIT 1)
+           AND x.created_at >= NOW() - INTERVAL '7 days'`,
+        [email],
+      ),
+    ]);
+
+    const row = {
+      flash_quiz_completed: userRow.rows[0]?.flash_quiz_completed ?? false,
+      materials: materialsResult.rows,
+      leaderboard: leaderboardResult.rows,
+      xp_logs: xpLogsResult.rows,
+    };
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const weekly = Array.from({ length: 7 }, (_, offset) => {
       const date = new Date();

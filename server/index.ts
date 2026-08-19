@@ -56,8 +56,10 @@ import tenantRoutes from './routes/tenants';
 // Validate critical environment variables before starting
 validateEnv();
 
-// Garante o tenant da plataforma no boot (Multi-Tenancy backward-compatible)
-void ensurePlatformTenant();
+// Garante o tenant da plataforma no boot (non-blocking)
+ensurePlatformTenant().catch((err) => {
+  log.warn('[RBAC] Falha ao garantir tenant da plataforma (non-fatal):', err);
+});
 
 export const app = express();
 
@@ -108,8 +110,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===== Anti-caching for API =====
+// ===== Anti-caching for API (skip stable endpoints) =====
 app.use('/api', (req, res, next) => {
+  // Allow short cache for stable read-only data
+  const stableEndpoints = ['/api/leaderboard', '/api/materials', '/api/questoes'];
+  if (req.method === 'GET' && stableEndpoints.some(ep => req.path.startsWith(ep))) {
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return next();
+  }
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');

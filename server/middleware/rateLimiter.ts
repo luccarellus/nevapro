@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger';
-import { isRedisConfigured, runRedisPipeline } from '../services/cache';
+import { isRedisConfigured, runRedisCommand } from '../services/cache';
 
 const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
 const RATE_LIMITER_MAX_ENTRIES = 10_000;
@@ -55,25 +55,24 @@ export const rateLimiter = (limit: number, windowMs: number) => {
       const ttlSeconds = Math.ceil(windowMs / 1000);
 
       try {
-        const results = await runRedisPipeline([
-          ['SET', redisKey, '0', 'EX', String(ttlSeconds), 'NX'],
-          ['INCR', redisKey],
-        ]);
+        // Single INCR command instead of SET+INCR pipeline
+        // TTL is set on first increment (when count === 1)
+        const incrResult = await runRedisCommand(['INCR', redisKey]);
+        const currentCount = typeof incrResult === 'number' ? incrResult : Number(incrResult);
 
-        if (results && results.length === 2) {
-          const incrResult = results[1]?.result;
-          const currentCount =
-            typeof incrResult === 'number' ? incrResult : Number(incrResult);
-
-          if (!Number.isNaN(currentCount) && currentCount > limit) {
-            res.status(429).json({
-              error: 'Muitas requisições. Tente novamente mais tarde.',
-            });
-            return;
-          }
-
-          return next();
+        if (currentCount === 1) {
+          // First request in this window — set expiry
+          await runRedisCommand(['EXPIRE', redisKey, String(ttlSeconds)]);
         }
+
+        if (!Number.isNaN(currentCount) && currentCount > limit) {
+          res.status(429).json({
+            error: 'Muitas requisições. Tente novamente mais tarde.',
+          });
+          return;
+        }
+
+        return next();
       } catch (err) {
         log.warn('[RateLimiter] Redis indisponível, usando fallback in-memory');
       }

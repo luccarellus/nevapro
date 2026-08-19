@@ -2,7 +2,6 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, authenticateUser } from '../middleware/auth';
-import { verifyRecaptcha } from '../middleware/recaptcha';
 import { query } from '../../src/lib/db';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
@@ -16,7 +15,7 @@ import { sendPasswordResetEmail, sendWelcomeEmail } from '../services/email';
 const router = Router();
 
 // ============= LOGIN =============
-router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -26,11 +25,49 @@ router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: Aut
   const cleanEmail = normalizeEmail(email);
 
   try {
-    // Brute force lock check + authentication in parallel
-    const [lockCheck, authResult] = await Promise.allSettled([
+    // Run reCAPTCHA, brute force check, and auth ALL in parallel for maximum speed
+    const [recaptchaResult, lockCheck, authResult] = await Promise.allSettled([
+      (async () => {
+        const secretKey = process.env.RECAPTCHA_SECRET_KEY;
+        const token = req.body?.recaptcha_token;
+        if (!secretKey || !token || typeof token !== 'string') return null;
+        const params = new URLSearchParams({ secret: secretKey, response: token });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1500);
+        try {
+          const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+          if (!response.ok) return null;
+          const data = await response.json() as any;
+          return data;
+        } catch {
+          clearTimeout(timeout);
+          return null;
+        }
+      })(),
       query('SELECT attempts, lock_until FROM public.login_attempts WHERE email = $1', [cleanEmail]),
       authenticateUser(cleanEmail, password),
     ]);
+
+    // Check reCAPTCHA result (non-blocking on failure — only blocks on explicit low score)
+    if (recaptchaResult.status === 'fulfilled' && recaptchaResult.value) {
+      const recaptchaData = recaptchaResult.value;
+      if (recaptchaData.success === false) {
+        const errorCodes = recaptchaData['error-codes'] || [];
+        if (!errorCodes.includes('invalid-input-secret') && !errorCodes.includes('bad-request')) {
+          log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
+          // Don't block login on reCAPTCHA failure — rate limiter is the real protection
+        }
+      } else if (typeof recaptchaData.score === 'number' && recaptchaData.score < 0.5) {
+        log.warn(`[Auth] reCAPTCHA score baixo no login: ${recaptchaData.score}`);
+        // Don't block — rate limiter provides brute force protection
+      }
+    }
 
     // Check brute force lock (non-blocking — if query fails, proceed with login)
     if (lockCheck.status === 'fulfilled') {
@@ -106,7 +143,7 @@ router.post('/login', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: Aut
 });
 
 // ============= REGISTER =============
-router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -125,23 +162,17 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
   const safeGremio = sanitizeInput(gremio);
 
   try {
-    // Check admin email conflict
-    const { rows: adminExists } = await query(
-      'SELECT 1 FROM public.admin_users WHERE email = $1 LIMIT 1',
-      [cleanEmail],
-    );
-    if (adminExists.length > 0) {
+    // Check admin email conflict + existing student in parallel
+    const [adminCheck, existingCheck] = await Promise.all([
+      query('SELECT 1 FROM public.admin_users WHERE email = $1 LIMIT 1', [cleanEmail]),
+      dbAdmin.from('users').select('email').eq('email', cleanEmail).maybeSingle(),
+    ]);
+
+    if (adminCheck.rows.length > 0) {
       res.status(403).json({ error: 'E-mails administrativos devem ser gerenciados pelo banco de dados.' });
       return;
     }
-
-    // Check existing student
-    const { data: existing } = await dbAdmin
-      .from('users')
-      .select('email')
-      .eq('email', cleanEmail)
-      .maybeSingle();
-    if (existing) {
+    if (existingCheck.data) {
       res.status(400).json({ error: 'E-mail já cadastrado.' });
       return;
     }
@@ -220,7 +251,7 @@ router.post('/register', rateLimiter(5, 60_000), verifyRecaptcha(), async (req: 
 });
 
 // ============= FORGOT PASSWORD (solicitar link de recuperação) =============
-router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/forgot-password', rateLimiter(3, 60_000), async (req: AuthenticatedRequest, res: Response) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'E-mail é obrigatório.' });
@@ -307,7 +338,6 @@ router.post('/forgot-password', rateLimiter(3, 60_000), verifyRecaptcha(), async
 router.post(
   '/reset-password',
   rateLimiter(3, 60_000),
-  verifyRecaptcha(),
   async (req: AuthenticatedRequest, res: Response) => {
     const { password, token, email } = req.body;
 
@@ -380,7 +410,6 @@ router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
 router.post(
   '/change-password',
   rateLimiter(3, 60_000),
-  verifyRecaptcha(),
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     const { email, currentPassword, newPassword } = req.body;

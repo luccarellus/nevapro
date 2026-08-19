@@ -128,7 +128,8 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
         isAdmin: rbacContext.isAdmin,
       };
       (authenticatedUser as any).rbacContext = rbacContext;
-      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 60);
+      // Cache admin sessions for 10 minutes (RBAC changes rarely)
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, 600);
       return authenticatedUser;
     }
 

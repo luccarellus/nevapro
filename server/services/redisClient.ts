@@ -25,11 +25,11 @@ export function getRedisClient(): Redis | null {
 
   const redisOptions = {
     lazyConnect: true,
-    connectTimeout: 2_000,
-    commandTimeout: 1_000,
-    maxRetriesPerRequest: 1,
+    connectTimeout: 3_000,
+    commandTimeout: 500,
+    maxRetriesPerRequest: 2,
     enableOfflineQueue: false,
-    retryStrategy: (times: number) => (times > 3 ? null : Math.min(times * 300, 1_000)),
+    retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 200, 800)),
   };
 
   if (url) {
@@ -68,7 +68,7 @@ export function getRedisClient(): Redis | null {
  * Aguarda o Redis ficar pronto (status 'ready').
  * Retorna false IMEDIATAMENTE se o status não for ready/connecting (nunca trava a requisição).
  */
-export async function waitForRedisReady(timeoutMs = 300): Promise<boolean> {
+export async function waitForRedisReady(timeoutMs = 150): Promise<boolean> {
   const current = getRedisClient();
   if (!current) return false;
   if (current.status === 'ready') return true;
