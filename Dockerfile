@@ -15,7 +15,7 @@ ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY \
     GEMINI_API_KEY=$GEMINI_API_KEY
 
 COPY package*.json ./
-RUN npm ci
+RUN apk upgrade --no-cache && npm ci
 
 COPY . .
 RUN npm run build
@@ -27,9 +27,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# curl: healthcheck do container. postgresql-client: permite pg_dump nativo nos backups
-# (se indisponível, o backup usa o fallback Node.js interno).
-RUN apk add --no-cache curl postgresql-client
+# Atualiza pacotes da base Alpine para eliminar vulnerabilidades de segurança.
+# curl: healthcheck do container. postgresql-client: permite pg_dump nativo nos backups.
+RUN apk upgrade --no-cache && apk add --no-cache curl postgresql-client
 
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
