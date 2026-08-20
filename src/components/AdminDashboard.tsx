@@ -275,33 +275,30 @@ export default function AdminDashboard({
         eventosCount={eventos.length}
       />
 
-      <main className="h-full overflow-y-auto bg-bg-main relative transition-colors duration-300 pt-16 md:pt-0 md:pl-72">
-        <div className="p-6 md:p-12 max-w-7xl mx-auto">
-          {activeTab === 'panorama' ? (
+      <main className="min-h-screen bg-bg-main relative transition-colors duration-300 pt-20 sm:pt-24 pb-12">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
+          {activeTab === 'panorama' && (
             <AdminPanorama
               materials={materials} recados={recados} eventos={eventos} students={students}
               onNavigateToAlunos={() => setActiveTab('alunos')}
               onOpenModal={setShowModal}
               onSetSearchTerm={setSearchTerm}
             />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {activeTab === 'eventos' && <AdminEventos eventos={eventos} onEdit={handleEditEvent} onDelete={handleDeleteEvent} onAdd={() => setShowModal('evento')} />}
-              {activeTab === 'materiais' && <AdminMateriais materials={materials} onEdit={handleEditMaterial} onDelete={handleDeleteMaterial} onAdd={() => setShowModal('material')} />}
-              {activeTab === 'mural' && <AdminMural recados={recados} onEdit={handleEditMural} onDelete={handleDeleteRecado} onAdd={() => setShowModal('recado')} />}
-              {activeTab === 'alunos' && (
-                <AdminAlunos
-                  students={students} filteredStudents={filteredStudents}
-                  searchTerm={searchTerm} onSearchChange={setSearchTerm}
-                  filterCity={filterCity} onFilterCityChange={setFilterCity}
-                  filterSchool={filterSchool} onFilterSchoolChange={setFilterSchool}
-                  filterGremio={filterGremio} onFilterGremioChange={setFilterGremio}
-                  filterType={filterType} onFilterTypeChange={setFilterType}
-                  cidadeOptions={citiesMA} escolaOptions={schoolsMA} gremioOptions={gremiosMA}
-                  onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
-                />
-              )}
-            </div>
+          )}
+          {activeTab === 'eventos' && <AdminEventos eventos={eventos} onEdit={handleEditEvent} onDelete={handleDeleteEvent} onAdd={() => setShowModal('evento')} />}
+          {activeTab === 'materiais' && <AdminMateriais materials={materials} onEdit={handleEditMaterial} onDelete={handleDeleteMaterial} onAdd={() => setShowModal('material')} />}
+          {activeTab === 'mural' && <AdminMural recados={recados} onEdit={handleEditMural} onDelete={handleDeleteRecado} onAdd={() => setShowModal('recado')} />}
+          {activeTab === 'alunos' && (
+            <AdminAlunos
+              students={students} filteredStudents={filteredStudents}
+              searchTerm={searchTerm} onSearchChange={setSearchTerm}
+              filterCity={filterCity} onFilterCityChange={setFilterCity}
+              filterSchool={filterSchool} onFilterSchoolChange={setFilterSchool}
+              filterGremio={filterGremio} onFilterGremioChange={setFilterGremio}
+              filterType={filterType} onFilterTypeChange={setFilterType}
+              cidadeOptions={citiesMA} escolaOptions={schoolsMA} gremioOptions={gremiosMA}
+              onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
+            />
           )}
         </div>
       </main>
@@ -364,8 +361,8 @@ export default function AdminDashboard({
                   </div>
                   <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveEvent} disabled={isLoading}
-                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
-                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
+                      className="flex-1 bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm shadow-brand-primary/20">
+                      {isLoading ? <Spinner size={14} className="text-white" /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Evento Atualizado' : 'Evento Salvo') : (editingId ? 'Atualizar evento' : 'Salvar evento')}
                     </button>
                     <button onClick={() => setEventForm({ title: '', releaseDate: '', xpReward: '20', category: 'Evento', observation: '' })}
@@ -404,8 +401,8 @@ export default function AdminDashboard({
                   </div>
                   <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveMural} disabled={isLoading}
-                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
-                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
+                      className="flex-1 bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm shadow-brand-primary/20">
+                      {isLoading ? <Spinner size={14} className="text-white" /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Recado Atualizado' : 'Recado Salvo') : (editingId ? 'Atualizar recado' : 'Salvar recado')}
                     </button>
                     <button onClick={() => setMuralForm({ title: '', category: 'importante', tag: '', content: '' })}
@@ -450,7 +447,7 @@ export default function AdminDashboard({
                       <div className="flex-1 bg-bg-main/50 border border-border-color rounded-xl px-3 py-2 flex items-center gap-3 overflow-hidden w-full">
                         <input type="file" id="file-upload" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.webm" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
                         <label htmlFor="file-upload"
-                          className="bg-bg-sidebar border border-border-color text-text-main px-3 py-1 rounded-lg text-[10px] font-bold tracking-wide cursor-pointer hover:bg-bg-card transition-all shrink-0">Escolher arquivo</label>
+                          className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary px-3 py-1 rounded-lg text-[10px] font-bold tracking-wide cursor-pointer hover:bg-brand-primary/20 transition-all shrink-0">Escolher arquivo</label>
                         <span className="text-[10px] font-semibold text-text-secondary truncate opacity-60">{selectedFile ? selectedFile.name : 'Nenhum arquivo escolhido'}</span>
                       </div>
                     </div>
@@ -463,8 +460,8 @@ export default function AdminDashboard({
                   </div>
                   <div className="flex gap-3 pt-3">
                     <button onClick={handleSaveMaterial} disabled={isLoading}
-                      className="flex-1 bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm">
-                      {isLoading ? <Spinner size={14} /> : isSuccess ? <CheckCircle2 size={14} /> : null}
+                      className="flex-1 bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm shadow-brand-primary/20">
+                      {isLoading ? <Spinner size={14} className="text-white" /> : isSuccess ? <CheckCircle2 size={14} /> : null}
                       {isSuccess ? (editingId ? 'Material Atualizado' : 'Material Salvo') : (editingId ? 'Atualizar Material' : 'Salvar Material')}
                     </button>
                     <button onClick={() => { setMaterialForm({ title: '', type: 'pdf', foco: 'ENEM geral', url: '', description: '' }); setSelectedFile(null); }}

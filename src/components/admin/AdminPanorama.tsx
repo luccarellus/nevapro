@@ -109,7 +109,7 @@ export default function AdminPanorama({
       {/* Header Title Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0">
             <ShieldCheck size={20} />
           </div>
           <div>
@@ -119,7 +119,7 @@ export default function AdminPanorama({
         </div>
         <button
           onClick={onNavigateToAlunos}
-          className="bg-bg-card border border-border-color hover:bg-bg-sidebar text-text-main px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+          className="bg-brand-primary text-white hover:opacity-90 transition-all px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm shadow-brand-primary/20 flex items-center gap-2 cursor-pointer"
         >
           <Users size={15} />
           Ver alunos
@@ -127,21 +127,21 @@ export default function AdminPanorama({
       </div>
 
       {/* Row 1: Config + Hall da Fama */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mb-6">
         {/* Config Column */}
-        <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
+        <div className="lg:col-span-5 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between transition-colors duration-300">
           <div>
             <h3 className="text-base font-black text-text-main mb-1 font-sans">Configuração do Portal e Recompensas</h3>
-            <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-6">Configurações automáticas de XP — não afeta as ações já concluídas</p>
-            <div className="flex gap-3 bg-bg-main p-1.5 rounded-xl border border-border-color mb-6">
+            <p className="text-[11px] text-text-secondary font-medium opacity-80 mb-5">Configurações automáticas de XP — não afeta as ações já concluídas</p>
+            <div className="flex gap-2.5 bg-bg-main p-1.5 rounded-xl border border-border-color mb-5">
               <button onClick={() => onOpenModal('material')}
-                className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-bold text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/5 transition-all cursor-pointer">
-                <Library size={14} className="opacity-70" />
+                className="flex-1 bg-brand-primary/10 border border-brand-primary/20 text-brand-primary py-2.5 rounded-lg text-xs font-bold shadow-xs flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer">
+                <Library size={14} className="opacity-80" />
                 Material / Biblioteca
               </button>
               <button onClick={() => onOpenModal('recado')}
-                className="flex-1 bg-bg-card border border-border-color py-2.5 rounded-lg text-xs font-bold text-text-main shadow-sm flex items-center justify-center gap-2 hover:bg-text-main/5 transition-all cursor-pointer">
-                <Megaphone size={14} className="opacity-70" />
+                className="flex-1 bg-brand-primary/10 border border-brand-primary/20 text-brand-primary py-2.5 rounded-lg text-xs font-bold shadow-xs flex items-center justify-center gap-2 hover:bg-brand-primary/20 transition-all cursor-pointer">
+                <Megaphone size={14} className="opacity-80" />
                 Mural / Avisos
               </button>
             </div>
@@ -186,11 +186,11 @@ export default function AdminPanorama({
         </div>
 
         {/* Hall da Fama */}
-        <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[480px] transition-colors duration-300">
+        <div className="lg:col-span-7 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between overflow-y-auto max-h-[440px] transition-colors duration-300">
           <div>
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border-color">
+            <div className="flex items-center justify-between mb-5 pb-3.5 border-b border-border-color">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-text-main/5 text-text-main border border-border-color rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-xl flex items-center justify-center shrink-0">
                   <Trophy size={18} />
                 </div>
                 <div>
@@ -198,21 +198,21 @@ export default function AdminPanorama({
                   <p className="text-[11px] text-text-secondary font-medium opacity-60">Estudantes com maior engajamento acumulado</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider bg-text-main/5 px-2.5 py-1 rounded-lg border border-border-color">Top Alunos</span>
+              <span className="text-[10px] font-bold text-brand-primary uppercase tracking-wider bg-brand-primary/10 px-2.5 py-1 rounded-lg border border-brand-primary/20">Top Alunos</span>
             </div>
 
             {/* Ranking list */}
             <div className="space-y-2">
               {topStudents.map((entry, index) => (
-                <div key={entry.id || index} className="flex items-center justify-between p-3 rounded-xl border border-border-color/60 bg-bg-main/30 hover:bg-text-main/[0.02] transition-colors">
+                <div key={entry.id || index} className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl border border-border-color/60 bg-bg-main/30 hover:bg-text-main/[0.02] transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`w-6 h-6 rounded-lg font-black text-[11px] flex items-center justify-center border ${
-                      index === 0 ? 'bg-text-main text-bg-main border-text-main' :
-                      index === 1 ? 'bg-text-main/10 text-text-main border-border-color' :
+                      index === 0 ? 'bg-brand-primary text-white border-brand-primary' :
+                      index === 1 ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/20' :
                       index === 2 ? 'bg-text-main/5 text-text-secondary border-border-color' :
                       'bg-transparent text-text-secondary opacity-50 border-transparent'
                     }`}>{index + 1}</span>
-                    <div className="w-8 h-8 rounded-lg bg-text-main/5 border border-border-color flex items-center justify-center font-bold text-text-main text-xs shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center font-bold text-brand-primary text-xs shrink-0">
                       {entry.name?.charAt(0) || '?'}
                     </div>
                     <div className="min-w-0">
@@ -221,7 +221,7 @@ export default function AdminPanorama({
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-xs font-black text-text-main">{(entry.xp || 0).toLocaleString()} XP</span>
+                    <span className="text-xs font-black text-brand-primary">{(entry.xp || 0).toLocaleString()} XP</span>
                   </div>
                 </div>
               ))}
@@ -234,14 +234,14 @@ export default function AdminPanorama({
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 mb-6">
         <div className="bg-bg-card border border-border-color rounded-2xl p-5 shadow-sm relative flex flex-col justify-between h-[150px] transition-colors duration-300">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">MÉDIA DE XP</span>
               <span className="text-2xl font-black text-text-main leading-none block">{averageXp.toLocaleString()} XP</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Library size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0"><Library size={18} /></div>
           </div>
           <div className="text-[10px] font-medium text-text-secondary opacity-60 pt-4 border-t border-border-color">
             <span>Média de engajamento dos alunos</span>
@@ -254,11 +254,11 @@ export default function AdminPanorama({
               <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">ESCOLAS</span>
               <span className="text-2xl font-black text-text-main leading-none block">{schoolRanking.length}</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Users size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0"><Users size={18} /></div>
           </div>
           <div className="flex justify-between items-center pt-4 border-t border-border-color">
             <span className="text-[10px] font-medium text-text-secondary opacity-60">{schoolRanking.length} ativas</span>
-            <span className="bg-text-main/5 border border-border-color text-text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">+100% ativas</span>
+            <span className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-bold px-2 py-0.5 rounded-full">+100% ativas</span>
           </div>
         </div>
 
@@ -268,11 +268,11 @@ export default function AdminPanorama({
               <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">XP ACUMULADO</span>
               <span className="text-2xl font-black text-text-main leading-none block">{totalXp.toLocaleString()} XP</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Trophy size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0"><Trophy size={18} /></div>
           </div>
           <div className="flex justify-between items-center pt-4 border-t border-border-color">
             <span className="text-[10px] font-medium text-text-secondary opacity-60">{activeStudentsCount} alunos com XP</span>
-            <span className="bg-text-main/5 border border-border-color text-text-secondary text-[9px] font-bold px-2 py-0.5 rounded-full">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
+            <span className="bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-bold px-2 py-0.5 rounded-full">{xpConfiguredInEvents.toLocaleString()} XP eventos</span>
           </div>
         </div>
 
@@ -282,7 +282,7 @@ export default function AdminPanorama({
               <span className="text-[10px] font-bold text-text-secondary uppercase opacity-60 tracking-wider block mb-1">AVISOS NO MURAL</span>
               <span className="text-2xl font-black text-text-main leading-none block">{recados.length}</span>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-text-main/5 border border-border-color flex items-center justify-center text-text-main shrink-0"><Megaphone size={18} /></div>
+            <div className="w-9 h-9 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shrink-0"><Megaphone size={18} /></div>
           </div>
           <div className="text-[10px] font-medium text-text-secondary opacity-60 pt-4 border-t border-border-color">
             <span>Comunicados ativos no sistema</span>
@@ -291,14 +291,14 @@ export default function AdminPanorama({
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mb-6">
         {/* Growth Chart */}
-        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between min-h-[320px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Evolução de alunos</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Novos alunos cadastrados por mês (últimos 6)</p>
           </div>
-          <div className="flex-1 w-full relative min-h-[200px] mt-4 flex items-center">
+          <div className="flex-1 w-full relative min-h-[180px] mt-4 flex items-center">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={studentGrowth} margin={{ top: 10, right: 8, left: -24, bottom: 0 }}>
                 <defs>
@@ -331,19 +331,19 @@ export default function AdminPanorama({
         </div>
 
         {/* Engagement Distribution */}
-        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between min-h-[320px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Distribuição de engajamento</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Status atual das contas</p>
           </div>
-          <div className="flex justify-center items-center h-52 mt-4">
-            <svg width="160" height="160" viewBox="0 0 100 100">
+          <div className="flex justify-center items-center h-44 mt-3">
+            <svg width="150" height="150" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
               <circle cx="50" cy="50" r="30" fill="none" stroke="#64748b" strokeWidth="12" strokeDasharray="52.78 188.49" strokeDashoffset="-135.71" transform="rotate(-90 50 50)" strokeLinecap="round" />
               <circle cx="50" cy="50" r="30" fill="none" stroke="#38bdf8" strokeWidth="12" strokeDasharray="135.71 188.49" strokeDashoffset="0" transform="rotate(-90 50 50)" strokeLinecap="round" />
             </svg>
           </div>
-          <div className="flex justify-center gap-6 text-[10px] font-bold text-text-secondary opacity-80 mt-4 border-t border-border-color pt-3">
+          <div className="flex justify-center gap-6 text-[10px] font-bold text-text-secondary opacity-80 mt-3 border-t border-border-color pt-3">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 bg-[#64748b] rounded-full shrink-0" />
               <span>Sem atividade recente</span>
@@ -357,13 +357,13 @@ export default function AdminPanorama({
       </div>
 
       {/* Content Volume + At-Risk Students */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
-        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mb-6">
+        <div className="lg:col-span-8 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between min-h-[320px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Volume de conteúdos criados</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Por mês — materiais e eventos cadastrados</p>
           </div>
-          <div className="flex gap-4 h-48 items-end px-2 mt-4">
+          <div className="flex gap-4 h-44 items-end px-2 mt-4">
             {[
               { month: 'fev', count: 4, height: '20%' },
               { month: 'mar', count: 6, height: '30%' },
@@ -374,7 +374,7 @@ export default function AdminPanorama({
             ].map((item) => (
               <div key={item.month} className="flex-1 flex flex-col items-center gap-2 group">
                 <span className="text-[9px] font-black text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">{item.count}</span>
-                <div className="w-full bg-bg-main border border-border-color rounded-t-lg h-36 flex items-end overflow-hidden">
+                <div className="w-full bg-bg-main border border-border-color rounded-t-lg h-32 flex items-end overflow-hidden">
                   <div style={{ height: item.height }} className="w-full bg-text-main/20 rounded-t-lg transition-all group-hover:bg-text-main/40" />
                 </div>
                 <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mt-1">{item.month}</span>
@@ -383,14 +383,14 @@ export default function AdminPanorama({
           </div>
         </div>
 
-        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-6 shadow-sm flex flex-col justify-between h-[360px] transition-colors duration-300">
+        <div className="lg:col-span-4 bg-bg-card border border-border-color rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between min-h-[320px] transition-colors duration-300">
           <div>
             <h3 className="text-sm font-black text-text-main mb-1 font-sans">Alunos em alerta</h3>
             <p className="text-[10px] text-text-secondary font-medium opacity-60">Sem interação registrada há mais de 30 dias</p>
           </div>
-          <div className="space-y-4 my-4 overflow-y-auto max-h-56 pr-1">
+          <div className="space-y-3.5 my-3 overflow-y-auto max-h-52 pr-1">
             {atRiskStudents.slice(0, 4).map((student) => (
-              <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-3 border-b border-border-color last:border-0 last:pb-0">
+              <div key={student.id} className="flex items-center justify-between group gap-4 w-full min-w-0 pb-2.5 border-b border-border-color last:border-0 last:pb-0">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span className="text-[9px] font-bold text-text-secondary bg-text-main/10 px-2 py-0.5 rounded-full border border-border-color shrink-0">Inativo</span>
                   <div className="min-w-0 flex-1">
@@ -407,7 +407,7 @@ export default function AdminPanorama({
               </div>
             ))}
             {atRiskStudents.length === 0 && (
-              <div className="h-40 flex items-center justify-center text-[10px] font-medium text-text-secondary opacity-50">Nenhum aluno em alerta</div>
+              <div className="h-36 flex items-center justify-center text-[10px] font-medium text-text-secondary opacity-50">Nenhum aluno em alerta</div>
             )}
           </div>
           <div className="border-t border-border-color pt-3">

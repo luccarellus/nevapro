@@ -226,65 +226,75 @@ export default function AdminHeader({
 
   return (
     <>
-      <aside className="hidden md:flex fixed inset-y-0 left-0 z-50 w-72 bg-bg-sidebar border-r border-border-color flex-col p-5 transition-colors duration-300">
-        <div className="flex items-center justify-center mb-7">
-          <Logo className="h-12 justify-center" />
-        </div>
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 sm:h-20 bg-bg-sidebar/95 backdrop-blur-md border-b border-border-color transition-colors duration-300">
+        <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+          {/* Left: Logo & Brand Badge */}
+          <div className="flex items-center gap-3 shrink-0">
+            <Logo className="h-9 sm:h-10 justify-start" />
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
+              <ShieldCheck size={13} />
+              Super-Admin
+            </div>
+          </div>
 
-        <div className="bg-text-main/5 border border-border-color px-3.5 py-2 rounded-xl flex items-center gap-2 mb-8">
-          <ShieldCheck size={14} className="text-text-main opacity-80" />
-          <span className="text-[10px] font-bold tracking-wider text-text-secondary uppercase">Super-admin Neva Pro</span>
-        </div>
+          {/* Center: Centralized Tabs Navigation (Desktop) */}
+          <nav className="hidden md:flex items-center gap-1.5 p-1.5 bg-bg-main/60 rounded-2xl border border-border-color/80 shadow-xs">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange(tab.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    isActive
+                      ? 'bg-brand-primary text-white shadow-sm shadow-brand-primary/30 font-black'
+                      : 'text-text-secondary hover:text-text-main hover:bg-text-main/5'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span>{tab.label}</span>
+                  {tab.count !== null && tab.count > 0 && (
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isActive ? 'bg-white/25 text-white' : 'bg-brand-primary/15 text-brand-primary'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
 
-        <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide uppercase mb-3 px-2">Navegacao</div>
-        {renderNav()}
+          {/* Right: Theme Toggle & Admin Profile */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onToggleDarkMode}
+              className="p-2.5 rounded-xl bg-bg-card border border-border-color text-text-secondary hover:text-text-main hover:border-brand-primary/30 transition-all cursor-pointer"
+              title={isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
+              aria-label={isDarkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
+            >
+              {isDarkMode ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-brand-primary" />}
+            </button>
 
-        <div className="mt-auto space-y-3">
-          <button
-            onClick={onToggleDarkMode}
-            className="w-full h-11 px-4 rounded-xl bg-bg-card/50 text-text-secondary hover:text-text-main transition-all cursor-pointer flex items-center gap-3 text-xs font-black"
-            title={isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
-            aria-label={isDarkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-          >
-            {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
-            {isDarkMode ? 'Modo claro' : 'Modo escuro'}
-          </button>
+            {profileButton}
 
-          {profileButton}
-
-          <button
-            onClick={onLogout}
-            className="w-full h-11 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-500 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-black"
-            title="Sair do sistema"
-          >
-            <LogOut size={16} />
-            Sair do sistema
-          </button>
-        </div>
-      </aside>
-
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-bg-sidebar border-b border-border-color flex items-center justify-between px-4 shrink-0 z-50 transition-colors duration-300">
-        <Logo className="h-10 justify-start" />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onToggleDarkMode}
-            className="p-2.5 bg-bg-card/50 rounded-xl text-text-secondary hover:text-text-main transition-all cursor-pointer"
-            title={isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
-            aria-label={isDarkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-          >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2.5 bg-text-main/5 hover:bg-text-main/10 border border-border-color rounded-xl text-text-secondary hover:text-text-main cursor-pointer"
-            title="Alternar menu"
-            aria-label="Alternar menu"
-          >
-            <PanelLeftClose size={18} className={isSidebarOpen ? '' : 'rotate-180'} />
-          </button>
+            {/* Mobile Menu Toggle Button */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="md:hidden p-2.5 bg-bg-card border border-border-color rounded-xl text-text-secondary hover:text-text-main cursor-pointer"
+              title="Alternar menu"
+              aria-label="Alternar menu"
+            >
+              <PanelLeftClose size={18} className={isSidebarOpen ? '' : 'rotate-180'} />
+            </button>
+          </div>
         </div>
       </header>
 
+      {/* Mobile Centralized Menu Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
@@ -293,32 +303,57 @@ export default function AdminHeader({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] mt-16"
+              className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-[45] mt-16 sm:mt-20"
             />
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
-              className="md:hidden fixed inset-y-0 left-0 w-72 bg-bg-sidebar border-r border-border-color flex flex-col z-[60] mt-16 p-6"
+            <motion.div
+              initial={{ y: '-100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '-100%', opacity: 0 }}
+              transition={{ type: 'tween', duration: 0.25 }}
+              className="md:hidden fixed top-16 sm:top-20 left-0 right-0 bg-bg-sidebar border-b border-border-color p-4 z-[50] shadow-2xl space-y-3"
             >
-              <div className="bg-text-main/5 border border-border-color px-3.5 py-2 rounded-xl flex items-center gap-2 mb-6">
-                <ShieldCheck size={14} className="text-text-main opacity-80" />
-                <span className="text-[10px] font-bold tracking-wider text-text-secondary uppercase">Super-admin Neva Pro</span>
+              <div className="grid grid-cols-2 gap-2">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        onTabChange(tab.id);
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`p-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
+                        isActive
+                          ? 'bg-brand-primary text-white shadow-sm shadow-brand-primary/30 font-black'
+                          : 'bg-bg-main/50 text-text-secondary border border-border-color hover:text-text-main'
+                      }`}
+                    >
+                      <Icon size={16} />
+                      <span className="truncate">{tab.label}</span>
+                      {tab.count !== null && tab.count > 0 && (
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-white/20 text-white font-bold">
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="text-[10px] font-black text-text-secondary opacity-50 tracking-wide uppercase mb-3">Navegacao</div>
-              {renderNav(() => setIsSidebarOpen(false))}
-              <div className="mt-auto space-y-3">
-                {profileButton}
+              <div className="pt-3 border-t border-border-color flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-text-main">
+                  <ShieldCheck size={14} className="text-brand-primary" />
+                  <span className="text-[11px]">Super-Admin</span>
+                </div>
                 <button
                   onClick={onLogout}
-                  className="w-full h-11 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-500 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-black"
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-xs font-black flex items-center gap-1.5 cursor-pointer"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={14} />
                   Sair do sistema
                 </button>
               </div>
-            </motion.aside>
+            </motion.div>
           </>
         )}
       </AnimatePresence>

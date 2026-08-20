@@ -139,8 +139,7 @@ export default function AdminAlunos({
 
   return (
     <>
-      <div className="lg:col-span-12">
-        <div className="bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-[32px] md:rounded-[40px] p-8 md:p-12 relative overflow-hidden">
+      <div className="bg-bg-card border border-border-color rounded-2xl md:rounded-3xl p-5 sm:p-6 lg:p-8 shadow-sm relative overflow-hidden">
           {/* Header */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
             <div className="flex-1">
@@ -171,7 +170,7 @@ export default function AdminAlunos({
                     onClick={() => onFilterTypeChange(type)}
                     className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-xs font-bold ${
                       filterType === type
-                        ? 'bg-text-main text-bg-main border-text-main shadow-sm'
+                        ? 'bg-brand-primary text-white border-brand-primary shadow-xs shadow-brand-primary/30'
                         : 'bg-bg-card text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar'
                     }`}
                   >
@@ -213,7 +212,7 @@ export default function AdminAlunos({
               const Icon = stat.icon;
               return (
                 <div key={stat.label} className="flex items-center gap-3.5 min-w-0 bg-bg-main/30 border border-border-color rounded-xl p-3.5">
-                  <div className="w-10 h-10 rounded-lg border border-border-color bg-text-main/5 flex items-center justify-center shrink-0 text-text-main">
+                  <div className="w-10 h-10 rounded-lg border border-brand-primary/20 bg-brand-primary/10 flex items-center justify-center shrink-0 text-brand-primary">
                     <Icon size={18} />
                   </div>
                   <div className="min-w-0">
@@ -382,7 +381,6 @@ export default function AdminAlunos({
             )}
           </div>
         </div>
-      </div>
 
       {/* Student Detail Drawer */}
       <AnimatePresence>
@@ -527,7 +525,7 @@ export default function AdminAlunos({
                   <button
                     onClick={handleUpdateAccuracy}
                     disabled={isUpdatingAccuracy}
-                    className="w-full bg-text-main text-bg-main hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/20"
                   >
                     {isUpdatingAccuracy ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
                     Salvar precisão

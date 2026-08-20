@@ -17,15 +17,14 @@ const typeConfig: Record<string, { icon: typeof FileText; color: string }> = {
 
 export default function AdminMateriais({ materials, onEdit, onDelete, onAdd }: AdminMateriaisProps) {
   return (
-    <div className="lg:col-span-12">
-      <div className="bg-bg-card border border-border-color rounded-2xl md:rounded-3xl p-6 md:p-10 shadow-sm">
+    <div className="bg-bg-card border border-border-color rounded-2xl md:rounded-3xl p-5 sm:p-6 lg:p-8 shadow-sm">
         <div className="flex justify-between items-center mb-8 pb-4 border-b border-border-color">
           <div>
             <h3 className="text-xl font-black text-text-main tracking-tight">Gerenciar Materiais</h3>
             <p className="text-xs text-text-secondary font-medium mt-0.5">Biblioteca de PDFs, vídeos e links externos para os alunos.</p>
           </div>
           <button onClick={onAdd}
-            className="bg-text-main text-bg-main hover:opacity-90 transition-all px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm">
+            className="bg-brand-primary text-white hover:opacity-90 transition-all px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm shadow-brand-primary/20">
             <Plus size={15} />
             Adicionar Material
           </button>
@@ -114,6 +113,5 @@ export default function AdminMateriais({ materials, onEdit, onDelete, onAdd }: A
           )}
         </div>
       </div>
-    </div>
   );
 }

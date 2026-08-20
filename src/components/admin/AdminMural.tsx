@@ -17,15 +17,14 @@ const categoryConfig: Record<string, { label: string; color: string }> = {
 
 export default function AdminMural({ recados, onEdit, onDelete, onAdd }: AdminMuralProps) {
   return (
-    <div className="lg:col-span-12">
-      <div className="bg-bg-card border border-border-color rounded-2xl md:rounded-3xl p-6 md:p-10 shadow-sm">
+    <div className="bg-bg-card border border-border-color rounded-2xl md:rounded-3xl p-5 sm:p-6 lg:p-8 shadow-sm">
         <div className="flex justify-between items-center mb-8 pb-4 border-b border-border-color">
           <div>
             <h3 className="text-xl font-black text-text-main tracking-tight">Mural de Recados</h3>
             <p className="text-xs text-text-secondary font-medium mt-0.5">Comunicados e avisos oficiais do projeto.</p>
           </div>
           <button onClick={onAdd}
-            className="bg-text-main text-bg-main hover:opacity-90 transition-all px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm">
+            className="bg-brand-primary text-white hover:opacity-90 transition-all px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm shadow-brand-primary/20">
             <Plus size={15} />
             Adicionar Recado
           </button>
@@ -109,6 +108,5 @@ export default function AdminMural({ recados, onEdit, onDelete, onAdd }: AdminMu
           )}
         </div>
       </div>
-    </div>
   );
 }
