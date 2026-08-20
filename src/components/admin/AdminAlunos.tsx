@@ -498,39 +498,41 @@ export default function AdminAlunos({
                 </div>
 
                 {/* Accuracy Management */}
-                <div className="border-t border-border-color pt-6 mb-6">
-                  <h4 className="text-sm font-black text-text-main mb-4">Gerenciar precisão</h4>
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Respondidas</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={answeredQuestionsInput}
-                        onChange={(e) => setAnsweredQuestionsInput(e.target.value)}
-                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
-                      />
+                {!(currentSelectedStudent.role === 'admin' || currentSelectedStudent.roles?.includes('tenant_admin') || currentSelectedStudent.roles?.includes('super_admin')) && (
+                  <div className="border-t border-border-color pt-6 mb-6">
+                    <h4 className="text-sm font-black text-text-main mb-4">Gerenciar precisão</h4>
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Respondidas</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={answeredQuestionsInput}
+                          onChange={(e) => setAnsweredQuestionsInput(e.target.value)}
+                          className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Acertos</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={correctAnswersInput}
+                          onChange={(e) => setCorrectAnswersInput(e.target.value)}
+                          className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-text-secondary uppercase opacity-60 mb-2">Acertos</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={correctAnswersInput}
-                        onChange={(e) => setCorrectAnswersInput(e.target.value)}
-                        className="w-full bg-bg-main/40 border border-border-color rounded-xl px-4 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-text-main/30 transition-all"
-                      />
-                    </div>
+                    <button
+                      onClick={handleUpdateAccuracy}
+                      disabled={isUpdatingAccuracy}
+                      className="w-full bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/20"
+                    >
+                      {isUpdatingAccuracy ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
+                      Salvar precisão
+                    </button>
                   </div>
-                  <button
-                    onClick={handleUpdateAccuracy}
-                    disabled={isUpdatingAccuracy}
-                    className="w-full bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/20"
-                  >
-                    {isUpdatingAccuracy ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
-                    Salvar precisão
-                  </button>
-                </div>
+                )}
 
                 {/* Alert */}
                 {drawerAlert && (
