@@ -155,6 +155,7 @@ export default function App() {
     localStorage.setItem('neva_active_tenant', tenantId);
     setUser(prev => ({ ...prev, tenantId }));
     invalidateRequestCache();
+    prefetchEndpoint('/api/bootstrap');
   };
 
   const fetchUser = async (email?: string): Promise<boolean> => {
@@ -288,13 +289,6 @@ export default function App() {
     }
     await performLogout();
   }
-
-  const handleSelectTenant = (tenantId: string) => {
-    localStorage.setItem('neva_active_tenant', tenantId);
-    setUser((prev) => ({ ...prev, tenantId }));
-    invalidateRequestCache();
-    prefetchEndpoint('/api/bootstrap');
-  };
 
   const handleConfirmExit = async () => {
     setIsSimulationActive(false);

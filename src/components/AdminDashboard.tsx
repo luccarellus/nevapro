@@ -49,7 +49,6 @@ export default function AdminDashboard({
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos'>('panorama');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCity, setFilterCity] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
