@@ -14,13 +14,14 @@ import { uploadService } from '../services/uploadService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
 import cidadesEscolasData from '../data/cidades_escolas.json';
-import AdminHeader from './admin/AdminHeader';
+import { normalizeString, getCanonicalSchoolMap, getUniqueNormalized } from './admin/AdminUtils';
+import AdminHeader, { AdminTab } from './admin/AdminHeader';
 import AdminPanorama from './admin/AdminPanorama';
 import AdminEventos from './admin/AdminEventos';
 import AdminMateriais from './admin/AdminMateriais';
 import AdminMural from './admin/AdminMural';
 import AdminAlunos from './admin/AdminAlunos';
-import { normalizeString, getCanonicalSchoolMap, getUniqueNormalized } from './admin/AdminUtils';
+import AdminTenants from './admin/AdminTenants';
 
 interface AdminDashboardProps {
   user: UserProfile;
@@ -41,6 +42,7 @@ export default function AdminDashboard({
   isDarkMode,
   onToggleDarkMode
 }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<AdminTab>('panorama');
   const [materials, setMaterials] = useState<Material[]>([]);
   const [recados, setRecados] = useState<Notice[]>([]);
   const [eventos, setEventos] = useState<StudyEvent[]>([]);
@@ -246,15 +248,20 @@ export default function AdminDashboard({
     else { throw new Error('Falha ao excluir perfil'); }
   };
 
-  if (user.role !== 'admin') {
+  const hasAdminAccess =
+    user.isAdmin ||
+    user.role === 'admin' ||
+    user.roles?.some((r) => ['super_admin', 'tenant_admin', 'teacher'].includes(r));
+
+  if (!hasAdminAccess) {
     return (
       <div className="min-h-[100dvh] w-full flex items-center justify-center bg-bg-main text-text-main pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="text-center">
           <ShieldCheck size={64} className="mx-auto mb-6 text-red-500" />
           <h1 className="text-3xl font-black mb-2">Acesso Restrito</h1>
-          <p className="text-text-secondary mb-8">Esta área é exclusiva para administradores.</p>
+          <p className="text-text-secondary mb-8">Esta área é exclusiva para administradores e professores.</p>
           <button onClick={() => { localStorage.removeItem('neva_student_session'); onLogout(); }}
-            className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white">Sair do sistema</button>
+            className="bg-brand-primary px-8 py-4 rounded-2xl font-bold text-white cursor-pointer">Sair do sistema</button>
         </div>
       </div>
     );
@@ -298,6 +305,12 @@ export default function AdminDashboard({
               filterType={filterType} onFilterTypeChange={setFilterType}
               cidadeOptions={citiesMA} escolaOptions={schoolsMA} gremioOptions={gremiosMA}
               onUpdateAccuracy={handleUpdateAccuracy} onDeleteStudent={handleDeleteStudent}
+            />
+          )}
+          {activeTab === 'tenants' && (
+            <AdminTenants
+              currentUser={user}
+              activeTenantId={user.tenantId}
             />
           )}
         </div>

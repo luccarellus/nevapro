@@ -200,6 +200,46 @@ router.get('/:id/roles', requireAuth, resolveTenant, async (req: AuthenticatedRe
   }
 });
 
+// ============= LIST TENANT MEMBERS WITH ROLES =============
+router.get(
+  '/:id/members',
+  requireAuth,
+  resolveTenant,
+  requirePermission(
+    PERMISSIONS.USERS_MANAGE_ADMINS,
+    PERMISSIONS.USERS_MANAGE_TEACHERS,
+    PERMISSIONS.USERS_MANAGE_STUDENTS,
+    PERMISSIONS.TENANTS_VIEW_SETTINGS,
+  ),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const tenantId = req.params.id;
+    try {
+      const { rows } = await query(
+        `SELECT utr.id as link_id, utr.user_id, utr.assigned_at,
+                r.id as role_id, r.code as role_code, r.name as role_name,
+                COALESCE(u.name, au.name, 'Usuário') as user_name,
+                COALESCE(u.email, au.email) as user_email,
+                COALESCE(u.avatar_url, au.avatar_url) as avatar_url,
+                COALESCE(u.xp, au.xp, 0) as xp,
+                COALESCE(u.level, au.level, 1) as level,
+                CASE WHEN au.id IS NOT NULL THEN 'admin' ELSE 'student' END as source_table
+         FROM public.user_tenant_roles utr
+         JOIN public.roles r ON r.id = utr.role_id
+         LEFT JOIN public.users u ON u.id = utr.user_id
+         LEFT JOIN public.admin_users au ON au.id = utr.user_id
+         WHERE utr.tenant_id = $1
+         ORDER BY utr.assigned_at DESC`,
+        [tenantId],
+      );
+
+      res.json(rows);
+    } catch (err) {
+      log.error('[Tenant Members List] Error:', err);
+      res.status(500).json({ error: 'Erro ao listar membros do tenant.' });
+    }
+  },
+);
+
 // ============= ASSIGN ROLE TO USER =============
 router.post(
   '/:id/members',

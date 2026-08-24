@@ -447,13 +447,38 @@ export default function AdminAlunos({
                   </div>
                 </div>
 
-                {/* Rank Badge */}
-                <div className="mb-8">
+                {/* Rank & Role Badges */}
+                <div className="flex flex-wrap items-center gap-2 mb-8">
                   {(() => {
                     const info = getStudentRankInfo(currentSelectedStudent.level || calculateLevelAndProgression(currentSelectedStudent.xp || 0).level);
                     return (
                       <span className={`inline-block px-3 py-1.5 text-[10px] font-bold rounded-lg uppercase tracking-wider ${info.classes}`}>
                         {info.label}
+                      </span>
+                    );
+                  })()}
+
+                  {(() => {
+                    const studentRole = currentSelectedStudent.roles?.[0] || (currentSelectedStudent.role === 'admin' ? 'tenant_admin' : 'student');
+                    const roleBadgeClass =
+                      studentRole === 'super_admin'
+                        ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                        : studentRole === 'tenant_admin'
+                        ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                        : studentRole === 'teacher'
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        : 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+                    const roleLabel =
+                      studentRole === 'super_admin'
+                        ? 'Super Admin'
+                        : studentRole === 'tenant_admin'
+                        ? 'Admin Institucional'
+                        : studentRole === 'teacher'
+                        ? 'Professor'
+                        : 'Estudante';
+                    return (
+                      <span className={`inline-block px-3 py-1.5 text-[10px] font-black rounded-lg uppercase tracking-wider border ${roleBadgeClass}`}>
+                        {roleLabel}
                       </span>
                     );
                   })()}

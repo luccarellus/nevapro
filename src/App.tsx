@@ -289,6 +289,13 @@ export default function App() {
     await performLogout();
   }
 
+  const handleSelectTenant = (tenantId: string) => {
+    localStorage.setItem('neva_active_tenant', tenantId);
+    setUser((prev) => ({ ...prev, tenantId }));
+    invalidateRequestCache();
+    prefetchEndpoint('/api/bootstrap');
+  };
+
   const handleConfirmExit = async () => {
     setIsSimulationActive(false);
     if (pendingTab) {
@@ -420,7 +427,7 @@ export default function App() {
           />
         );
       case 'admin':
-        return user.role === 'admin' ? (
+        return isUserAdmin ? (
           <AdminDashboard
             user={user}
             onLogout={handleLogout}
@@ -446,7 +453,13 @@ export default function App() {
     }
   };
 
-  const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || user.role === 'admin';
+  const isUserAdmin = Boolean(
+    user.isAdmin ||
+    user.role === 'admin' ||
+    user.roles?.some((r) => ['super_admin', 'tenant_admin', 'teacher'].includes(r))
+  );
+
+  const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || (isUserAdmin && activeTab === 'admin');
 
   if (isUnderMaintenance) {
     return <Maintenance />;
@@ -459,7 +472,7 @@ export default function App() {
           <Header 
             isDarkMode={isDarkMode} 
             toggleDarkMode={toggleDarkMode} 
-            isAdmin={user.role === 'admin'} 
+            isAdmin={isUserAdmin} 
             onTabChange={handleTabChange}
             userEmail={user.email}
             user={user}
@@ -468,7 +481,7 @@ export default function App() {
           <Navigation 
             activeTab={activeTab} 
             setActiveTab={handleTabChange} 
-            isAdmin={user.role === 'admin'} 
+            isAdmin={isUserAdmin} 
             onLogout={handleLogout}
             user={user}
             onTabHover={handleNavHover}

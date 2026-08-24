@@ -7,24 +7,27 @@ import {
   Library,
   Megaphone,
   Users,
+  Building2,
   Sun,
   Moon,
   UserCircle,
   LogOut,
   PanelLeftClose,
-  Upload
+  Upload,
+  GraduationCap
 } from 'lucide-react';
 import Logo from '../Logo';
 import { userService } from '../../services/userService';
 import { uploadService } from '../../services/uploadService';
 import Spinner from '../Spinner';
+import { UserProfile } from '../../types';
 
-type AdminTab = 'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos';
+export type AdminTab = 'panorama' | 'eventos' | 'materiais' | 'mural' | 'alunos' | 'tenants';
 
 interface AdminHeaderProps {
   activeTab: AdminTab;
   onTabChange: (tab: AdminTab) => void;
-  user: { name?: string; email?: string; avatarUrl?: string; avatar?: string };
+  user: UserProfile;
   onLogout: () => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
@@ -52,13 +55,34 @@ export default function AdminHeader({
   const [avatarUploadError, setAvatarUploadError] = useState('');
   const adminAvatarUrl = user.avatarUrl || user.avatar || '';
 
-  const tabs = [
-    { id: 'panorama' as const, label: 'Painel', icon: LayoutGrid, count: null },
-    { id: 'eventos' as const, label: 'Eventos', icon: Calendar, count: eventosCount },
-    { id: 'materiais' as const, label: 'Materiais', icon: Library, count: materialsCount },
-    { id: 'mural' as const, label: 'Mural', icon: Megaphone, count: recadosCount },
-    { id: 'alunos' as const, label: 'Alunos', icon: Users, count: null },
+  const isSuperAdmin = user.roles?.includes('super_admin') || user.role === 'admin';
+  const isTenantAdmin = user.roles?.includes('tenant_admin');
+  const isTeacher = user.roles?.includes('teacher');
+
+  const roleLabel = isSuperAdmin
+    ? 'Super-Admin'
+    : isTenantAdmin
+    ? 'Admin da Escola'
+    : isTeacher
+    ? 'Professor'
+    : 'Backoffice';
+
+  const baseTabs = [
+    { id: 'panorama' as const, label: 'Painel', icon: LayoutGrid, count: null, visible: true },
+    { id: 'eventos' as const, label: 'Eventos', icon: Calendar, count: eventosCount, visible: true },
+    { id: 'materiais' as const, label: 'Materiais', icon: Library, count: materialsCount, visible: true },
+    { id: 'mural' as const, label: 'Mural', icon: Megaphone, count: recadosCount, visible: true },
+    { id: 'alunos' as const, label: 'Alunos', icon: Users, count: null, visible: true },
+    {
+      id: 'tenants' as const,
+      label: 'Instituições',
+      icon: Building2,
+      count: null,
+      visible: isSuperAdmin || isTenantAdmin,
+    },
   ];
+
+  const tabs = baseTabs.filter((t) => t.visible);
 
   const handleAdminAvatarUpload = async (file?: File | null) => {
     if (!file) return;
@@ -233,7 +257,7 @@ export default function AdminHeader({
             <Logo className="h-9 sm:h-10 justify-start" />
             <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
               <ShieldCheck size={13} />
-              Super-Admin
+              {roleLabel}
             </div>
           </div>
 
@@ -343,7 +367,7 @@ export default function AdminHeader({
               <div className="pt-3 border-t border-border-color flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-bold text-text-main">
                   <ShieldCheck size={14} className="text-brand-primary" />
-                  <span className="text-[11px]">Super-Admin</span>
+                  <span className="text-[11px]">{roleLabel}</span>
                 </div>
                 <button
                   onClick={onLogout}

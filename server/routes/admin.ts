@@ -56,83 +56,113 @@ router.get(
 });
 
 // ============= ADMIN ACTIVITIES =============
-router.get('/activities', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const cached = await cacheGet<{ activities: unknown[]; production: unknown[] }>(CACHE_KEYS.ADMIN_ACTIVITIES);
-    if (cached) {
-      res.json(cached);
-      return;
-    }
+router.get(
+  '/activities',
+  requireAuth,
+  resolveTenant,
+  requirePermission(
+    PERMISSIONS.ANALYTICS_TENANT_SUMMARY,
+    PERMISSIONS.USERS_MANAGE_STUDENTS,
+    PERMISSIONS.USERS_MANAGE_TEACHERS,
+  ),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const tenantId = req.tenantId;
+      const isSuperAdmin = (req as any).rbacContext?.isSuperAdmin;
+      const cacheKey = tenantId ? `${CACHE_KEYS.ADMIN_ACTIVITIES}:${tenantId}` : CACHE_KEYS.ADMIN_ACTIVITIES;
+      const cached = await cacheGet<{ activities: unknown[]; production: unknown[] }>(cacheKey);
+      if (cached) {
+        res.json(cached);
+        return;
+      }
 
-    const { rows: logs } = await query(`
-      SELECT x.*, u.name as user_name, u.city as user_city
-      FROM xp_logs x
-      LEFT JOIN users u ON x.user_id = u.id
-      ORDER BY x.created_at DESC
-      LIMIT 20
-    `);
+      // Query XP logs scoped by tenant
+      const logQuery = isSuperAdmin && !tenantId
+        ? `SELECT x.*, u.name as user_name, u.city as user_city
+           FROM xp_logs x
+           LEFT JOIN users u ON x.user_id = u.id
+           ORDER BY x.created_at DESC
+           LIMIT 20`
+        : `SELECT x.*, u.name as user_name, u.city as user_city
+           FROM xp_logs x
+           JOIN users u ON x.user_id = u.id
+           WHERE ($1::uuid IS NULL OR u.tenant_id = $1)
+           ORDER BY x.created_at DESC
+           LIMIT 20`;
 
-    const activities = (logs || []).map((logEntry: Record<string, unknown>) => {
-      const logDate = new Date(logEntry.created_at as string);
-      const diff = Math.floor((Date.now() - logDate.getTime()) / 60000);
-      let timeStr = 'Agora';
-      if (diff > 0 && diff < 60) timeStr = `Há ${diff} min`;
-      else if (diff >= 60 && diff < 1440) timeStr = `Há ${Math.floor(diff / 60)}h`;
-      else if (diff >= 1440) timeStr = `Há ${Math.floor(diff / 1440)} dias`;
+      const { rows: logs } = await query(logQuery, isSuperAdmin && !tenantId ? [] : [tenantId || null]);
 
-      return {
-        id: logEntry.id,
-        user: logEntry.user_name || 'Estudante',
-        action: `Ganhou ${logEntry.amount} XP: ${logEntry.reason || 'Atividade'}`,
-        time: timeStr,
-        city: logEntry.user_city || 'Brasil',
-      };
-    });
+      const activities = (logs || []).map((logEntry: Record<string, unknown>) => {
+        const logDate = new Date(logEntry.created_at as string);
+        const diff = Math.floor((Date.now() - logDate.getTime()) / 60000);
+        let timeStr = 'Agora';
+        if (diff > 0 && diff < 60) timeStr = `Há ${diff} min`;
+        else if (diff >= 60 && diff < 1440) timeStr = `Há ${Math.floor(diff / 60)}h`;
+        else if (diff >= 1440) timeStr = `Há ${Math.floor(diff / 1440)} dias`;
 
-    // Weekly production
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return {
+          id: logEntry.id,
+          user: logEntry.user_name || 'Estudante',
+          action: `Ganhou ${logEntry.amount} XP: ${logEntry.reason || 'Atividade'}`,
+          time: timeStr,
+          city: logEntry.user_city || 'Brasil',
+        };
+      });
 
-    const [mats, recs] = await Promise.all([
-      dbAdmin
+      // Weekly production scoped by tenant
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      let matsBuilder = dbAdmin
         .from('materials')
         .select('uploaded_at')
-        .gte('uploaded_at', sevenDaysAgo.toISOString().split('T')[0]),
-      dbAdmin
+        .gte('uploaded_at', sevenDaysAgo.toISOString().split('T')[0]);
+
+      let recsBuilder = dbAdmin
         .from('mural')
         .select('created_at')
-        .gte('created_at', sevenDaysAgo.toISOString()),
-    ]);
+        .gte('created_at', sevenDaysAgo.toISOString());
 
-    const days = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-    const production: Record<string, number> = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      production[days[d.getDay()]] = 0;
+      if (tenantId && (!isSuperAdmin || tenantId)) {
+        matsBuilder = matsBuilder.eq('tenant_id', tenantId);
+        recsBuilder = recsBuilder.eq('tenant_id', tenantId);
+      }
+
+      const [mats, recs] = await Promise.all([
+        matsBuilder.execute(),
+        recsBuilder.execute(),
+      ]);
+
+      const days = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+      const production: Record<string, number> = {};
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        production[days[d.getDay()]] = 0;
+      }
+
+      for (const m of mats.data || []) {
+        const d = new Date((m as any).uploaded_at);
+        const day = days[d.getDay()];
+        if (production[day] !== undefined) production[day]++;
+      }
+
+      for (const r of recs.data || []) {
+        const d = new Date((r as any).created_at || (r as any).date);
+        const day = days[d.getDay()];
+        if (production[day] !== undefined) production[day]++;
+      }
+
+      const productionList = Object.entries(production).map(([day, value]) => ({ day, value }));
+      const result = { activities, production: productionList };
+
+      await cacheSet(cacheKey, result);
+      res.json(result);
+    } catch (err) {
+      log.error('[Admin Activities] Error:', err);
+      res.status(500).json({ error: 'Failed to fetch activities' });
     }
-
-    for (const m of mats.data || []) {
-      const d = new Date((m as any).uploaded_at);
-      const day = days[d.getDay()];
-      if (production[day] !== undefined) production[day]++;
-    }
-
-    for (const r of recs.data || []) {
-      const d = new Date((r as any).created_at || (r as any).date);
-      const day = days[d.getDay()];
-      if (production[day] !== undefined) production[day]++;
-    }
-
-    const productionList = Object.entries(production).map(([day, value]) => ({ day, value }));
-    const result = { activities, production: productionList };
-
-    await cacheSet(CACHE_KEYS.ADMIN_ACTIVITIES, result);
-    res.json(result);
-  } catch (err) {
-    log.error('[Admin Activities] Error:', err);
-    res.status(500).json({ error: 'Failed to fetch activities' });
-  }
-});
+  },
+);
 
 export default router;
