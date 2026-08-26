@@ -230,7 +230,7 @@ export default function AdminHeader({
       <button
         type="button"
         onClick={() => setShowAdminPreferences((current) => !current)}
-        className={`w-full flex items-center gap-3 border rounded-xl px-3 py-2.5 text-text-main transition-all cursor-pointer ${
+        className={`w-full flex items-center gap-3 border rounded-full px-3.5 py-2 text-text-main transition-all cursor-pointer ${
           showAdminPreferences
             ? 'bg-text-main/15 border-text-main/30'
             : 'bg-text-main/5 hover:bg-text-main/10 border-border-color'
@@ -238,7 +238,7 @@ export default function AdminHeader({
         title="Abrir preferencias do admin"
         aria-label="Abrir preferencias do admin"
       >
-        <div className="w-8 h-8 rounded-lg bg-text-main/10 text-text-main border border-border-color flex items-center justify-center font-black text-xs overflow-hidden">
+        <div className="w-8 h-8 rounded-full bg-text-main/10 text-text-main border border-border-color flex items-center justify-center font-black text-xs overflow-hidden">
           {adminAvatarUrl ? (
             <img src={adminAvatarUrl} alt="" className="w-full h-full object-cover" />
           ) : (
@@ -303,7 +303,7 @@ export default function AdminHeader({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onToggleDarkMode}
-              className="p-2.5 rounded-xl bg-bg-card border border-border-color text-text-secondary hover:text-text-main hover:border-brand-primary/30 transition-all cursor-pointer"
+              className="p-2.5 rounded-full bg-bg-card border border-border-color text-text-secondary hover:text-text-main hover:border-brand-primary/30 transition-all cursor-pointer"
               title={isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
               aria-label={isDarkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
             >
@@ -315,7 +315,7 @@ export default function AdminHeader({
             {/* Mobile Menu Toggle Button */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="md:hidden p-2.5 bg-bg-card border border-border-color rounded-xl text-text-secondary hover:text-text-main cursor-pointer"
+              className="md:hidden p-2.5 bg-bg-card border border-border-color rounded-full text-text-secondary hover:text-text-main cursor-pointer"
               title="Alternar menu"
               aria-label="Alternar menu"
             >
