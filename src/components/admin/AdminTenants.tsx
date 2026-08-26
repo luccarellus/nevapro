@@ -4,7 +4,6 @@ import {
   Building2,
   Plus,
   ShieldCheck,
-  UserCheck,
   Users,
   CheckCircle2,
   AlertCircle,
@@ -13,12 +12,11 @@ import {
   Tag,
   Search,
   X,
-  UserPlus,
   GraduationCap,
   BookOpen,
 } from 'lucide-react';
 import Spinner from '../Spinner';
-import { adminService, TenantMember, RoleOption } from '../../services/adminService';
+import { adminService, TenantMember } from '../../services/adminService';
 import { RbacRole, TenantInfo, UserProfile } from '../../types';
 
 interface AdminTenantsProps {
@@ -34,21 +32,12 @@ export default function AdminTenants({
 }: AdminTenantsProps) {
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string>(activeTenantId || '');
-  const [members, setMembers] = useState<TenantMember[]>([]);
-  const [roles, setRoles] = useState<RoleOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMembersLoading, setIsMembersLoading] = useState(false);
-
-  // Modals & forms
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const [tenantName, setTenantName] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
   const [tenantDomain, setTenantDomain] = useState('');
   const [tenantPlan, setTenantPlan] = useState('standard');
 
-  const [assignEmail, setAssignEmail] = useState('');
-  const [assignRole, setAssignRole] = useState<RbacRole>('student');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -75,12 +64,8 @@ export default function AdminTenants({
     if (!tenantId) return;
     setIsMembersLoading(true);
     try {
-      const [membersData, rolesData] = await Promise.all([
-        adminService.getTenantMembers(tenantId).catch(() => []),
-        adminService.getTenantRoles(tenantId).catch(() => []),
-      ]);
+      const membersData = await adminService.getTenantMembers(tenantId).catch(() => []);
       setMembers(membersData || []);
-      setRoles(rolesData || []);
     } catch (err: any) {
       console.error('Failed to load members:', err);
     } finally {
@@ -119,24 +104,6 @@ export default function AdminTenants({
       setSelectedTenantId(created.id);
     } catch (err: any) {
       setFeedback({ type: 'error', message: err.message || 'Erro ao criar instituição.' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleAssignRole = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assignEmail || !assignRole || !selectedTenantId) return;
-    setIsSubmitting(true);
-    setFeedback(null);
-    try {
-      await adminService.assignMemberRole(selectedTenantId, assignEmail, assignRole);
-      setFeedback({ type: 'success', message: 'Papel atribuído com sucesso!' });
-      setAssignEmail('');
-      setShowAssignModal(false);
-      await fetchMembersAndRoles(selectedTenantId);
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'Erro ao atribuir papel.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -303,14 +270,6 @@ export default function AdminTenants({
                   Membros com papéis atribuídos nesta instituição.
                 </p>
               </div>
-
-              <button
-                onClick={() => setShowAssignModal(true)}
-                className="px-4 py-2 rounded-xl bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <UserPlus size={14} />
-                Atribuir Papel
-              </button>
             </div>
 
             {/* Search Filter for Members */}
@@ -513,86 +472,6 @@ export default function AdminTenants({
         )}
       </AnimatePresence>
 
-      {/* Modal: Assign Role */}
-      <AnimatePresence>
-        {showAssignModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowAssignModal(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="relative w-full max-w-md bg-bg-sidebar border border-border-color rounded-2xl p-6 shadow-2xl z-10"
-            >
-              <div className="flex items-center justify-between mb-5 pb-3 border-b border-border-color">
-                <h3 className="text-base font-black text-text-main">Atribuir Papel no Tenant</h3>
-                <button
-                  onClick={() => setShowAssignModal(false)}
-                  className="p-1.5 text-text-secondary hover:text-text-main rounded-lg"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <form onSubmit={handleAssignRole} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60 mb-1.5">
-                    E-mail do Usuário
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={assignEmail}
-                    onChange={(e) => setAssignEmail(e.target.value)}
-                    placeholder="aluno@escola.com.br"
-                    className="w-full bg-bg-main/50 border border-border-color rounded-xl px-3.5 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60 mb-1.5">
-                    Papel a Atribuir
-                  </label>
-                  <select
-                    value={assignRole}
-                    onChange={(e) => setAssignRole(e.target.value as RbacRole)}
-                    className="w-full bg-bg-main/50 border border-border-color rounded-xl px-3.5 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all"
-                  >
-                    <option value="student">Estudante (Student)</option>
-                    <option value="teacher">Professor / Tutor (Teacher)</option>
-                    <option value="tenant_admin">Administrador da Escola (Tenant Admin)</option>
-                    {isSuperAdmin && <option value="super_admin">Super Administrador (Global)</option>}
-                  </select>
-                </div>
-
-                <div className="flex gap-3 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAssignModal(false)}
-                    className="flex-1 bg-text-main/5 hover:bg-text-main/10 text-text-main py-2.5 rounded-xl font-bold text-xs transition-all border border-border-color"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 bg-brand-primary text-white hover:opacity-90 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSubmitting ? <Spinner size={14} className="text-white" /> : <UserCheck size={14} />}
-                    Vincular Papel
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

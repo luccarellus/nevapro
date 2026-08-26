@@ -14,7 +14,8 @@ import {
   LogOut,
   PanelLeftClose,
   Upload,
-  GraduationCap
+  GraduationCap,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import Logo from '../Logo';
 import { userService } from '../../services/userService';
@@ -32,6 +33,7 @@ interface AdminHeaderProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onUpdateUser: (user: any) => void;
+  onOpenSettings?: () => void;
   materialsCount: number;
   recadosCount: number;
   eventosCount: number;
@@ -45,6 +47,7 @@ export default function AdminHeader({
   isDarkMode,
   onToggleDarkMode,
   onUpdateUser,
+  onOpenSettings,
   materialsCount,
   recadosCount,
   eventosCount
@@ -59,13 +62,7 @@ export default function AdminHeader({
   const isTenantAdmin = user.roles?.includes('tenant_admin');
   const isTeacher = user.roles?.includes('teacher');
 
-  const roleLabel = isSuperAdmin
-    ? 'Super-Admin'
-    : isTenantAdmin
-    ? 'Admin da Escola'
-    : isTeacher
-    ? 'Professor'
-    : 'Backoffice';
+  const roleLabel = 'Admin';
 
   const baseTabs = [
     { id: 'panorama' as const, label: 'Painel', icon: LayoutGrid, count: null, visible: true },
@@ -154,7 +151,7 @@ export default function AdminHeader({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="absolute left-0 bottom-full mb-3 w-[min(340px,calc(100vw-2rem))] z-[80] rounded-2xl border border-border-color bg-bg-sidebar shadow-2xl shadow-black/20 overflow-hidden"
+            className="absolute right-0 top-full mt-2.5 w-[min(340px,calc(100vw-2rem))] z-[80] rounded-2xl border border-border-color bg-bg-sidebar shadow-2xl shadow-black/20 overflow-hidden"
           >
             <div className="p-5 border-b border-border-color bg-text-main/[0.03]">
               <div className="flex items-center gap-3">
@@ -197,6 +194,24 @@ export default function AdminHeader({
                 )}
               </div>
             </div>
+
+            {onOpenSettings && (
+              <div className="p-3 border-b border-border-color bg-bg-main/20">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminPreferences(false);
+                    onOpenSettings();
+                  }}
+                  className="w-full rounded-xl border border-border-color bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary px-3.5 py-2.5 flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <SettingsIcon size={15} />
+                    <span>Configurações da Conta</span>
+                  </div>
+                </button>
+              </div>
+            )}
 
             <div className="p-4 border-t border-border-color bg-bg-main/30 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-[10px] font-bold text-text-secondary opacity-70">
@@ -255,7 +270,7 @@ export default function AdminHeader({
           {/* Left: Logo & Brand Badge */}
           <div className="flex items-center gap-3 shrink-0">
             <Logo className="h-9 sm:h-10 justify-start" />
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
               <ShieldCheck size={13} />
               {roleLabel}
             </div>
@@ -365,9 +380,9 @@ export default function AdminHeader({
                 })}
               </div>
               <div className="pt-3 border-t border-border-color flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-text-main">
-                  <ShieldCheck size={14} className="text-brand-primary" />
-                  <span className="text-[11px]">{roleLabel}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
+                  <ShieldCheck size={13} />
+                  <span>{roleLabel}</span>
                 </div>
                 <button
                   onClick={onLogout}

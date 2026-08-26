@@ -22,6 +22,7 @@ import AdminMateriais from './admin/AdminMateriais';
 import AdminMural from './admin/AdminMural';
 import AdminAlunos from './admin/AdminAlunos';
 import AdminTenants from './admin/AdminTenants';
+import Settings from './Settings';
 
 interface AdminDashboardProps {
   user: UserProfile;
@@ -56,6 +57,7 @@ export default function AdminDashboard({
   const [filterType, setFilterType] = useState<'all' | 'top10' | 'new' | 'inactive'>('all');
 
   const [showModal, setShowModal] = useState<'material' | 'recado' | 'evento' | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'evento' | 'material' | 'recado'; title: string } | null>(null);
@@ -276,6 +278,7 @@ export default function AdminDashboard({
         isDarkMode={isDarkMode}
         onToggleDarkMode={onToggleDarkMode}
         onUpdateUser={onUpdateUser}
+        onOpenSettings={() => setShowSettingsModal(true)}
         materialsCount={materials.length}
         recadosCount={recados.length}
         eventosCount={eventos.length}
@@ -511,6 +514,20 @@ export default function AdminDashboard({
                 </div>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSettingsModal && (
+          <div className="fixed inset-0 z-[100] bg-bg-main overflow-y-auto">
+            <Settings
+              user={user}
+              onUpdateUser={onUpdateUser}
+              onClose={() => setShowSettingsModal(false)}
+              theme={isDarkMode ? 'dark' : 'light'}
+              onThemeChange={() => {}}
+            />
           </div>
         )}
       </AnimatePresence>

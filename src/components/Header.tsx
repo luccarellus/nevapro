@@ -140,7 +140,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
                       </div>
                     )}
                   </div>
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold text-yellow-400">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-black uppercase tracking-wider">
                     Admin
                   </span>
                 </button>
