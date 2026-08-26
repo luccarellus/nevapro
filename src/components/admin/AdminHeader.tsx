@@ -7,7 +7,6 @@ import {
   Library,
   Megaphone,
   Users,
-  Building2,
   Sun,
   Moon,
   UserCircle,
@@ -70,13 +69,6 @@ export default function AdminHeader({
     { id: 'materiais' as const, label: 'Materiais', icon: Library, count: materialsCount, visible: true },
     { id: 'mural' as const, label: 'Mural', icon: Megaphone, count: recadosCount, visible: true },
     { id: 'alunos' as const, label: 'Alunos', icon: Users, count: null, visible: true },
-    {
-      id: 'tenants' as const,
-      label: 'Instituições',
-      icon: Building2,
-      count: null,
-      visible: isSuperAdmin || isTenantAdmin,
-    },
   ];
 
   const tabs = baseTabs.filter((t) => t.visible);
