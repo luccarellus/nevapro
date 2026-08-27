@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger';
-import { isRedisConfigured, runRedisCommand } from '../services/cache';
+import { isRedisConfigured } from '../services/cache';
+import { getRedisClient, waitForRedisReady } from '../services/redisClient';
 
 const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
 const RATE_LIMITER_MAX_ENTRIES = 10_000;
@@ -31,16 +32,19 @@ setInterval(() => {
   }
 }, RATE_LIMITER_CLEANUP_INTERVAL_MS).unref();
 
-
+// Lua script atômico de incremento com expiração em 1 só rtt (<1ms)
+const RATE_LIMIT_LUA = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+`;
 
 /**
- * Rate Limiter — hybrid Redis + in-memory fallback.
- * 
- * Uses Redis (self-hosted via REDIS_URL) quando disponível.
- * Falls back to in-memory Map when Redis is unavailable.
- * 
- * @param limit Maximum number of requests allowed within the window
- * @param windowMs Time window in milliseconds
+ * Rate Limiter — híbrido Redis ultra-rápido (Lua atômico) + fallback em memória local.
+ *
+ * Executa verificações no Redis em <1ms via Script Lua de ida e volta única.
  */
 export const rateLimiter = (limit: number, windowMs: number) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -49,32 +53,35 @@ export const rateLimiter = (limit: number, windowMs: number) => {
     const now = Date.now();
     const windowKey = Math.floor(now / windowMs);
 
-    // Try Redis first
+    // Tenta Redis primeiro se configurado
     if (isRedisConfigured()) {
-      const redisKey = `ratelimit:${ip}:${path}:${windowKey}`;
-      const ttlSeconds = Math.ceil(windowMs / 1000);
-
-      try {
-        // Single INCR command instead of SET+INCR pipeline
-        // TTL is set on first increment (when count === 1)
-        const incrResult = await runRedisCommand(['INCR', redisKey]);
-        const currentCount = typeof incrResult === 'number' ? incrResult : Number(incrResult);
-
-        if (currentCount === 1) {
-          // First request in this window — set expiry
-          await runRedisCommand(['EXPIRE', redisKey, String(ttlSeconds)]);
+      const client = getRedisClient();
+      if (client) {
+        if (client.status !== 'ready') {
+          await waitForRedisReady(50);
         }
 
-        if (!Number.isNaN(currentCount) && currentCount > limit) {
-          res.status(429).json({
-            error: 'Muitas requisições. Tente novamente mais tarde.',
-          });
-          return;
-        }
+        if (client.status === 'ready') {
+          const redisKey = `ratelimit:${ip}:${path}:${windowKey}`;
+          const ttlSeconds = Math.ceil(windowMs / 1000);
 
-        return next();
-      } catch (err) {
-        log.warn('[RateLimiter] Redis indisponível, usando fallback in-memory');
+          try {
+            // Executa script Lua em 1 única ida e volta (sub-milissegundo)
+            const result = await client.eval(RATE_LIMIT_LUA, 1, redisKey, String(ttlSeconds));
+            const currentCount = Number(result);
+
+            if (!Number.isNaN(currentCount) && currentCount > limit) {
+              res.status(429).json({
+                error: 'Muitas requisições. Tente novamente mais tarde.',
+              });
+              return;
+            }
+
+            return next();
+          } catch (err) {
+            log.warn('[RateLimiter] Erro na execução Redis, usando fallback in-memory');
+          }
+        }
       }
     }
 

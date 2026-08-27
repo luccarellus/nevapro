@@ -21,7 +21,7 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { verifyRecaptcha } from './middleware/recaptcha';
 import { requireAuth } from './middleware/auth';
 import pool from '../src/lib/db';
-import { closeRedisClient } from './services/redisClient';
+import { closeRedisClient, getRedisClient } from './services/redisClient';
 import { dbAdmin } from './lib/dbQueryBuilder';
 import { query } from '../src/lib/db';
 import { sanitizeInput } from './utils/sanitize';
@@ -55,6 +55,9 @@ import tenantRoutes from './routes/tenants';
 
 // Validate critical environment variables before starting
 validateEnv();
+
+// Eagerly connect to Redis on boot
+getRedisClient();
 
 // Garante o tenant da plataforma no boot (non-blocking)
 ensurePlatformTenant().catch((err) => {

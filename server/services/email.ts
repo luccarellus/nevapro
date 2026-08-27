@@ -27,10 +27,10 @@ function getLogoUrl(): string {
 
   // Se LOGO_URL não foi definida, usa a URL da própria aplicação (mesmo domínio do envio)
   if (!logoUrl) {
-    let baseUrl = process.env.APP_URL?.trim() || 'https://nevapro.olharjovem.org';
+    let baseUrl = process.env.APP_URL?.trim() || 'https://nevapro.com';
     baseUrl = baseUrl.replace(/^APP_URL=/, '').trim();
     baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    logoUrl = `${baseUrl}/logo.png`;
+    logoUrl = `${baseUrl}/favicon.png`;
   }
 
   // Sanitização de segurança: corrige acidentes comuns de digitação/cópia em variáveis de ambiente
@@ -53,7 +53,7 @@ export async function sendPasswordResetEmail(
   userName: string,
   resetLink: string,
 ): Promise<void> {
-  const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
+  const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@nevapro.com';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
   const logoUrl = getLogoUrl();
 
@@ -78,7 +78,7 @@ export async function sendPasswordResetEmail(
             <td style="background:#ffffff;border-radius:24px;padding:32px 32px 40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
               <!-- Logo Header -->
               <div style="text-align:center;padding-bottom:20px;border-bottom:1px solid #f1f5f9;margin-bottom:24px;">
-                <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
+                <img src="${logoUrl}" alt="Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
               </div>
               <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;text-align:left;">
                 Redefinição de senha
@@ -119,7 +119,7 @@ export async function sendPasswordResetEmail(
           <tr>
             <td style="padding:24px 32px 0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                Neva PRO &bull; Instituto Olhar Jovem<br />
+                Neva PRO<br />
                 Se tiver dúvidas, entre em contato pelo nosso suporte.
               </p>
             </td>
@@ -144,9 +144,9 @@ export async function sendPasswordResetEmail(
 export async function sendWelcomeEmail(
   to: string,
   userName: string,
-  loginUrl: string = process.env.APP_URL || 'https://nevapro.olharjovem.org',
+  loginUrl: string = process.env.APP_URL || 'https://nevapro.com',
 ): Promise<void> {
-  const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@olharjovem.org';
+  const from = process.env.RESEND_FROM_EMAIL || 'naoresponda@nevapro.com';
   const senderName = process.env.RESEND_SENDER_NAME || 'Neva PRO';
   const logoUrl = getLogoUrl();
 
@@ -171,7 +171,7 @@ export async function sendWelcomeEmail(
             <td style="background:#ffffff;border-radius:24px;padding:32px 32px 40px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
               <!-- Logo Header -->
               <div style="text-align:center;padding-bottom:20px;border-bottom:1px solid #f1f5f9;margin-bottom:24px;">
-                <img src="${logoUrl}" alt="Instituto Olhar Jovem - Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
+                <img src="${logoUrl}" alt="Neva PRO" width="320" style="max-width:320px;width:100%;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;" />
               </div>
               <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#1a1a2e;text-align:left;">
                 Bem-vindo(a) ao Neva PRO!
@@ -188,7 +188,7 @@ export async function sendWelcomeEmail(
                   🔑 Dados de Acesso:
                 </p>
                 <p style="margin:0 0 6px;font-size:14px;color:#475569;">
-                  <strong>Link da Plataforma:</strong> <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;text-decoration:underline;">nevapro.olharjovem.org</a>
+                  <strong>Link da Plataforma:</strong> <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;text-decoration:underline;">${loginUrl}</a>
                 </p>
                 <p style="margin:0 0 6px;font-size:14px;color:#475569;">
                   <strong>E-mail:</strong> ${to}
@@ -215,7 +215,7 @@ export async function sendWelcomeEmail(
               <!-- Direct Link -->
               <p style="margin:0 0 24px;font-size:13px;color:#94a3b8;word-break:break-all;text-align:center;">
                 Ou acesse diretamente pelo endereço:<br />
-                <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;">nevapro.olharjovem.org</a>
+                <a href="${loginUrl}" style="color:#6C5CE7;font-weight:600;">${loginUrl}</a>
               </p>
 
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
@@ -228,7 +228,7 @@ export async function sendWelcomeEmail(
           <tr>
             <td style="padding:24px 32px 0;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                Neva PRO &bull; Instituto Olhar Jovem<br />
+                Neva PRO<br />
                 Bons estudos!
               </p>
             </td>

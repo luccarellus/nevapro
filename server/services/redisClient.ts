@@ -1,14 +1,11 @@
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 import { log } from '../utils/logger';
 
 /**
- * Cliente Redis self-hosted (VPS / docker-compose).
+ * Cliente Redis ultra-rápido (VPS / docker-compose).
  *
- * Usa a variável REDIS_URL (ex.: redis://redis:6379). Quando não configurada,
- * o app continua funcionando apenas com o fallback em memória.
- *
- * O cliente é criado de forma lazy e NUNCA derruba o servidor: erros de conexão
- * são apenas logados e as chamadas retornam fallback.
+ * Configurado com TCP_NODELAY, auto-pipelining, TCP keep-alive e inicialização ansiosa.
+ * Se Redis estiver indisponível, falha silenciosamente de forma instantânea sem travar as requisições.
  */
 let client: Redis | null = null;
 let connectPromise: Promise<boolean> | null = null;
@@ -23,13 +20,16 @@ export function getRedisClient(): Redis | null {
   if (!url && !host) return null;
   if (client) return client;
 
-  const redisOptions = {
+  const redisOptions: RedisOptions = {
     lazyConnect: true,
-    connectTimeout: 3_000,
-    commandTimeout: 500,
-    maxRetriesPerRequest: 2,
+    connectTimeout: 2_000,
+    commandTimeout: 300,
+    maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
-    retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 200, 800)),
+    enableAutoPipelining: true,
+    keepAlive: 5_000,
+    noDelay: true,
+    retryStrategy: (times: number) => (times > 5 ? null : Math.min(times * 150, 500)),
   };
 
   if (url) {
@@ -54,8 +54,7 @@ export function getRedisClient(): Redis | null {
     log.warn('[Redis] Conexão com Redis encerrada');
   });
 
-  // Conecta sem bloquear o boot do servidor e guarda a promise para que as
-  // primeiras chamadas possam aguardar o Redis ficar pronto (sem race).
+  // Conecta sem bloquear o boot do servidor
   connectPromise = client
     .connect()
     .then(() => true)
@@ -68,7 +67,7 @@ export function getRedisClient(): Redis | null {
  * Aguarda o Redis ficar pronto (status 'ready').
  * Retorna false IMEDIATAMENTE se o status não for ready/connecting (nunca trava a requisição).
  */
-export async function waitForRedisReady(timeoutMs = 150): Promise<boolean> {
+export async function waitForRedisReady(timeoutMs = 100): Promise<boolean> {
   const current = getRedisClient();
   if (!current) return false;
   if (current.status === 'ready') return true;
@@ -98,5 +97,14 @@ export async function closeRedisClient(): Promise<void> {
     await current.quit();
   } catch {
     current.disconnect();
+  }
+}
+
+// Inicializa a conexão de forma ansiosa no boot se o Redis estiver configurado
+if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+  try {
+    getRedisClient();
+  } catch {
+    // Ignora erros na inicialização estática
   }
 }

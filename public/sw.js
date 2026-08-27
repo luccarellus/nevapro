@@ -7,7 +7,7 @@
  * - API calls: Network-only (never cache sensitive data)
  */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `neva-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `neva-pages-${CACHE_VERSION}`;
 const IMAGE_CACHE = `neva-images-${CACHE_VERSION}`;
@@ -16,6 +16,7 @@ const IMAGE_CACHE = `neva-images-${CACHE_VERSION}`;
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
+  '/favicon.svg',
   '/favicon.png',
   '/icon-512.png',
   '/logo.png',
