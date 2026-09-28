@@ -25,7 +25,7 @@ function SemicircleGauge({
   value,
   max = 1000,
   label,
-  color = '#34d399',
+  color = 'var(--brand-primary)',
   icon: Icon
 }: {
   value: number;
@@ -185,9 +185,9 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
     }
 
     return [
-      { name: 'Dominado (≥ 70%)', value: high, color: '#34d399' },
-      { name: 'Em Progresso (50-69%)', value: medium, color: '#fbbf24' },
-      { name: 'Atenção (< 50%)', value: critical, color: '#c9636c' }
+      { name: 'Dominado (≥ 70%)', value: high, color: '#35917d' },
+      { name: 'Em Progresso (50-69%)', value: medium, color: '#d8b478' },
+      { name: 'Atenção (< 50%)', value: critical, color: '#c76b5c' }
     ].filter(item => item.value > 0);
   }, [subjectsMastery]);
 
@@ -303,7 +303,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     label="Matemática"
                     value={latestTriScore?.math_score || 0}
                     max={1000}
-                    color="#38bdf8"
+                    color="#8ad4c4"
                     icon={Calculator}
                   />
 
@@ -311,7 +311,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     label="Ciências da Natureza"
                     value={latestTriScore?.nature_score || 0}
                     max={1000}
-                    color="#34d399"
+                    color="#4aab96"
                     icon={Atom}
                   />
 
@@ -319,7 +319,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     label="Ciências Humanas"
                     value={latestTriScore?.humanities_score || 0}
                     max={1000}
-                    color="#fbbf24"
+                    color="#35917d"
                     icon={Globe}
                   />
 
@@ -327,7 +327,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                     label="Linguagens"
                     value={latestTriScore?.languages_score || 0}
                     max={1000}
-                    color="#c084fc"
+                    color="#2a7565"
                     icon={Languages}
                   />
                 </div>
@@ -431,8 +431,8 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                           boxShadow: 'var(--card-shadow)'
                         }}
                       />
-                      <Bar dataKey="Corretas" fill="#34d399" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="Incorretas" fill="#c9636c" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Corretas" fill="#35917d" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Incorretas" fill="#c76b5c" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

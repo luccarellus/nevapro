@@ -78,7 +78,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           particleCount: 40,
           spread: 50,
           origin: { y: 0.7 },
-          colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff'],
+          colors: ['#00b094', '#4aab96', '#d8b478', '#ffffff'],
         });
       }
 
@@ -95,7 +95,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             particleCount: 90,
             spread: 80,
             origin: { y: 0.5 },
-            colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff'],
+            colors: ['#00b094', '#4aab96', '#d8b478', '#ffffff'],
           });
         }, 400);
       }
@@ -146,7 +146,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         particleCount: 30,
         spread: 40,
         origin: { y: 0.6 },
-        colors: ['#00b094', '#4fb99b', '#ffffff'],
+        colors: ['#00b094', '#4aab96', '#ffffff'],
       });
     }, 1000);
   };

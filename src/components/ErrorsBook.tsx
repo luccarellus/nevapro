@@ -167,7 +167,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff']
+          colors: ['#00b094', '#4aab96', '#d8b478', '#ffffff']
         });
 
         // Concede XP e pontos de acerto

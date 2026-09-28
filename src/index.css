@@ -2,84 +2,83 @@
 @import "tailwindcss";
 
 /* =============================================================
-   PALETA GAMIFICADA SUAVE — "Teal dominante"
-   As cores do Tailwind usadas nos componentes (emerald, rose,
-   amber, red, cyan, blue, indigo, purple, orange, yellow, sky)
-   foram remapeadas para tons dessaturados e harmonizados com o
-   teal da marca. Isso suaviza a UI inteira de forma centralizada.
-   Regra: 400 = tom “suave” (texto/ícones), 500 = tom “cheio”
-   (badges/ação), 600 = hover/ativo. Nada de neon.
+   LINGUAGEM BICOLOR — teal da marca + areia quente
+   A UI é neutra ou teal. Areia/mel aparece APENAS em conquistas
+   (ranking, streak, XP acumulado). Coral é exclusivo de erro/
+   destrutivo; azul-aço de informação. As demais famílias do
+   Tailwind são ALIASES destas quatro — nunca novos matizes.
+   Regra: 400 = texto/ícones, 500 = badges/ação, 600 = hover.
    ============================================================= */
 @theme {
-  /* Sucesso / progresso — verde-menta dessaturado */
-  --color-emerald-300: #7fd8c0;
-  --color-emerald-400: #4fb99b;
-  --color-emerald-500: #3a9c81;
-  --color-emerald-600: #2e7d67;
+  /* Sucesso / progresso — teal da marca */
+  --color-emerald-300: #8ad4c4;
+  --color-emerald-400: #4aab96;
+  --color-emerald-500: #35917d;
+  --color-emerald-600: #2a7565;
   --color-emerald-950: #06231c;
 
-  /* Erro — coral suave (mantém o sinal de “errado” sem gritar) */
-  --color-red-300: #f2a08e;
-  --color-red-400: #e57f6d;
-  --color-red-500: #d66655;
-  --color-red-600: #b95245;
+  /* Erro — coral dessaturado (único vermelho do sistema) */
+  --color-red-300: #e8a698;
+  --color-red-400: #d98a7a;
+  --color-red-500: #c76b5c;
+  --color-red-600: #a85448;
 
-  /* Erro pendente / caderno de erros — rosa-coral dessaturado */
-  --color-rose-300: #eda2a6;
-  --color-rose-400: #dd7f85;
-  --color-rose-500: #c9636c;
-  --color-rose-600: #ab4f58;
+  /* Pendência / revisão — o mesmo coral, leitura rosada */
+  --color-rose-300: #e5a8a4;
+  --color-rose-400: #d2807c;
+  --color-rose-500: #bd6561;
+  --color-rose-600: #9e4f4c;
 
-  /* Recompensa / streak / ranking — âmbar-mel suave */
-  --color-amber-300: #eccf97;
-  --color-amber-400: #ddb46f;
-  --color-amber-500: #c99a51;
-  --color-amber-600: #a97e40;
-  --color-amber-700: #8a6535;
-  --color-amber-800: #6f522c;
-  --color-amber-850: #63482a;
-  --color-amber-950: #3a2f1a;
+  /* Recompensa / streak / ranking — areia-mel (2º acento) */
+  --color-amber-300: #ecd9ac;
+  --color-amber-400: #d8b478;
+  --color-amber-500: #c39c5e;
+  --color-amber-600: #a17e49;
+  --color-amber-700: #82633a;
+  --color-amber-800: #674d2e;
+  --color-amber-850: #5a4329;
+  --color-amber-950: #332818;
 
-  /* Ouro do 1º lugar — dourado velho (menos “neon” que yellow-500) */
-  --color-yellow-300: #e9d48f;
-  --color-yellow-400: #dbbf70;
-  --color-yellow-500: #c8a751;
-  --color-yellow-600: #a68843;
-  --color-yellow-750: #8a6f3a;
-  --color-yellow-950: #3a301a;
+  /* Ouro do 1º lugar — areia mais clara (mesma família do âmbar) */
+  --color-yellow-300: #e8d6a4;
+  --color-yellow-400: #d4bd7c;
+  --color-yellow-500: #c2a95f;
+  --color-yellow-600: #a08848;
+  --color-yellow-750: #856f3c;
+  --color-yellow-950: #332b16;
 
-  /* Laranja (streak/frequência) — tangerina suave */
-  --color-orange-400: #e09464;
-  --color-orange-500: #cc7a4b;
-  --color-orange-600: #a96039;
+  /* Frequência/streak — areia queimada (família quente) */
+  --color-orange-400: #d4a173;
+  --color-orange-500: #bf8857;
+  --color-orange-600: #9d6d45;
 
-  /* Informação — azul-acinzentado calmo */
-  --color-blue-300: #93b5d8;
-  --color-blue-400: #6f97bc;
-  --color-blue-500: #587da0;
-  --color-blue-600: #486683;
+  /* Informação — azul-aço neutro (dados, links, datas) */
+  --color-blue-300: #a3b8cc;
+  --color-blue-400: #7f97ad;
+  --color-blue-500: #647c92;
+  --color-blue-600: #516478;
 
-  /* IA / professor IA — índigo-lavanda suave */
-  --color-indigo-300: #a9a8d8;
-  --color-indigo-400: #8d8cc5;
-  --color-indigo-500: #7574ab;
-  --color-indigo-600: #605f8d;
+  /* IA / professor IA — alias do teal (a marca responde tudo) */
+  --color-indigo-300: #8ad4c4;
+  --color-indigo-400: #4aab96;
+  --color-indigo-500: #35917d;
+  --color-indigo-600: #2a7565;
 
-  /* Mural — lilás suave */
-  --color-purple-300: #c0a5d8;
-  --color-purple-400: #a687c2;
-  --color-purple-500: #8d6ea8;
-  --color-purple-600: #745a8a;
+  /* Mural — alias do teal */
+  --color-purple-300: #8ad4c4;
+  --color-purple-400: #4aab96;
+  --color-purple-500: #35917d;
+  --color-purple-600: #2a7565;
 
-  /* Destaques claros — ciano e céu puxados pro teal da marca */
-  --color-cyan-300: #7fd4d8;
-  --color-cyan-400: #58bcc2;
-  --color-cyan-500: #42a0a8;
-  --color-cyan-600: #358288;
-  --color-sky-300: #85c9d8;
-  --color-sky-400: #5fafc2;
-  --color-sky-500: #4a95a8;
-  --color-sky-600: #3b788a;
+  /* Destaques claros — alias do teal */
+  --color-cyan-300: #8ad4c4;
+  --color-cyan-400: #4aab96;
+  --color-cyan-500: #35917d;
+  --color-cyan-600: #2a7565;
+  --color-sky-300: #8ad4c4;
+  --color-sky-400: #4aab96;
+  --color-sky-500: #35917d;
+  --color-sky-600: #2a7565;
 
   /* Neutros de destaque — slate levemente frio (mantém contraste) */
   --color-slate-300: #b8c0cc;
@@ -104,7 +103,8 @@
   --color-input-bg: var(--input-bg);
   --color-border-color: var(--border-color);
 
-  /* Linguagem gamificada: XP verde, nível roxo, ranking dourado, info azul, alerta vermelho */
+  /* Linguagem bicolor: XP/nível em teal, ranking em areia,
+     info em azul-aço, alerta em coral */
   --color-xp: var(--xp-green);
   --color-level: var(--level-purple);
   --color-rank: var(--rank-gold);
@@ -132,11 +132,11 @@
   --input-bg: #101a2c;
   --card-shadow: rgba(0, 0, 0, 0.3);
 
-  --xp-green: #19c37d;
-  --level-purple: #8b5cf6;
-  --rank-gold: #f5b942;
-  --info-blue: #38bdf8;
-  --alert-red: #f97373;
+  --xp-green: #3aa08a;
+  --level-purple: #8b95a5;
+  --rank-gold: #d4b478;
+  --info-blue: #7f97ad;
+  --alert-red: #d98a7a;
 }
 
 [data-theme='light'] {
@@ -153,11 +153,11 @@
   --brand-primary-rgb: 5 150 105;
   --input-bg: #ffffff;
   --card-shadow: rgba(15, 23, 42, 0.08);
-  --xp-green: #00a878;
-  --level-purple: #7c3aed;
-  --rank-gold: #b8860b;
-  --info-blue: #0284c7;
-  --alert-red: #dc2626;
+  --xp-green: #00846b;
+  --level-purple: #64748b;
+  --rank-gold: #9c7a35;
+  --info-blue: #4d6a80;
+  --alert-red: #b05744;
 }
 
 [data-theme='cyberpunk'] {
@@ -531,8 +531,8 @@ button:disabled,
 
 /* =============================================================
    GAMIFIED UI — classes utilitárias do painel admin
-   Linguagem visual: XP verde, nível roxo, ranking dourado,
-   info azul, alerta vermelho. Fundo permanece limpo.
+   XP/nível em teal, ranking em areia, info em azul-aço,
+   alerta em coral. Fundo permanece neutro.
    ============================================================= */
 
 /* Títulos do painel (Nunito) */
@@ -582,7 +582,7 @@ button:disabled,
 
 /* Preenchimento da barra (usar com style width %) */
 @utility gam-progress-fill {
-  @apply h-full rounded-full bg-xp transition-all duration-500;
+  @apply h-full rounded-full bg-brand-primary transition-all duration-500;
 }
 
 /* Ícone com fundo colorido suave — hero dos cards de métrica */

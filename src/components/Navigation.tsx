@@ -17,33 +17,33 @@ interface NavigationProps {
 export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout, user, onTabHover }: NavigationProps) {
   const [showMore, setShowMore] = useState(false);
 
-  // Paleta suavizada: 5 famílias derivadas do teal da marca em vez de um arco-íris.
-  // Uso geral: teal = navegação/geral, mel = conquistas, coral = revisão de erros,
-  // lavanda = IA/conteúdo, azul-aço = tarefas/dados.
+  // Linguagem bicolor: teal da marca domina a navegação, areia em conquistas,
+  // coral em revisão de erros, neutro em preferências. Hex acompanham os tokens
+  // definidos no index.css (usados no glow do indicador ativo).
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
     { id: 'questions', label: 'Questões', icon: BookOpen, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
-    { id: 'simulados', label: 'Simulados', icon: ClipboardList, color: 'text-cyan-400', bgColor: 'bg-cyan-400/10', hex: '#58bcc2' },
-    { id: 'errors', label: 'Caderno de Erros', icon: AlertOctagon, color: 'text-rose-400', bgColor: 'bg-rose-400/10', hex: '#dd7f85' },
+    { id: 'simulados', label: 'Simulados', icon: ClipboardList, color: 'text-cyan-400', bgColor: 'bg-cyan-400/10', hex: '#4aab96' },
+    { id: 'errors', label: 'Caderno de Erros', icon: AlertOctagon, color: 'text-rose-400', bgColor: 'bg-rose-400/10', hex: '#d2807c' },
     { id: 'plano_estudos', label: 'Plano de Estudos', icon: Target, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
-    { id: 'desempenho', label: 'Desempenho', icon: TrendingUp, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4fb99b' },
-    { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-400', bgColor: 'bg-amber-400/10', hex: '#ddb46f' },
-    { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4fb99b' },
-    { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-400', bgColor: 'bg-purple-400/10', hex: '#a687c2' },
-    { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#5fafc2' },
-    { id: 'redacao', label: 'Redação', icon: PenTool, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#8d8cc5' },
-    { id: 'professor_ia', label: 'Professor IA', icon: Sparkles, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#8d8cc5' },
+    { id: 'desempenho', label: 'Desempenho', icon: TrendingUp, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96' },
+    { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-400', bgColor: 'bg-amber-400/10', hex: '#d8b478' },
+    { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96' },
+    { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-400', bgColor: 'bg-purple-400/10', hex: '#4aab96' },
+    { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#4aab96' },
+    { id: 'redacao', label: 'Redação', icon: PenTool, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#4aab96' },
+    { id: 'professor_ia', label: 'Professor IA', icon: Sparkles, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#4aab96' },
   ];
 
   if (isAdmin) {
-    tabs.push({ id: 'admin', label: 'Backoffice', icon: ShieldCheck, color: 'text-sky-500', bgColor: 'bg-sky-500/10', hex: '#0ea5e9' });
+    tabs.push({ id: 'admin', label: 'Backoffice', icon: ShieldCheck, color: 'text-sky-500', bgColor: 'bg-sky-500/10', hex: '#35917d' });
   }
 
   const mainMobileTabs = tabs.slice(0, 4);
   const otherTabs = [
     ...tabs.slice(4),
     { id: 'profile', label: 'Preferências', icon: User, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' },
-    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-400', bgColor: 'bg-red-400/10', hex: '#e57f6d' }
+    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-400', bgColor: 'bg-red-400/10', hex: '#d98a7a' }
   ];
 
   const handleTabClick = (id: string) => {
