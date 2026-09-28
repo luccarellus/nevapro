@@ -78,7 +78,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
           particleCount: 40,
           spread: 50,
           origin: { y: 0.7 },
-          colors: ['#00b094', '#10b981', '#34d399', '#ffffff'],
+          colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff'],
         });
       }
 
@@ -95,7 +95,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
             particleCount: 90,
             spread: 80,
             origin: { y: 0.5 },
-            colors: ['#00b094', '#10b981', '#fbbf24', '#ffffff'],
+            colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff'],
           });
         }, 400);
       }
@@ -146,7 +146,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
         particleCount: 30,
         spread: 40,
         origin: { y: 0.6 },
-        colors: ['#00b094', '#10b981', '#ffffff'],
+        colors: ['#00b094', '#4fb99b', '#ffffff'],
       });
     }, 1000);
   };
@@ -506,7 +506,7 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
                     <select
                       value={newTaskTime}
                       onChange={(e) => setNewTaskTime(e.target.value)}
-                      className="bg-bg-main border border-border-color rounded-xl px-3 py-2 text-xs text-text-secondary focus:outline-none focus:border-brand-primary"
+                      className="select-pill"
                     >
                       <option value="15 min">15 min</option>
                       <option value="30 min">30 min</option>

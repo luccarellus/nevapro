@@ -187,7 +187,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
     return [
       { name: 'Dominado (≥ 70%)', value: high, color: '#34d399' },
       { name: 'Em Progresso (50-69%)', value: medium, color: '#fbbf24' },
-      { name: 'Atenção (< 50%)', value: critical, color: '#f43f5e' }
+      { name: 'Atenção (< 50%)', value: critical, color: '#c9636c' }
     ].filter(item => item.value > 0);
   }, [subjectsMastery]);
 
@@ -432,7 +432,7 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
                         }}
                       />
                       <Bar dataKey="Corretas" fill="#34d399" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="Incorretas" fill="#f43f5e" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Incorretas" fill="#c9636c" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

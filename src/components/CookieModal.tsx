@@ -88,7 +88,7 @@ export default function CookieModal({ onClose, onSave }: CookieModalProps) {
               <p className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] opacity-50">Transparência & LGPD</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-bg-card rounded-2xl transition-all text-text-secondary">
+          <button onClick={onClose} className="p-3 hover:bg-bg-card rounded-full transition-all text-text-secondary">
             <X size={24} />
           </button>
         </div>
@@ -148,13 +148,13 @@ export default function CookieModal({ onClose, onSave }: CookieModalProps) {
           <div className="flex items-center gap-3 w-full sm:w-auto">
              <button
               onClick={onClose}
-              className="px-8 py-4 rounded-2xl border border-border-color text-[11px] font-black uppercase tracking-widest text-text-secondary hover:bg-bg-card transition-all flex-1 sm:flex-none"
+              className="px-8 py-4 rounded-full border border-border-color text-[11px] font-black uppercase tracking-widest text-text-secondary hover:bg-bg-card transition-all flex-1 sm:flex-none"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
-              className="px-10 py-4 rounded-2xl bg-brand-primary text-white text-[11px] font-black uppercase tracking-widest shadow-lg shadow-brand-primary/20 hover:bg-brand-secondary transition-all active:scale-95 flex-1 sm:flex-none"
+              className="px-10 py-4 rounded-full bg-brand-primary text-white text-[11px] font-black uppercase tracking-widest shadow-lg shadow-brand-primary/20 hover:bg-brand-secondary transition-all active:scale-95 flex-1 sm:flex-none"
             >
               Salvar Preferências
             </button>

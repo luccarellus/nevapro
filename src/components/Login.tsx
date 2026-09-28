@@ -238,14 +238,14 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                                   setSchool('');
                                 }}
                                 required
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-10 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner appearance-none [color-scheme:dark] relative z-0"
+                                className="select-pill select-pill-lg w-full pl-12 relative z-0"
                               >
                                 <option value="">Selecione sua cidade</option>
                                 {uniqueCities.map(c => (
                                   <option key={c} value={c}>{c}</option>
                                 ))}
                               </select>
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 z-10">
+                              <div className="select-pill-chevron opacity-50 z-10">
                                 <ArrowRight className="rotate-90 text-text-secondary" size={14} />
                               </div>
                             </div>
@@ -261,14 +261,14 @@ export default function Login({ onLogin, onTabChange }: LoginProps) {
                                 onChange={(e) => setSchool(e.target.value)}
                                 required
                                 disabled={!city}
-                                className="w-full bg-input-bg rounded-2xl py-4 pl-12 pr-10 text-text-main font-bold focus:outline-none focus:border-brand-primary/50 transition-all shadow-inner appearance-none disabled:opacity-50 [color-scheme:dark] relative z-0"
+                                className="select-pill select-pill-lg w-full pl-12 relative z-0"
                               >
                                 <option value="">{city ? "Selecione sua escola" : "Selecione uma cidade primeiro"}</option>
                                 {availableSchools.map(s => (
                                   <option key={s} value={s}>{s}</option>
                                 ))}
                               </select>
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 z-10">
+                              <div className="select-pill-chevron opacity-50 z-10">
                                 <ArrowRight className="rotate-90 text-text-secondary" size={14} />
                               </div>
                             </div>

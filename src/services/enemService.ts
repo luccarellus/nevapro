@@ -20,6 +20,55 @@ export interface EnemQuestion {
   correctAlternative: string;
 }
 
+export interface EnemHubQuestion {
+  id: string;
+  externalId: string;
+  year: number;
+  difficulty: string;
+  statement: string;
+  correctAlternative: string;
+  exam: string;
+  subject: { id: string; name: string; area: string };
+  alternatives: {
+    id: string;
+    letter: string;
+    text: string;
+    isCorrect: boolean;
+    image?: string;
+  }[];
+}
+
+/**
+ * Strip de HTML basico convertendo cada <img> em imagem markdown inline.
+ * Preserva a POSICAO e a ORDEM de todos os graficos do enunciado — antes,
+ * apenas a primeira imagem era mantida e as demais eram descartadas,
+ * fazendo questoes com multiplus graficos perderem informacao.
+ */
+export function stripHtml(html: string): { text: string; images: string[] } {
+  const images: string[] = [];
+  let out = html || '';
+  // Converte <img src> em markdown inline (renderizado via MarkdownImage/ProxiedImage)
+  out = out.replace(/<img[^>]+src=["']([^"']+)["'][^>]*>/g, (_m, src) => {
+    images.push(src);
+    const proxied = proxyImageUrl(src) || src;
+    return `\n\n![](${proxied})\n\n`;
+  });
+  // Paragrafos e quebras viram linhas
+  out = out.replace(/<\/?p>/g, '\n').replace(/<br\s*\/?>/g, '\n');
+  // Remove demais tags
+  out = out.replace(/<[^>]+>/g, '');
+  out = out
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  // Colapsa linhas vazias repetidas
+  out = out.replace(/\n{3,}/g, '\n\n').trim();
+  return { text: out, images };
+}
+
 const proxyImageUrl = (urlOrObj: any) => {
   if (!urlOrObj) return undefined;
   
@@ -39,6 +88,9 @@ const proxyImageUrl = (urlOrObj: any) => {
   if (url.startsWith('/')) {
     // If it starts with /v1, it's likely already correct relative to api.enem.dev
     absoluteUrl = `https://api.enem.dev${url}`;
+  } else if (url.includes('img.enemhub.com.br')) {
+    // EnemHub image CDN — absolute, no rewrite
+    return `/api/imagem?url=${encodeURIComponent(url)}`;
   } else if (!url.startsWith('http')) {
     // If it's a relative path like "files/abc.jpg", try prefixing with api.enem.dev/v1/
     absoluteUrl = `https://api.enem.dev/v1/${url}`;
@@ -49,6 +101,50 @@ const proxyImageUrl = (urlOrObj: any) => {
 
 const normalizeStr = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+/** Busca questoes da EnemHub via proxy interno e normaliza para Question. */
+const enemhubService = {
+  async getQuestionsByYear(year: number): Promise<Question[]> {
+    try {
+      const batches = [1, 2, 3, 4].map((page) =>
+        fetch(`/api/questoes/enemhub?year=${year}&limit=50&page=${page}`)
+          .then((res) => (res.ok ? res.json() : { questions: [] }))
+          .catch(() => ({ questions: [] })),
+      );
+      const results = await Promise.all(batches);
+      const raw = results.flatMap((r) => r.questions || []) as EnemHubQuestion[];
+
+      // Deduplica por id da EnemHub
+      const unique = Array.from(new Map(raw.map((q) => [q.id, q])).values());
+
+      return unique.map((q) => {
+        // Todos os graficos ficam inline no texto (markdown); imageUrl fica vazio
+        // para nao duplicar a 1a imagem nos componentes que a renderizam em bloco.
+        const { text } = stripHtml(q.statement || '');
+        const alts = q.alternatives || [];
+        const subjectName = q.subject?.name || 'Geral';
+        const discNorm = normalizeStr(subjectName);
+        const difficulty = (q.difficulty || 'médio').toLowerCase() as Question['difficulty'];
+
+        return {
+          id: `ehub-${year}-${q.externalId || q.id.slice(0, 8)}`,
+          subject: subjectName,
+          text,
+          options: alts.map((a) => a.text || ''),
+          optionImages: alts.map((a) => (a.image ? (proxyImageUrl(a.image) ?? null) : null)),
+          imageUrl: undefined,
+          correctOptionIndex: alts.findIndex((a) => a.isCorrect),
+          explanation: 'Questão oficial do ENEM (EnemHub).',
+          difficulty: difficulty === 'fácil' || difficulty === 'difícil' ? difficulty : 'médio',
+          xpReward: 15,
+        };
+      });
+    } catch (err) {
+      console.error('[EnemHub Service] fetch failed (fallback para enem.dev):', err);
+      return [];
+    }
+  },
+};
+
 export const enemService = {
   async getQuestionsByYear(year: number): Promise<Question[]> {
     console.log(`[ENEM Service] Starting fetch for year ${year}`);
@@ -56,6 +152,8 @@ export const enemService = {
     const TOTAL_REQUESTS = 5; // Fetch 250 items to be safe for 180 questions
 
     try {
+      // Fonte 2 (EnemHub) em paralelo — falha nao quebra o fluxo (fallback interno)
+      const hubPromise = enemhubService.getQuestionsByYear(year).catch(() => [] as Question[]);
       const fetchPromises = Array.from({ length: TOTAL_REQUESTS }, (_, i) => {
         const offset = i * BATCH_SIZE;
         const url = `/api/questoes?year=${year}&limit=${BATCH_SIZE}&offset=${offset}`;
@@ -75,13 +173,33 @@ export const enemService = {
       const results = await Promise.all(fetchPromises);
       const allApiQuestions: EnemQuestion[] = results.flat();
 
+      // Merge com EnemHub (fonte 2): converte e concatena
+      const hubQuestions = await hubPromise;
+      const hubAsEnem: EnemQuestion[] = hubQuestions.map((q) => ({
+        title: '',
+        index: parseInt(q.id.split('-')[2] || '0', 10) || 0,
+        discipline: q.subject,
+        year,
+        context: q.text,
+        alternativesIntroduction: '',
+        files: q.imageUrl ? [q.imageUrl] : [],
+        alternatives: q.options.map((opt, i) => ({
+          letter: String.fromCharCode(65 + i),
+          text: opt,
+          file: q.optionImages?.[i] || null,
+          isCorrect: i === q.correctOptionIndex,
+        })),
+        correctAlternative: String.fromCharCode(65 + (q.correctOptionIndex >= 0 ? q.correctOptionIndex : 0)),
+      }));
+
       console.log(`[ENEM Service] Total questions collected: ${allApiQuestions.length}`);
       
       if (allApiQuestions.length === 0) {
         console.warn(`[ENEM Service] No questions were collected for year ${year}. Check server proxy logs.`);
       }
 
-      return allApiQuestions.map(q => {
+      // EnemHub ja vem no formato Question; injeta no pool final dedup por id
+      const mappedDev = allApiQuestions.map(q => {
         const rawText = `${q.context || ''}\n\n${q.alternativesIntroduction || ''}`.trim();
         // Corrige links de imagem com espaço e alt text
         let cleanedText = rawText.replace(/!\[(.*?)\]\s+\((.*?)\)/g, '![$1]($2)');
@@ -105,19 +223,37 @@ export const enemService = {
         const isEng = discNorm.includes('ing') || discNorm.includes('english');
         const isEsp = discNorm.includes('esp') || discNorm.includes('spanish');
 
+        // Se a imagem principal já está inline no markdown do texto, não seta
+        // imageUrl — os componentes renderizam imageUrl em bloco e a imagem duplicaria.
+        // Compara pelo basename do arquivo (sobrevive ao URL-encoding do proxy).
+        const mainImage = q.files && q.files.length > 0 ? proxyImageUrl(q.files[0]) : undefined;
+        const mainFileBasename = q.files?.[0]?.split('/').pop()?.split('?')[0];
+        const alreadyInline = !!mainFileBasename && cleanedText.includes(mainFileBasename);
+
         return {
           id: `${year}-${q.index || 0}-${discNorm}`,
           subject: q.discipline || 'Geral',
           text: cleanedText,
           options: (q.alternatives || []).map(opt => opt.text || ''),
           optionImages: (q.alternatives || []).map(opt => proxyImageUrl(opt.file) || null),
-          imageUrl: q.files && q.files.length > 0 ? proxyImageUrl(q.files[0]) : undefined,
+          imageUrl: mainImage && !alreadyInline ? mainImage : undefined,
           correctOptionIndex: (q.alternatives || []).findIndex(opt => opt.letter === q.correctAlternative),
           explanation: 'Resolução baseada nos critérios oficiais do ENEM.',
           difficulty: 'médio',
           xpReward: 15
         };
       });
+
+      // Merge das duas fontes: dedup por id + embaralha para variar o pool
+      const typedDev = mappedDev as Question[];
+      const merged = [...typedDev, ...hubQuestions];
+      const seen = new Set<string>();
+      const deduped = merged.filter((q) => {
+        if (seen.has(q.id)) return false;
+        seen.add(q.id);
+        return true;
+      });
+      return deduped.sort(() => Math.random() - 0.5);
     } catch (error) {
       console.error('[ENEM Service] Critical error in getQuestionsByYear:', error);
       return [];
@@ -126,6 +262,9 @@ export const enemService = {
 
   async getLimitedQuestions(year: number, subject: string, limit: number = 50, preferredLanguage: 'ingles' | 'espanhol' = 'ingles'): Promise<Question[]> {
     console.log(`[ENEM Service] getLimitedQuestions(year: ${year}, subject: ${subject}, limit: ${limit}, lang: ${preferredLanguage})`);
+    // REGRA DO SISTEMA: treino livre entrega exatamente 50 questões.
+    // Clamp defensivo: nunca mais que 50, mesmo se a chamada pedir outro valor.
+    limit = Math.min(limit, 50);
     
     const fetchQuestionsPool = async (targetYear: number) => {
       const questions = await this.getQuestionsByYear(targetYear);
@@ -164,8 +303,8 @@ export const enemService = {
         return targetSlugs.some(slug => qSubject.includes(normalizeStr(slug)) || normalizeStr(slug).includes(qSubject));
       });
 
-      // Remove duplicates by internal index for this batch
-      return Array.from(new Map<string, Question>(filtered.map(q => [q.id.split('-')[1], q])).values());
+      // Deduplica pelo id completo (preserva questoes ehub- e dev- separadamente)
+      return Array.from(new Map<string, Question>(filtered.map(q => [q.id, q])).values());
     };
 
     let pool = await fetchQuestionsPool(year);
@@ -186,7 +325,11 @@ export const enemService = {
     
     const fetchQuestionsPool = async (targetYear: number) => {
       const allQuestions = await this.getQuestionsByYear(targetYear);
-      let filtered = allQuestions.filter(q => {
+      // Questoes ehub (ehub-{year}-{externalId}) nao tem indice oficial de prova:
+      // ficam no final do pool, usadas apenas para completar 90 questoes/dia
+      const official = allQuestions.filter(q => !q.id.startsWith('ehub-'));
+      const extras = allQuestions.filter(q => q.id.startsWith('ehub-'));
+      let filtered = official.filter(q => {
         const parts = q.id.split('-');
         const idx = parseInt(parts[1]);
         const discipline = parts[2] || ''; 
@@ -209,11 +352,17 @@ export const enemService = {
         const idx = q.id.split('-')[1];
         if (!uniqueMap.has(idx)) uniqueMap.set(idx, q);
       });
-      return Array.from(uniqueMap.values());
+      const officialPool = Array.from(uniqueMap.values());
+      // Extras ehub mantidos em pool separado para preencher lacunas abaixo
+      return officialPool.length > 0 ? officialPool : Array.from(new Map(extras.map(q => [q.id, q])).values());
     };
 
     let questions = await fetchQuestionsPool(year);
-    
+
+    // REGRA DO SISTEMA: simulado entrega exatamente 90 questões por dia.
+    // Nos anos 2024/2025 (só EnemHub, sem índice oficial) o pool oficial é vazio
+    // e o próprio fetchQuestionsPool já retorna os extras ehub.
+
     // If we have gaps (ENEM should have 90), fetch some from previous year to fill up
     if (questions.length < 90 && year > 2009) {
       console.log(`[ENEM Service] Only ${questions.length} questions found for ${year} day ${day}. Filling gaps from ${year - 1}.`);

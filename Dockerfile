@@ -1,5 +1,6 @@
 # Multi-stage build para otimização de imagem
-FROM node:20-alpine AS builder
+# Variante "-dev" inclui npm e ferramentas de build, com 0 CVEs críticos/altos
+FROM cgr.dev/chainguard/node:latest-22-dev AS builder
 
 WORKDIR /app
 
@@ -15,29 +16,22 @@ ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY \
     GEMINI_API_KEY=$GEMINI_API_KEY
 
 COPY package*.json ./
-RUN apk upgrade --no-cache && npm ci
+RUN npm ci
 
 COPY . .
 RUN npm run build
 
-# Stage de Produção
-FROM node:20-alpine
+# Stage de Produção — imagem hardened Chainguard (0 CVEs críticos/altos)
+# Sem shell, sem apk, sem root: superfície de ataque mínima.
+FROM cgr.dev/chainguard/node:latest-22
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Atualiza pacotes da base Alpine para eliminar vulnerabilidades de segurança.
-# curl: healthcheck do container. postgresql-client: permite pg_dump nativo nos backups.
-RUN apk upgrade --no-cache && apk add --no-cache curl postgresql-client
-
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-
-# Garante permissões e executa com usuário node (sem privilégios root)
-RUN chown -R node:node /app
-USER node
 
 EXPOSE 3000
 

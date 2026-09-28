@@ -11,7 +11,7 @@
     "not dead"
   ],
   "scripts": {
-    "dev": "tsx server/index.ts",
+    "dev": "tsx server.ts",
     "build:api": "esbuild server/vercel.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=api/index.js",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
@@ -19,7 +19,9 @@
     "lint": "tsc --noEmit",
     "test:backblaze-logs": "tsx server/scripts/testBackblazeLogs.ts",
     "test:backblaze-backup": "tsx server/scripts/testBackblazeBackup.ts",
-    "backup:db": "tsx server/scripts/runBackup.ts"
+    "backup:db": "tsx server/scripts/runBackup.ts",
+    "db:schema": "node -e \"require('dotenv').config();const{Pool}=require('pg');const fs=require('fs');const pool=new Pool({connectionString:process.env.DATABASE_URL});pool.query(fs.readFileSync('scripts/schema.sql','utf-8')).then(()=>console.log('Schema OK')).catch(e=>{console.error(e.message);process.exit(1)}).finally(()=>pool.end())\"",
+    "promote:admin": "tsx server/scripts/promoteSuperAdmin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",

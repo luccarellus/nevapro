@@ -183,7 +183,48 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/client-logs', rateLimiter(30, 60_000), clientLogRoutes);
 app.use('/api/tenants', tenantRoutes);
 
-// ===== Image Proxy =====
+// Segue redirects HTTP de forma segura: cada salto e revalidado contra a
+// allow-list (enem.dev, api.enem.dev, img.enemhub.com.br + env). Antes o proxy
+// rejeitava qualquer 3xx e nao permitia imagens da EnemHub, quebrando muitas
+// imagens de enunciados e alternativas.
+const IMAGE_PROXY_MAX_REDIRECTS = 5;
+
+const isAllowedImageHost = (hostname: string): boolean => {
+  const h = hostname.toLowerCase();
+  if (h === 'enem.dev' || h === 'api.enem.dev' || h === 'img.enemhub.com.br') return true;
+  const extraHosts = (process.env.ALLOWED_IMAGE_HOSTS || '')
+    .split(',')
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+  return extraHosts.includes(h);
+};
+
+const fetchImageWithRedirects = async (rawUrl: string): Promise<Response> => {
+  let currentUrl = rawUrl.trim();
+  for (let hop = 0; hop <= IMAGE_PROXY_MAX_REDIRECTS; hop++) {
+    const parsed = new URL(currentUrl);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error('protocolo nao permitido');
+    }
+    if (!isAllowedImageHost(parsed.hostname)) {
+      throw new Error('Acesso negado: dominio nao permitido.');
+    }
+    const response = await fetch(parsed.toString(), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NevaApp/1.0)', Referer: 'https://enem.dev/' },
+      redirect: 'manual',
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('redirect sem location');
+      // Header pode conter espacos e URLs relativas — resolve antes da proxima iteracao
+      currentUrl = new URL(location.trim(), parsed).toString();
+      continue;
+    }
+    return response;
+  }
+  throw new Error('limite de redirecionamentos excedido');
+};
+
 app.get('/api/imagem', async (req, res) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) {
@@ -191,23 +232,7 @@ app.get('/api/imagem', async (req, res) => {
     return;
   }
   try {
-    const parsedUrl = new URL(imageUrl);
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const allowedHostsEnv = process.env.ALLOWED_IMAGE_HOSTS || '';
-    const extraHosts = allowedHostsEnv.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
-    const isAllowedHost = hostname === 'enem.dev' || hostname === 'api.enem.dev' || extraHosts.includes(hostname);
-    if (!isAllowedHost) {
-      res.status(403).send('Acesso negado: domínio não permitido.');
-      return;
-    }
-    const response = await fetch(imageUrl, {
-      headers: { 'User-Agent': 'Mozilla', Referer: 'https://enem.dev/' },
-      redirect: 'manual',
-    });
-    if (response.status >= 300 && response.status < 400) {
-      res.status(403).send('Acesso negado: redirecionamentos não são permitidos.');
-      return;
-    }
+    const response = await fetchImageWithRedirects(imageUrl);
     if (!response.ok) {
       res.status(response.status).send('Fetch error');
       return;
@@ -216,12 +241,15 @@ app.get('/api/imagem', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     const buffer = Buffer.from(await response.arrayBuffer());
     res.send(buffer);
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    if (message.indexOf('Acesso negado') >= 0 || message.indexOf('protocolo') >= 0) {
+      res.status(403).send(message);
+      return;
+    }
     res.status(500).send('Proxy error');
   }
 });
-
-
 
 // ===== Storage Proxy (B2) =====
 app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {

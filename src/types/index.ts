@@ -19,6 +19,8 @@ export interface TenantInfo {
   slug: string;
   name: string;
   plan: string;
+  /** Domínio customizado (opcional). */
+  domain?: string;
 }
 
 export interface UserProfile {

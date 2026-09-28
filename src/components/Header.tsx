@@ -171,15 +171,15 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
                      animate={{ opacity: 1, y: 0, scale: 1 }}
                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                     className="absolute right-0 mt-4 w-[calc(100vw-2rem)] sm:w-[400px] bg-[#0d1425] border border-white/5 rounded-[32px] shadow-2xl overflow-hidden shadow-black/80 z-50 transition-all duration-300"
+                     className="absolute right-0 mt-4 w-[calc(100vw-2rem)] sm:w-[400px] bg-bg-card border border-border-color rounded-[32px] shadow-2xl overflow-hidden shadow-black/80 z-50 transition-all duration-300"
                       style={{ transformOrigin: 'top right' }}
                    >
                      <div className="p-6 border-b border-white/5 flex justify-between items-center">
                        <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#00e5ff] leading-none mb-1">Notificações</h4>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-primary leading-none mb-1">Notificações</h4>
                         <p className="text-[9px] text-text-secondary mt-0.5 font-bold opacity-40 uppercase tracking-widest">{unreadCount} mensagens</p>
                        </div>
-                       <button onClick={() => setShowNotifications(false)} className="text-text-secondary hover:text-white p-1 rounded-lg hover:bg-white/5">
+                       <button onClick={() => setShowNotifications(false)} className="text-text-secondary hover:text-white p-1 rounded-full hover:bg-white/5">
                          <X size={14} />
                        </button>
                      </div>
@@ -195,12 +195,12 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
                          notifications.map(n => (
                            <div key={n.id} onClick={() => handleNotificationClick(n)} className={`p-5 border-b border-white/5 last:border-0 hover:bg-white/[0.02] cursor-pointer transition-colors group relative ${!n.read ? 'bg-white/[0.02]' : ''}`}>
                              {!n.read && (
-                               <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#00e5ff]" />
+                               <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-primary" />
                              )}
                              <div className="flex justify-between items-start mb-2">
                                <div className="flex items-center gap-2">
                                  {getIconForType(n.type)}
-                                 <h5 className={`font-black text-[13px] tracking-tight leading-none uppercase ${!n.read ? 'text-white' : 'text-text-secondary opacity-50'} group-hover:text-[#00e5ff] transition-colors`}>{n.title}</h5>
+                                 <h5 className={`font-black text-[13px] tracking-tight leading-none uppercase ${!n.read ? 'text-text-main' : 'text-text-secondary opacity-50'} group-hover:text-brand-primary transition-colors`}>{n.title}</h5>
                                </div>
                                <span className="text-[8px] font-bold text-white/20 whitespace-nowrap">{getTimeAgo(n.createdAt)}</span>
                              </div>
@@ -213,7 +213,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
                         <div className="p-4 bg-white/[0.02] text-center border-t border-white/5">
                           <button 
                             onClick={markAllAsRead}
-                            className="w-full py-3.5 rounded-xl bg-white/5 hover:bg-[#00e5ff] hover:text-black text-white text-[10px] font-black uppercase tracking-[0.3em] transition-all"
+                            className="w-full py-3.5 rounded-xl bg-text-main/5 hover:bg-brand-primary hover:text-white text-text-main text-[10px] font-black uppercase tracking-[0.3em] transition-all"
                           >
                             Marcar como concluídas
                           </button>

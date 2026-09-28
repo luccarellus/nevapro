@@ -109,7 +109,7 @@ export default function AdminHeader({
             onTabChange(tab.id);
             onSelect?.();
           }}
-          className={`w-full h-12 px-4 rounded-xl text-sm font-black transition-all flex items-center gap-3 cursor-pointer ${
+          className={`w-full h-12 px-4 rounded-full text-sm font-black transition-all flex items-center gap-3 cursor-pointer ${
             activeTab === tab.id
               ? 'bg-text-main/10 text-text-main shadow-sm'
               : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
@@ -195,7 +195,7 @@ export default function AdminHeader({
                     setShowAdminPreferences(false);
                     onOpenSettings();
                   }}
-                  className="w-full rounded-xl border border-border-color bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary px-3.5 py-2.5 flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
+                  className="w-full rounded-full border border-border-color bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary px-3.5 py-2.5 flex items-center justify-between text-xs font-bold transition-all cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <SettingsIcon size={15} />
@@ -213,7 +213,7 @@ export default function AdminHeader({
               <button
                 type="button"
                 onClick={onLogout}
-                className="text-[10px] font-black text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer"
+                className="text-[10px] font-black text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer rounded-full px-2.5 py-1.5 hover:bg-red-500/10 transition-colors"
               >
                 <LogOut size={13} />
                 Sair
@@ -277,7 +277,7 @@ export default function AdminHeader({
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     isActive
                       ? 'bg-brand-primary text-white shadow-sm shadow-brand-primary/30 font-black'
                       : 'text-text-secondary hover:text-text-main hover:bg-text-main/5'
@@ -354,7 +354,7 @@ export default function AdminHeader({
                         onTabChange(tab.id);
                         setIsSidebarOpen(false);
                       }}
-                      className={`p-3 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
+                      className={`p-3 rounded-full text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
                         isActive
                           ? 'bg-brand-primary text-white shadow-sm shadow-brand-primary/30 font-black'
                           : 'bg-bg-main/50 text-text-secondary border border-border-color hover:text-text-main'
@@ -378,7 +378,7 @@ export default function AdminHeader({
                 </div>
                 <button
                   onClick={onLogout}
-                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-red-500 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-full text-red-500 text-xs font-black flex items-center gap-1.5 cursor-pointer"
                 >
                   <LogOut size={14} />
                   Sair do sistema

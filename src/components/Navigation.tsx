@@ -17,19 +17,22 @@ interface NavigationProps {
 export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout, user, onTabHover }: NavigationProps) {
   const [showMore, setShowMore] = useState(false);
 
+  // Paleta suavizada: 5 famílias derivadas do teal da marca em vez de um arco-íris.
+  // Uso geral: teal = navegação/geral, mel = conquistas, coral = revisão de erros,
+  // lavanda = IA/conteúdo, azul-aço = tarefas/dados.
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-[#00e5ff]', bgColor: 'bg-[#00e5ff]/10', hex: '#00e5ff' },
-    { id: 'questions', label: 'Questões', icon: BookOpen, color: 'text-blue-500', bgColor: 'bg-blue-500/10', hex: '#3b82f6' },
-    { id: 'simulados', label: 'Simulados', icon: ClipboardList, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#38bdf8' },
-    { id: 'errors', label: 'Caderno de Erros', icon: AlertOctagon, color: 'text-rose-500', bgColor: 'bg-rose-500/10', hex: '#f43f5e' },
-    { id: 'plano_estudos', label: 'Plano de Estudos', icon: Target, color: 'text-cyan-400', bgColor: 'bg-cyan-400/10', hex: '#22d3ee' },
-    { id: 'desempenho', label: 'Desempenho', icon: TrendingUp, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#34d399' },
-    { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-500', bgColor: 'bg-amber-500/10', hex: '#f59e0b' },
-    { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', hex: '#10b981' },
-    { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-500', bgColor: 'bg-purple-500/10', hex: '#a855f7' },
-    { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' },
-    { id: 'redacao', label: 'Redação', icon: PenTool, color: 'text-rose-400', bgColor: 'bg-rose-400/10', hex: '#fb7185' },
-    { id: 'professor_ia', label: 'Professor IA', icon: Sparkles, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#818cf8' },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
+    { id: 'questions', label: 'Questões', icon: BookOpen, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
+    { id: 'simulados', label: 'Simulados', icon: ClipboardList, color: 'text-cyan-400', bgColor: 'bg-cyan-400/10', hex: '#58bcc2' },
+    { id: 'errors', label: 'Caderno de Erros', icon: AlertOctagon, color: 'text-rose-400', bgColor: 'bg-rose-400/10', hex: '#dd7f85' },
+    { id: 'plano_estudos', label: 'Plano de Estudos', icon: Target, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
+    { id: 'desempenho', label: 'Desempenho', icon: TrendingUp, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4fb99b' },
+    { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-400', bgColor: 'bg-amber-400/10', hex: '#ddb46f' },
+    { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4fb99b' },
+    { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-400', bgColor: 'bg-purple-400/10', hex: '#a687c2' },
+    { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#5fafc2' },
+    { id: 'redacao', label: 'Redação', icon: PenTool, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#8d8cc5' },
+    { id: 'professor_ia', label: 'Professor IA', icon: Sparkles, color: 'text-indigo-400', bgColor: 'bg-indigo-400/10', hex: '#8d8cc5' },
   ];
 
   if (isAdmin) {
@@ -40,7 +43,7 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
   const otherTabs = [
     ...tabs.slice(4),
     { id: 'profile', label: 'Preferências', icon: User, color: 'text-slate-400', bgColor: 'bg-slate-400/10', hex: '#94a3b8' },
-    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-500', bgColor: 'bg-red-500/10', hex: '#ef4444' }
+    { id: 'logout', label: 'Sair', icon: LogOut, color: 'text-red-400', bgColor: 'bg-red-400/10', hex: '#e57f6d' }
   ];
 
   const handleTabClick = (id: string) => {

@@ -38,6 +38,9 @@ export default function AdminTenants({
   const [tenantDomain, setTenantDomain] = useState('');
   const [tenantPlan, setTenantPlan] = useState('standard');
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [members, setMembers] = useState<TenantMember[]>([]);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -178,7 +181,7 @@ export default function AdminTenants({
           {isSuperAdmin && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/25 cursor-pointer"
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-full bg-brand-primary text-white text-xs font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/25 cursor-pointer"
             >
               <Plus size={15} />
               Nova Instituição
@@ -339,7 +342,7 @@ export default function AdminTenants({
                         <td className="py-3 text-right pr-2">
                           <button
                             onClick={() => handleRemoveMember(m.user_id, m.user_name)}
-                            className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
+                            className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-full transition-all cursor-pointer"
                             title="Remover vínculo"
                           >
                             <Trash2 size={14} />
@@ -376,7 +379,7 @@ export default function AdminTenants({
                 <h3 className="text-base font-black text-text-main">Criar Nova Instituição</h3>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="p-1.5 text-text-secondary hover:text-text-main rounded-lg"
+                  className="p-1.5 text-text-secondary hover:text-text-main rounded-full"
                 >
                   <X size={16} />
                 </button>
@@ -441,7 +444,7 @@ export default function AdminTenants({
                   <select
                     value={tenantPlan}
                     onChange={(e) => setTenantPlan(e.target.value)}
-                    className="w-full bg-bg-main/50 border border-border-color rounded-xl px-3.5 py-2.5 text-xs font-bold text-text-main focus:outline-none focus:border-brand-primary/50 transition-all"
+                    className="select-pill w-full"
                   >
                     <option value="free">Free / Demonstração</option>
                     <option value="standard">Standard / Básico</option>
@@ -453,14 +456,14 @@ export default function AdminTenants({
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="flex-1 bg-text-main/5 hover:bg-text-main/10 text-text-main py-2.5 rounded-xl font-bold text-xs transition-all border border-border-color"
+                    className="flex-1 bg-text-main/5 hover:bg-text-main/10 text-text-main py-2.5 rounded-full font-bold text-xs transition-all border border-border-color"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 bg-brand-primary text-white hover:opacity-90 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="flex-1 bg-brand-primary text-white hover:opacity-90 py-2.5 rounded-full font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isSubmitting ? <Spinner size={14} className="text-white" /> : <Plus size={14} />}
                     Criar Instituição

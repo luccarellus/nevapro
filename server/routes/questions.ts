@@ -223,4 +223,98 @@ router.get('/', async (req, res: Response) => {
   }
 });
 
+// =============================================================
+// ENEMHUB — 2a fonte de questoes (api.enemhub.com.br)
+// Formato: statement HTML, subject {name, area},
+// alternatives[] com isCorrect, gabarito explicito.
+// =============================================================
+
+const ENEMHUB_BASE = 'https://api.enemhub.com.br/v1/enem';
+
+function getEnemHubKey(): string | null {
+  const key = process.env.ENEMHUB_API_KEY;
+  return key ? key : null;
+}
+
+// Subjects (disciplinas com subareas) — dado estatico, cache 1h
+router.get('/enemhub/subjects', async (_req, res: Response) => {
+  const key = getEnemHubKey();
+  if (!key) {
+    res.status(503).json({ error: 'EnemHub não configurada (ENEMHUB_API_KEY ausente).' });
+    return;
+  }
+  try {
+    const cacheKey = 'cache:enemhub:subjects';
+    const cached = await cacheGet<unknown>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const response = await fetch(ENEMHUB_BASE + '/subjects', {
+      headers: { 'X-API-Key': key },
+    });
+    if (response.status === 429) {
+      res.status(429).json({ error: 'EnemHub rate limit. Tente novamente em instantes.' });
+      return;
+    }
+    if (!response.ok) {
+      res.status(response.status).json({ error: 'EnemHub API error: ' + response.statusText });
+      return;
+    }
+    const body = await response.json();
+    const payload = { subjects: body.data || [] };
+    await cacheSet(cacheKey, payload, 3600);
+    res.json(payload);
+  } catch (err) {
+    log.error('[EnemHub Proxy] subjects error:', err);
+    res.status(500).json({ error: 'Falha ao listar disciplinas da EnemHub.' });
+  }
+});
+
+// Questoes por ano — cache 10min, retry unico em 429
+router.get('/enemhub', async (req, res: Response) => {
+  const { year, limit, page } = req.query;
+
+  const yearNum = parseInt(String(year || ''), 10);
+  if (!yearNum || yearNum < 2009 || yearNum > 2025) {
+    res.status(400).json({ error: 'Parâmetro year inválido (2009-2025).' });
+    return;
+  }
+  const limitNum = Math.min(Math.max(parseInt(String(limit || '50'), 10) || 50, 1), 200);
+  const pageNum = Math.max(parseInt(String(page || '1'), 10) || 1, 1);
+
+  const key = getEnemHubKey();
+  if (!key) {
+    res.status(503).json({ error: 'EnemHub não configurada (ENEMHUB_API_KEY ausente).' });
+    return;
+  }
+
+  try {
+    const cacheKey = 'cache:enemhub:questions:' + yearNum + ':' + limitNum + ':' + pageNum;
+    const cached = await cacheGet<unknown>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+    const apiUrl = ENEMHUB_BASE + '/questions?year=' + yearNum + '&limit=' + limitNum + '&page=' + pageNum;
+    let response = await fetch(apiUrl, { headers: { 'X-API-Key': key } });
+    if (response.status === 429) {
+      // Retry unico apos pausa curta (rate limit da EnemHub)
+      await new Promise((r) => setTimeout(r, 2500));
+      response = await fetch(apiUrl, { headers: { 'X-API-Key': key } });
+    }
+    if (!response.ok) {
+      res.status(response.status).json({ error: 'EnemHub API error: ' + response.statusText });
+      return;
+    }
+    const body = await response.json();
+    const payload = { questions: body.data || [], meta: body.meta || null };
+    await cacheSet(cacheKey, payload, 600);
+    res.json(payload);
+  } catch (err) {
+    log.error('[EnemHub Proxy] questions error:', err);
+    res.status(500).json({ error: 'Falha ao buscar questões da EnemHub.' });
+  }
+});
+
 export default router;

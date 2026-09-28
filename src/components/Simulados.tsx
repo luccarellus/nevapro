@@ -660,7 +660,7 @@ export default function Simulados({
                     <select
                       value={selectedYears[sim.id] || 2023}
                       onChange={(e) => setSelectedYears(prev => ({ ...prev, [sim.id]: parseInt(e.target.value, 10) }))}
-                      className="pl-4 sm:pl-5 pr-8 sm:pr-10 py-1.5 sm:py-2 bg-text-main/5 hover:bg-text-main/10 border-none rounded-full text-[9px] sm:text-[10px] font-black text-text-secondary uppercase tracking-wider sm:tracking-widest cursor-pointer focus:outline-none ring-1 ring-border-color hover:ring-brand-primary/40 focus:ring-brand-primary text-center appearance-none [color-scheme:dark] transition-all duration-200"
+                      className="select-pill select-pill-sm bg-transparent text-center text-text-secondary hover:bg-text-main/10 ring-1 ring-border-color hover:ring-brand-primary/40 focus:ring-brand-primary"
                       title="Selecionar ano do ENEM"
                       aria-label="Selecionar ano do ENEM"
                     >
@@ -668,13 +668,13 @@ export default function Simulados({
                         <option 
                           key={year} 
                           value={year} 
-                          className="bg-[#111827] text-white dark:bg-[#111827] dark:text-white [data-theme=light]:bg-white [data-theme=light]:text-black font-bold text-xs"
+                          className="bg-bg-card text-text-main font-bold text-xs"
                         >
                           ENEM {year}
                         </option>
                       ))}
                     </select>
-                    <div className="absolute right-3 pointer-events-none text-brand-primary/75">
+                    <div className="select-pill-chevron right-3 text-brand-primary/75">
                       <ChevronDown size={12} className="transition-transform duration-200 group-hover:scale-110" />
                     </div>
                   </div>

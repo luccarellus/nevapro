@@ -107,7 +107,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
         spread: 70,
         origin: { y: 0.6 },
         zIndex: 99999,
-        colors: ['#00b094', '#00ffd5', '#fbbf24', '#ffffff'],
+        colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff'],
       });
       setTimeout(() => {
         confetti({
@@ -116,7 +116,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
           spread: 55,
           origin: { x: 0.1, y: 0.7 },
           zIndex: 99999,
-          colors: ['#00b094', '#00ffd5', '#fbbf24'],
+          colors: ['#00b094', '#4fb99b', '#ddb46f'],
         });
         confetti({
           particleCount: 40,
@@ -124,7 +124,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
           spread: 55,
           origin: { x: 0.9, y: 0.7 },
           zIndex: 99999,
-          colors: ['#00b094', '#00ffd5', '#fbbf24'],
+          colors: ['#00b094', '#4fb99b', '#ddb46f'],
         });
       }, 200);
     } catch (e) {

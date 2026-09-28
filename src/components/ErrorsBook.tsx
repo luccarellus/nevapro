@@ -167,7 +167,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#00e5ff', '#00b094', '#f43f5e', '#a855f7', '#f59e0b']
+          colors: ['#00b094', '#4fb99b', '#ddb46f', '#ffffff']
         });
 
         // Concede XP e pontos de acerto
@@ -328,14 +328,14 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                 title="Selecionar Matéria"
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
-                className="w-full pl-5 pr-10 py-3 bg-bg-main border border-border-color rounded-2xl text-[10px] font-black text-text-secondary uppercase tracking-wider cursor-pointer focus:outline-none focus:border-rose-500/50 appearance-none text-center"
+                className="select-pill w-full text-center text-text-secondary uppercase tracking-wider"
               >
                 <option value="all">Todas as Matérias</option>
                 {availableSubjects.map(sub => (
                   <option key={sub} value={sub}>{sub}</option>
                 ))}
               </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary/50">
+              <div className="select-pill-chevron">
                 <ChevronDown size={14} />
               </div>
             </div>
@@ -346,14 +346,14 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                 title="Selecionar Ano"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full pl-5 pr-10 py-3 bg-bg-main border border-border-color rounded-2xl text-[10px] font-black text-text-secondary uppercase tracking-wider cursor-pointer focus:outline-none focus:border-rose-500/50 appearance-none text-center"
+                className="select-pill w-full text-center text-text-secondary uppercase tracking-wider"
               >
                 <option value="all">Todos os Anos</option>
                 {availableYears.map(yr => (
                   <option key={yr} value={yr}>ENEM {yr}</option>
                 ))}
               </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary/50">
+              <div className="select-pill-chevron">
                 <ChevronDown size={14} />
               </div>
             </div>
@@ -448,7 +448,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                             
                             {/* Tags do Mockup */}
                             <div className="flex flex-wrap gap-2.5">
-                              <span className="px-4 py-1.5 bg-[#4285F4]/10 rounded-full text-[10px] font-bold text-[#4285F4] leading-none">
+                              <span className="px-4 py-1.5 bg-blue-500/10 rounded-full text-[10px] font-bold text-blue-400 leading-none">
                                 {q.subject}
                               </span>
                               <span className="px-4 py-1.5 bg-[#1F2937] text-white rounded-full text-[10px] font-bold leading-none">
@@ -519,7 +519,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
 
                               {/* Rodapé do Mockup: Badge da direita */}
                               <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end shrink-0">
-                                <div className="px-4 py-1.5 bg-[#4285F4]/10 text-[#4285F4] rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
+                                <div className="px-4 py-1.5 bg-blue-500/10 text-blue-400 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm">
                                   Resposta: {formatLetter(q.selectedOptionIndex)}
                                 </div>
                                 
@@ -628,7 +628,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="p-6 bg-bg-main/50 border border-border-color rounded-2xl space-y-4"
                               >
-                                <h5 className="text-[10px] font-black text-[#4285F4] uppercase tracking-widest flex items-center gap-1.5">
+                                <h5 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
                                   <BarChart2 size={13} /> Dados da Questão
                                 </h5>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -646,7 +646,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                                   </div>
                                   <div className="bg-bg-sidebar/50 p-3.5 rounded-xl border border-border-color/50">
                                     <span className="block text-[8px] font-black text-text-secondary uppercase opacity-60">Matéria</span>
-                                    <span className="text-xs font-black text-[#4285F4] truncate block">{q.subject}</span>
+                                    <span className="text-xs font-black text-blue-400 truncate block">{q.subject}</span>
                                   </div>
                                 </div>
                               </motion.div>

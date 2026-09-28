@@ -361,11 +361,11 @@ export default function AdminDashboard({
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Categoria</label>
                     <div className="relative">
                       <select value={eventForm.category} onChange={(e) => setEventForm({...eventForm, category: e.target.value})}
-                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
+                        className="select-pill w-full">
                         <option value="Evento">Evento</option><option value="Aulão">Aulão</option>
                         <option value="Simulado">Simulado</option><option value="Entrega">Entrega</option>
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
+                      <div className="select-pill-chevron opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -397,10 +397,10 @@ export default function AdminDashboard({
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Categoria</label>
                     <div className="relative">
                       <select value={muralForm.category} onChange={(e) => setMuralForm({...muralForm, category: e.target.value})}
-                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
+                        className="select-pill w-full">
                         <option value="importante">Aviso oficial</option><option value="estudos">Estudos</option><option value="apoio">Apoio</option>
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
+                      <div className="select-pill-chevron opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -437,21 +437,21 @@ export default function AdminDashboard({
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Tipo</label>
                     <div className="relative">
                       <select value={materialForm.type} onChange={(e) => setMaterialForm({...materialForm, type: e.target.value})}
-                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
+                        className="select-pill w-full">
                         <option value="pdf">PDF</option><option value="video">VÍDEO</option><option value="link">LINK EXTERNO</option>
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
+                      <div className="select-pill-chevron opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-text-secondary uppercase tracking-wider opacity-60">Foco</label>
                     <div className="relative">
                       <select value={materialForm.foco} onChange={(e) => setMaterialForm({...materialForm, foco: e.target.value})}
-                        className="w-full bg-bg-main/50 border border-border-color rounded-xl px-4 py-2.5 text-text-main font-bold text-xs focus:outline-none focus:border-text-main/30 transition-all appearance-none">
+                        className="select-pill w-full">
                         <option value="Turmas Gerais">Turmas Gerais</option><option value="Medicina">Medicina</option>
                         <option value="Exatas">Exatas</option><option value="Humanas">Humanas</option>
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
+                      <div className="select-pill-chevron opacity-50"><ArrowRight className="rotate-90" size={14} /></div>
                     </div>
                   </div>
                   <div className="space-y-1.5">

@@ -7,7 +7,7 @@
  * - API calls: Network-only (never cache sensitive data)
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `neva-static-${CACHE_VERSION}`;
 const PAGES_CACHE = `neva-pages-${CACHE_VERSION}`;
 const IMAGE_CACHE = `neva-images-${CACHE_VERSION}`;

@@ -18,7 +18,7 @@ export default function AdminEventos({ eventos, onEdit, onDelete, onAdd }: Admin
             <p className="text-xs text-text-secondary font-medium mt-0.5">Cronograma de simulados, aulões e eventos presenciais.</p>
           </div>
           <button onClick={onAdd}
-            className="bg-brand-primary text-white hover:opacity-90 transition-all px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm shadow-brand-primary/20">
+            className="bg-brand-primary text-white hover:opacity-90 transition-all px-4 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm shadow-brand-primary/20">
             <Plus size={15} />
             Adicionar Evento
           </button>
@@ -51,11 +51,11 @@ export default function AdminEventos({ eventos, onEdit, onDelete, onAdd }: Admin
                   <td className="py-4 text-right pr-3">
                     <div className="flex justify-end gap-1">
                       <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(evt); }}
-                        className="p-2 text-text-secondary hover:text-text-main transition-colors cursor-pointer relative z-[70]" title="Editar Evento">
+                        className="p-2 text-text-secondary hover:text-text-main transition-colors cursor-pointer relative z-[70] rounded-full" title="Editar Evento">
                         <Pencil size={15} />
                       </button>
                       <button onClick={(e) => onDelete(evt.id, e)}
-                        className="p-2 text-text-secondary hover:text-red-400 transition-colors cursor-pointer relative z-[70]" title="Excluir Evento">
+                        className="p-2 text-text-secondary hover:text-red-400 transition-colors cursor-pointer relative z-[70] rounded-full" title="Excluir Evento">
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -79,8 +79,8 @@ export default function AdminEventos({ eventos, onEdit, onDelete, onAdd }: Admin
                   <span className="bg-text-main/5 text-text-secondary border border-border-color text-[10px] font-semibold px-2 py-0.5 rounded-md">{evt.category}</span>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => onEdit(evt)} className="p-1.5 text-text-secondary hover:text-text-main transition-colors cursor-pointer"><Pencil size={14} /></button>
-                  <button onClick={(e) => onDelete(evt.id, e)} className="p-1.5 text-text-secondary hover:text-red-400 transition-colors cursor-pointer"><Trash2 size={14} /></button>
+                  <button onClick={() => onEdit(evt)} className="p-1.5 text-text-secondary hover:text-text-main transition-colors cursor-pointer rounded-full"><Pencil size={14} /></button>
+                  <button onClick={(e) => onDelete(evt.id, e)} className="p-1.5 text-text-secondary hover:text-red-400 transition-colors cursor-pointer rounded-full"><Trash2 size={14} /></button>
                 </div>
               </div>
               <div className="text-text-main font-bold text-sm mb-1">{evt.title}</div>

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, X, CheckCircle2, Trash2, ChevronRight, TrendingUp,
+  Users, X, CheckCircle2, Trash2, ChevronRight, TrendingUp, ChevronDown,
   ShieldAlert, Crown, UserCircle, Send, Clock, Trophy, Building2
 } from 'lucide-react';
 import Spinner from '../Spinner';
@@ -168,7 +168,7 @@ export default function AdminAlunos({
                   <button
                     key={type}
                     onClick={() => onFilterTypeChange(type)}
-                    className={`px-3 py-1.5 rounded-lg border transition-all cursor-pointer text-xs font-bold ${
+                    className={`px-3 py-1.5 rounded-full border transition-all cursor-pointer text-xs font-bold ${
                       filterType === type
                         ? 'bg-brand-primary text-white border-brand-primary shadow-xs shadow-brand-primary/30'
                         : 'bg-bg-card text-text-secondary border-border-color hover:text-text-main hover:bg-bg-sidebar'
@@ -233,12 +233,12 @@ export default function AdminAlunos({
                 title="Filtrar por cidade"
                 value={filterCity}
                 onChange={(e) => { onFilterCityChange(e.target.value); onFilterSchoolChange(''); }}
-                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="select-pill w-full"
               >
                 <option value="">Todas as cidades</option>
                 {cidadeOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
+              <ChevronDown size={14} className="select-pill-chevron" />
             </div>
             <div className="relative">
               <label className="block text-[10px] font-black text-text-secondary tracking-wider opacity-40 mb-3">Escolas</label>
@@ -246,12 +246,12 @@ export default function AdminAlunos({
                 title="Filtrar por escola"
                 value={filterSchool}
                 onChange={(e) => onFilterSchoolChange(e.target.value)}
-                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="select-pill w-full"
               >
                 <option value="">Todas as escolas</option>
                 {escolaOptions.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
+              <ChevronDown size={14} className="select-pill-chevron" />
             </div>
             <div className="relative">
               <label className="block text-[10px] font-black text-text-secondary tracking-wider opacity-40 mb-3">Gremios</label>
@@ -259,12 +259,12 @@ export default function AdminAlunos({
                 title="Filtrar por grêmio"
                 value={filterGremio}
                 onChange={(e) => onFilterGremioChange(e.target.value)}
-                className="w-full bg-transparent border-0 border-b border-border-color px-0 py-2.5 text-sm font-black text-text-main focus:outline-none focus:border-brand-primary/50 transition-all appearance-none pr-10"
+                className="select-pill w-full"
               >
                 <option value="">Todos os grêmios</option>
                 {gremioOptions.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
-              <ChevronRight size={12} className="absolute right-1 bottom-4 rotate-90 pointer-events-none opacity-30" />
+              <ChevronDown size={14} className="select-pill-chevron" />
             </div>
           </div>
 
@@ -403,7 +403,7 @@ export default function AdminAlunos({
               <div className="p-8">
                 {/* Close button */}
                 <button onClick={() => setSelectedStudent(null)}
-                  className="absolute top-6 right-6 p-2.5 bg-text-main/5 hover:bg-text-main/10 border border-border-color rounded-xl text-text-secondary hover:text-text-main transition-all cursor-pointer z-10">
+                  className="absolute top-6 right-6 p-2.5 bg-text-main/5 hover:bg-text-main/10 border border-border-color rounded-full text-text-secondary hover:text-text-main transition-all cursor-pointer z-10">
                   <X size={16} />
                 </button>
 
@@ -551,7 +551,7 @@ export default function AdminAlunos({
                     <button
                       onClick={handleUpdateAccuracy}
                       disabled={isUpdatingAccuracy}
-                      className="w-full bg-brand-primary text-white hover:opacity-90 py-3 rounded-xl font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/20"
+                      className="w-full bg-brand-primary text-white hover:opacity-90 py-3 rounded-full font-bold text-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-brand-primary/20"
                     >
                       {isUpdatingAccuracy ? <Spinner size={14} /> : <CheckCircle2 size={14} />}
                       Salvar precisão
@@ -573,7 +573,7 @@ export default function AdminAlunos({
                 <div className="border-t border-border-color pt-6">
                   {!showDeleteConfirm ? (
                     <button onClick={() => setShowDeleteConfirm(true)}
-                      className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 py-4 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer">
+                      className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-500 py-4 rounded-full font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer">
                       <Trash2 size={14} />
                       Excluir aluno
                     </button>
@@ -582,12 +582,12 @@ export default function AdminAlunos({
                       <p className="text-[10px] font-black text-red-400 mb-4">Tem certeza que deseja excluir este aluno? Esta ação não pode ser desfeita.</p>
                       <div className="flex gap-3">
                         <button onClick={() => setShowDeleteConfirm(false)}
-                          className="flex-1 bg-text-main/10 text-text-main py-3 rounded-xl font-black text-[10px] tracking-wider transition-all cursor-pointer">
+                          className="flex-1 bg-text-main/10 text-text-main py-3 rounded-full font-black text-[10px] tracking-wider transition-all cursor-pointer">
                           Cancelar
                         </button>
                         <button onClick={handleDeleteStudent}
                           disabled={isDeleting}
-                          className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-full font-black text-[10px] tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer">
                           {isDeleting ? <Spinner size={14} className="text-white" /> : <Trash2 size={14} />}
                           Confirmar exclusão
                         </button>

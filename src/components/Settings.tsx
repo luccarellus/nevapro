@@ -445,7 +445,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                     <select 
                       id="settings-daily-goal"
                       defaultValue="2 Horas"
-                      className="w-full bg-input-bg rounded-2xl px-6 py-5 text-text-main font-bold appearance-none cursor-pointer focus:outline-none focus:border-[#00b094]/50 transition-all shadow-inner"
+                      className="select-pill select-pill-lg w-full"
                       title="Meta de horas diárias"
                     >
                       <option>2 Horas</option>
@@ -454,7 +454,7 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                       <option>8 Horas</option>
                       <option>Tempo Livre</option>
                     </select>
-                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" size={18} />
+                    <ChevronDown className="select-pill-chevron text-text-secondary" size={18} />
                   </div>
                 </div>
 
