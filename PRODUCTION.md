@@ -48,8 +48,8 @@ docker compose logs -f api
 
 ### 2. Variáveis obrigatórias no `.env`
 
-O docker-compose injeta **todo o `.env`** no container `api` (`env_file`) e
-sobrescreve `REDIS_URL` para apontar para o Redis do próprio compose.
+O docker-compose injeta **todo o `.env`** no container `api` (`env_file`) e usa
+o `REDIS_URL` definido nele (com credenciais: `redis://default:[SENHA]@nevapro_redis:6379`).
 
 ```env
 # Banco (Supabase)
@@ -74,9 +74,9 @@ EVENTEASE_WEBHOOK_SECRET="[segredo do webhook]"
 # Gemini, Resend, Backblaze B2, Sentry, reCAPTCHA — como no .env.example
 ```
 
-> **Redis:** não precisa configurar `REDIS_URL` no `.env` — o compose injeta
-> `redis://redis:6379`. Em dev local sem Docker, defina `REDIS_URL` apontando
-> para seu Redis, ou deixe o app operar com fallback em memória.
+> **Redis:** defina `REDIS_URL` no `.env` com as credenciais do serviço
+> (ex.: `redis://default:[SENHA]@nevapro_redis:6379`). Em dev local sem Docker,
+> aponte para `localhost`, ou deixe o app operar com fallback em memória.
 
 ### 3. HTTPS (Certbot / Let's Encrypt)
 

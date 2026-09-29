@@ -2,6 +2,7 @@ import './instrument';
 import * as Sentry from '@sentry/node';
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
@@ -69,6 +70,14 @@ export const app = express();
 // Trust proxy (for rate limiting behind nginx / Vercel)
 app.set('trust proxy', 1);
 app.disable('etag');
+app.disable('x-powered-by');
+
+// Gzip no hot path: JSON da API e estáticos saem comprimidos (nível 6, threshold 1KB)
+app.use(compression({ level: 6, threshold: 1024, filter: (req, res) => {
+  // Nunca comprimir SSE/streaming
+  if (res.getHeader('Content-Type')?.toString().includes('text/event-stream')) return false;
+  return compression.filter(req, res);
+} }));
 
 // Agrupa os logs de cada requisição e grava assincronamente após o término da resposta.
 app.use((req, res, next) => {
@@ -458,7 +467,16 @@ const distPath = path.resolve('dist');
 const indexPath = path.join(distPath, 'index.html');
 
 if (fs.existsSync(indexPath)) {
-  app.use(express.static(distPath));
+  // Assets com hash no filename: cache público imutável por 1 ano (revalidação zero)
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    immutable: true,
+    maxAge: '365d',
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  }));
+  // HTML/raiz: sempre revalida (SPA updates instantâneos)
+  app.use(express.static(distPath, { etag: true, lastModified: true, setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+  } }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.sendFile(indexPath);
@@ -506,6 +524,9 @@ export const startServer = () => {
     log.info(`[Server] Running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     log.info(`[Server] Frontend: ${process.env.FRONTEND_URL || 'https://neva.pro'}`);
   });
+  // Atrás de nginx/proxy: mata keep-alive antes do proxy para evitar 502 intermitente
+  server.keepAliveTimeout = 5_000;
+  server.headersTimeout = 6_000;
 
   // Graceful shutdown
   const shutdown = (signal: string) => {

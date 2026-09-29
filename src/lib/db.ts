@@ -55,11 +55,14 @@ const ssl = getSslConfig();
 const pool = new Pool({
   connectionString,
   ssl,
-  max: 15,
-  min: 3,
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
-  statement_timeout: 15_000,
+  max: 30,                       // mais conexões simultâneas (rede interna, sem pgbouncer)
+  min: 5,                        // pool pré-aquecido: zero handshakes em cold start
+  idleTimeoutMillis: 60_000,     // conexões vivas mais tempo (evita reconnect em rajadas)
+  connectionTimeoutMillis: 3_000,
+  statement_timeout: 10_000,
+  query_timeout: 10_000,
+  keepAlive: true,               // TCP keepalive evita resets de conexões idle
+  keepAliveInitialDelayMillis: 10_000,
   application_name: 'nevapro-server',
 });
 

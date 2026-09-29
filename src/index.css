@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap');
 @import "tailwindcss";
 
 /* =============================================================
@@ -89,9 +88,9 @@
 }
 
 @theme {
-  --font-sans: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-numbers: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-numbers: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
   
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
@@ -535,12 +534,12 @@ button:disabled,
    alerta em coral. Fundo permanece neutro.
    ============================================================= */
 
-/* Títulos do painel (Nunito) */
+/* Títulos do painel (Ubuntu) */
 @utility gam-title {
   @apply font-display font-semibold tracking-tight text-text-main;
 }
 
-/* Números/indicadores fortes (Nunito) */
+/* Números/indicadores fortes (Ubuntu) */
 @utility gam-number {
   @apply font-numbers font-bold tabular-nums tracking-tight;
 }
