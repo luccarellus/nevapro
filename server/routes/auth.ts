@@ -219,15 +219,17 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
       log.error('[Auth] Erro ao enviar e-mail de boas-vindas:', emailErr);
     });
 
+    // Nunca retornar password_hash ao cliente
+    const { password_hash: _ignored, ...safeData } = data;
     const userObj = {
-      ...data,
-      id: data.id,
+      ...safeData,
+      id: safeData.id,
       role: 'student' as const,
-      answeredQuestions: data.answered_questions || 0,
-      correctAnswers: data.correct_answers || 0,
-      avatarUrl: resolveStoredFileUrl(data.avatar_url),
-      showInLeaderboard: data.show_in_leaderboard !== false,
-      languagePreference: data.language_preference || 'ingles',
+      answeredQuestions: safeData.answered_questions || 0,
+      correctAnswers: safeData.correct_answers || 0,
+      avatarUrl: resolveStoredFileUrl(safeData.avatar_url),
+      showInLeaderboard: safeData.show_in_leaderboard !== false,
+      languagePreference: safeData.language_preference || 'ingles',
     };
 
     const loginResult = await authenticateUser(cleanEmail, password);

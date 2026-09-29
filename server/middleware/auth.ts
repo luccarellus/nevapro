@@ -104,8 +104,21 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
     if (!user) return null;
 
     if (user.role === 'student') {
-      await setUserCache(userCacheKeys.auth(tokenHash), user, STUDENT_SESSION_TTL_SECONDS);
-      return user;
+      // Carrega o contexto RBAC UMA vez e cacheia junto com a sessão.
+      // Sem isso, cada requisição do aluno rodava 3 queries no Postgres
+      // (fallback do requireAuth) — maior custo do hot path autenticado.
+      const rbacContext = await getUserRbacContext(user.userId, 'student');
+      const authenticatedUser: AuthenticatedUser = {
+        ...user,
+        roles: rbacContext.roles,
+        permissions: rbacContext.permissions,
+        tenants: rbacContext.tenants,
+        tenantId: rbacContext.defaultTenantId || undefined,
+        isAdmin: rbacContext.isAdmin,
+      };
+      (authenticatedUser as any).rbacContext = rbacContext;
+      await setUserCache(userCacheKeys.auth(tokenHash), authenticatedUser, STUDENT_SESSION_TTL_SECONDS);
+      return authenticatedUser;
     }
 
     // Admin: load RBAC context

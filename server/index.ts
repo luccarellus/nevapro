@@ -99,7 +99,11 @@ app.use((req, res, next) => {
       });
     });
 
-    log.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    // Log HTTP apenas em dev/DEBUG: em produção cada linha virava 1 PUT no B2
+    // (flush por request) — custo de rede/event-loop desnecessário no hot path.
+    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
+      log.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    }
     next();
   });
 });

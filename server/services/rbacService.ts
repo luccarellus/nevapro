@@ -92,7 +92,7 @@ export async function resolveTenant(identifier: string): Promise<TenantInfo | nu
       `SELECT id, slug, name, plan
        FROM public.tenants
        WHERE active = true
-         AND (id = $1 OR lower(slug) = lower($1) OR lower(domain) = lower($1))
+         AND (id::text = $1 OR lower(slug) = lower($1) OR lower(domain::text) = lower($1))
        LIMIT 1`,
       [cacheKey],
     );

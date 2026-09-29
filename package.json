@@ -21,7 +21,8 @@
     "test:backblaze-backup": "tsx server/scripts/testBackblazeBackup.ts",
     "backup:db": "tsx server/scripts/runBackup.ts",
     "db:schema": "node -e \"require('dotenv').config();const{Pool}=require('pg');const fs=require('fs');const pool=new Pool({connectionString:process.env.DATABASE_URL});pool.query(fs.readFileSync('scripts/schema.sql','utf-8')).then(()=>console.log('Schema OK')).catch(e=>{console.error(e.message);process.exit(1)}).finally(()=>pool.end())\"",
-    "promote:admin": "tsx server/scripts/promoteSuperAdmin.ts"
+    "promote:admin": "tsx server/scripts/promoteSuperAdmin.ts",
+    "create:admin": "tsx server/scripts/createAdmin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",
