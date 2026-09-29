@@ -370,9 +370,11 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
 
 // Helper
 function formatUserProfile(data: Record<string, unknown>, role: 'admin' | 'student') {
+  // Nunca expor credenciais ao cliente
+  const { password_hash: _ph, ...safeData } = data;
   return {
-    ...data,
-    id: data.id || crypto.randomUUID(),
+    ...safeData,
+    id: safeData.id || crypto.randomUUID(),
     role,
     answeredQuestions: (data as any).answered_questions || (data as any).answeredQuestions || 0,
     correctAnswers: (data as any).correct_answers || (data as any).correctAnswers || 0,

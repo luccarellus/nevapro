@@ -263,6 +263,9 @@ export const authenticateUser = async (email: string, password: string) => {
     return { error: 'E-mail ou senha inválidos.' };
   }
 
+  // Nunca expor o hash para fora do processo (rotas devolvem este objeto)
+  delete userRow.password_hash;
+
   const rbacContext = await getUserRbacContext(userRow.id, userType);
 
   const authenticatedUser: AuthenticatedUser = {
