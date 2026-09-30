@@ -8,30 +8,55 @@ import { rateLimiter } from '../middleware/rateLimiter';
 import { query, getClient } from '../../src/lib/db';
 import { AuthenticatedRequest } from '../types';
 import { PERMISSIONS } from '../lib/permissions';
+import { sanitizeRichText, sanitizePlainText } from '../utils/sanitizeHtml';
 
 const router = Router();
 
 const BASE_URL = 'https://api.enem.dev/v1';
+const TENANT_QUESTIONS_PAGE_SIZE = 50;
 
-// ============= LIST TENANT CUSTOM QUESTIONS =============
+/** Chaves de cache da listagem paginada de questões do tenant. */
+function cacheKeysForTenant(tenantId: string | null): string[] {
+  // Páginas 1..10 cobrem até 500 questões; a listagem tem TTL curto (60s),
+  // então páginas mais antigas expiram naturalmente.
+  return Array.from({ length: 10 }, (_, i) => `cache:questions:tenant:${tenantId || 'platform'}:${i + 1}`);
+}
+
+// ============= LIST TENANT CUSTOM QUESTIONS (paginado + cache) =============
 router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = req.tenantId;
+    const pageRaw = parseInt(String(req.query.page || '1'), 10);
+    const page = Number.isInteger(pageRaw) && pageRaw > 0 ? Math.min(pageRaw, 1000) : 1;
+    const pageSize = TENANT_QUESTIONS_PAGE_SIZE;
+    const cacheKey = `cache:questions:tenant:${tenantId || 'platform'}:${page}`;
+
+    const cached = await cacheGet<unknown[]>(cacheKey);
+    if (cached) {
+      res.json(cached);
+      return;
+    }
+
     const { rows } = await query(
       `SELECT q.id, q.subject, q.text, q.image_url, q.correct_option_index,
               q.explanation, q.difficulty, q.xp_reward, q.year, q.tenant_id, q.created_at
        FROM public.questions q
        WHERE ($1::uuid IS NULL OR q.tenant_id = $1)
-       ORDER BY q.created_at DESC`,
-      [tenantId || null],
+       ORDER BY q.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [tenantId || null, pageSize + 1, (page - 1) * pageSize],
     );
 
-    if (rows.length === 0) {
+    // Um item extra indica que há próxima página (paginação sem COUNT(*)).
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+
+    if (pageRows.length === 0) {
       res.json([]);
       return;
     }
 
-    const questionIds = rows.map((r) => r.id);
+    const questionIds = pageRows.map((r) => r.id);
     const { rows: optionsRows } = await query(
       `SELECT question_id, text, image_url, letter, is_correct
        FROM public.question_options
@@ -50,7 +75,7 @@ router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedReque
       entry.optionImages.push(opt.image_url || null);
     }
 
-    const result = rows.map((q) => {
+    const result = pageRows.map((q) => {
       const opts = optionsMap.get(q.id) || { options: [], optionImages: [] };
       return {
         id: q.id,
@@ -68,6 +93,7 @@ router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedReque
       };
     });
 
+    await cacheSet(cacheKey, result, 60);
     res.json(result);
   } catch (err) {
     log.error('[Questions Tenant List] Error:', err);
@@ -83,15 +109,31 @@ router.post(
   resolveTenant,
   requirePermission(PERMISSIONS.QUESTIONS_CREATE),
   async (req: AuthenticatedRequest, res: Response) => {
-    const { subject, text, options, optionImages, correctOptionIndex, explanation, difficulty, xpReward, year } = req.body || {};
+    const { subject, text, options, optionImages, correctOptionIndex, explanation, difficulty, xpReward, year, imageUrl } = req.body || {};
 
-    if (!subject || !text || !Array.isArray(options) || options.length < 2) {
-      res.status(400).json({ error: 'Dados da questão incompletos (assunto, enunciado e opções são obrigatórios).' });
+    if (!subject || !text || !Array.isArray(options) || options.length < 2 || options.length > 10) {
+      res.status(400).json({ error: 'Dados da questão incompletos (assunto, enunciado e 2–10 opções são obrigatórios).' });
       return;
     }
 
     if (typeof correctOptionIndex !== 'number' || correctOptionIndex < 0 || correctOptionIndex >= options.length) {
       res.status(400).json({ error: 'Índice da alternativa correta inválido.' });
+      return;
+    }
+
+    // Sanitização de rich-text: este conteúdo é renderizado com rehype-raw no
+    // frontend — sem allowlist, a criação de questões seria vetor de XSS.
+    const safeText = sanitizeRichText(text);
+    const safeSubject = sanitizePlainText(subject, 120);
+    const safeOptions = options.map((opt: unknown) => sanitizeRichText(opt, 2_000));
+    const safeOptionImages = Array.isArray(optionImages)
+      ? optionImages.slice(0, 10).map((img: unknown) => (typeof img === 'string' && img.trim() && img.length <= 2048 ? img.trim() : null))
+      : [];
+    const safeExplanation = sanitizeRichText(explanation || '', 10_000);
+    const safeImageUrl = typeof imageUrl === 'string' && imageUrl.trim() && imageUrl.length <= 2048 ? imageUrl.trim() : null;
+
+    if (!safeText || safeOptions.some((opt: string) => !opt)) {
+      res.status(400).json({ error: 'Enunciado e alternativas não podem estar vazios após sanitização.' });
       return;
     }
 
@@ -107,19 +149,21 @@ router.post(
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
         [
           questionId,
-          subject,
-          text,
-          req.body.imageUrl || null,
+          safeSubject || 'Geral',
+          safeText,
+          safeImageUrl,
           correctOptionIndex,
-          explanation || '',
-          difficulty || 'médio',
-          xpReward || 50,
-          year || new Date().getFullYear(),
+          safeExplanation,
+          ['fácil', 'médio', 'difícil'].includes(String(difficulty || '').toLowerCase())
+            ? String(difficulty).toLowerCase()
+            : 'médio',
+          typeof xpReward === 'number' && xpReward >= 0 && xpReward <= 1000 ? Math.round(xpReward) : 50,
+          typeof year === 'number' && year >= 1990 && year <= 2100 ? Math.round(year) : new Date().getFullYear(),
           tenantId,
         ],
       );
 
-      for (let idx = 0; idx < options.length; idx++) {
+      for (let idx = 0; idx < safeOptions.length; idx++) {
         const letter = String.fromCharCode(65 + idx);
         await client.query(
           `INSERT INTO public.question_options
@@ -127,8 +171,8 @@ router.post(
            VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
           [
             questionId,
-            options[idx],
-            optionImages?.[idx] || null,
+            safeOptions[idx],
+            safeOptionImages[idx] || null,
             letter,
             idx === correctOptionIndex,
           ],
@@ -136,12 +180,14 @@ router.post(
       }
 
       await client.query('COMMIT');
+      // Invalida o cache da listagem paginada do tenant
+      await cacheInvalidate(...cacheKeysForTenant(tenantId));
       res.status(201).json({
         id: questionId,
-        subject,
-        text,
+        subject: safeSubject || 'Geral',
+        text: safeText,
         correctOptionIndex,
-        options,
+        options: safeOptions,
         tenantId,
       });
     } catch (err) {
@@ -179,6 +225,8 @@ router.delete(
         return;
       }
 
+      // Invalida o cache da listagem paginada do tenant
+      await cacheInvalidate(...cacheKeysForTenant(isSuperAdmin ? null : tenantId || null));
       res.json({ success: true, id });
     } catch (err) {
       log.error('[Questions Delete] Error:', err);
@@ -187,8 +235,9 @@ router.delete(
   },
 );
 
-// Proxy para questões do ENEM
-router.get('/', async (req, res: Response) => {
+// Proxy para questões do ENEM (autenticado: o backend atua como cliente pago
+// da API externa — não pode servir de proxy aberto)
+router.get('/', requireAuth, async (req, res: Response) => {
   const { year, limit, offset } = req.query;
 
   if (!year) {
@@ -236,8 +285,8 @@ function getEnemHubKey(): string | null {
   return key ? key : null;
 }
 
-// Subjects (disciplinas com subareas) — dado estatico, cache 1h
-router.get('/enemhub/subjects', async (_req, res: Response) => {
+// Subjects (disciplinas com subareas) — dado estatico, cache 1h (autenticado)
+router.get('/enemhub/subjects', requireAuth, async (_req, res: Response) => {
   const key = getEnemHubKey();
   if (!key) {
     res.status(503).json({ error: 'EnemHub não configurada (ENEMHUB_API_KEY ausente).' });
@@ -271,8 +320,8 @@ router.get('/enemhub/subjects', async (_req, res: Response) => {
   }
 });
 
-// Questoes por ano — cache 10min, retry unico em 429
-router.get('/enemhub', async (req, res: Response) => {
+// Questoes por ano — cache 10min, retry unico em 429 (autenticado)
+router.get('/enemhub', requireAuth, async (req, res: Response) => {
   const { year, limit, page } = req.query;
 
   const yearNum = parseInt(String(year || ''), 10);

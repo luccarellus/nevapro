@@ -17,7 +17,8 @@ function sanitizeSelectCols(cols: string): string {
   const parts = cols.split(',');
   for (let part of parts) {
     part = part.trim();
-    if (!/^[a-zA-Z0-9_*\\(\\)]+$/.test(part)) {
+    // Permite apenas identificadores simples, alias com AS e * — sem parênteses
+    if (!/^[a-zA-Z0-9_*]+(\s+as\s+[a-zA-Z0-9_]+)?$/i.test(part)) {
       throw new Error(`Coluna de select insegura detectada: ${part}`);
     }
   }
@@ -239,18 +240,10 @@ class PostgresQueryBuilder {
       const res = await query(sql, params);
       return { data: res.rows, error: null };
     } catch (e: any) {
-      if (e?.code === '42703' && (this.action === 'insert' || this.action === 'update')) {
-        const match = e.message?.match(/column "([^"]+)" of relation/i);
-        const badCol = match ? match[1] : null;
-        const targetObj = this.action === 'insert' ? this.insertData : this.updateData;
-
-        if (badCol && targetObj && typeof targetObj === 'object' && badCol in targetObj) {
-          log.warn(`[PG Wrapper Auto-Fix] Removing non-existent column "${badCol}" from ${this.action} on table "${safeTable}" and retrying.`);
-          delete targetObj[badCol];
-          return this.execute();
-        }
-      }
-
+      // Auto-fix REMOVIDO: o comportamento antigo (erro 42703 => remover a
+      // coluna e retentar) mascarava divergências de schema e podia gravar
+      // linhas incompletas em silêncio. Agora o erro falha ALTO e é corrigido
+      // na origem (schema/migração ou payload da rota).
       log.error(`[PG Wrapper Error] ${sql}`, e);
       return { data: null, error: e };
     }

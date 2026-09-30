@@ -123,6 +123,16 @@ router.put(
   requirePermission(PERMISSIONS.TENANTS_MANAGE),
   async (req: AuthenticatedRequest, res: Response) => {
     const tenantId = req.params.id;
+
+    // Isolamento cross-tenant: super_admin edita qualquer tenant; demais papéis
+    // só podem editar tenants aos quais estão vinculados.
+    const ctx = (req as any).rbacContext;
+    const isLinked = ctx?.isSuperAdmin || (ctx?.tenants || []).some((t: any) => t.id === tenantId);
+    if (!isLinked) {
+      res.status(403).json({ error: 'Acesso negado: você não pertence a este tenant.' });
+      return;
+    }
+
     const { name, slug, domain, plan, settings, active } = req.body || {};
     try {
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -157,6 +167,15 @@ router.delete(
   requirePermission(PERMISSIONS.TENANTS_MANAGE),
   async (req: AuthenticatedRequest, res: Response) => {
     const tenantId = req.params.id;
+
+    // Isolamento cross-tenant (mesma política do PUT)
+    const ctx = (req as any).rbacContext;
+    const isLinked = ctx?.isSuperAdmin || (ctx?.tenants || []).some((t: any) => t.id === tenantId);
+    if (!isLinked) {
+      res.status(403).json({ error: 'Acesso negado: você não pertence a este tenant.' });
+      return;
+    }
+
     if (tenantId === PLATFORM_TENANT_ID) {
       res.status(400).json({ error: 'O tenant da plataforma não pode ser desativado.' });
       return;

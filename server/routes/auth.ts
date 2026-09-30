@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { requireAuth, authenticateUser } from '../middleware/auth';
+import { requireAuth, authenticateUser, invalidateTokenVersionCache } from '../middleware/auth';
 import { query } from '../../src/lib/db';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
@@ -10,12 +10,45 @@ import { log } from '../utils/logger';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { sendPasswordResetEmail, sendWelcomeEmail } from '../services/email';
+import { createHash } from 'node:crypto';
+
+/**
+ * Tokens de redefinição são armazenados como SHA-256 (nunca em texto claro):
+ * um vazamento do banco não permite usar os tokens, assim como password_hash.
+ */
+const hashResetToken = (token: string): string =>
+  createHash('sha256').update(token).digest('hex');
 
 
 const router = Router();
 
+// ===== Rate limits endurecidos para endpoints de autenticação =====
+// Dupla camada: por IP (atacante com 1 IP) + por CONTA (atacante com botnet de
+// proxies — a chave é o e-mail alvo, imune a rotação de IP).
+// Janelas longas: login 10/5min, recuperação 3/15min (quebra email bombing).
+const loginIpLimiter = rateLimiter(10, 5 * 60_000);
+const loginAccountLimiter = rateLimiter(10, 5 * 60_000, {
+  keyBy: (req) => normalizeEmail(req.body?.email || ''),
+  message: 'Muitas tentativas de login para esta conta. Tente novamente em alguns minutos.',
+});
+const forgotIpLimiter = rateLimiter(3, 15 * 60_000);
+const forgotAccountLimiter = rateLimiter(2, 15 * 60_000, {
+  keyBy: (req) => normalizeEmail(req.body?.email || ''),
+  message: 'Limite de solicitações de recuperação atingido para este e-mail. Tente novamente em 15 minutos.',
+});
+const resetIpLimiter = rateLimiter(3, 15 * 60_000);
+const resetAccountLimiter = rateLimiter(5, 15 * 60_000, {
+  keyBy: (req) => normalizeEmail(req.body?.email || ''),
+  message: 'Muitas tentativas de redefinição para esta conta. Tente novamente mais tarde.',
+});
+const changePwIpLimiter = rateLimiter(3, 15 * 60_000);
+const changePwAccountLimiter = rateLimiter(3, 15 * 60_000, {
+  keyBy: (req) => normalizeEmail(req.body?.email || ''),
+  message: 'Muitas tentativas de alteração de senha para esta conta. Tente novamente mais tarde.',
+});
+
 // ============= LOGIN =============
-router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: AuthenticatedRequest, res: Response) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -143,7 +176,7 @@ router.post('/login', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, 
 });
 
 // ============= REGISTER =============
-router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/register', rateLimiter(5, 15 * 60_000), async (req: AuthenticatedRequest, res: Response) => {
   const { email, password, name, city, school, gremio } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
@@ -253,7 +286,7 @@ router.post('/register', rateLimiter(5, 60_000), async (req: AuthenticatedReques
 });
 
 // ============= FORGOT PASSWORD (solicitar link de recuperação) =============
-router.post('/forgot-password', rateLimiter(3, 60_000), async (req: AuthenticatedRequest, res: Response) => {
+router.post('/forgot-password', forgotIpLimiter, forgotAccountLimiter, async (req: AuthenticatedRequest, res: Response) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'E-mail é obrigatório.' });
@@ -285,16 +318,21 @@ router.post('/forgot-password', rateLimiter(3, 60_000), async (req: Authenticate
         [cleanEmail],
       );
 
-      // Insert new token
+      // Insert new token (armazenado como hash — o texto claro só existe no e-mail)
       await query(
         `INSERT INTO public.password_reset_tokens (id, user_id, token, expires_at, created_at)
          SELECT gen_random_uuid(), id, $1, $2, NOW()
          FROM public.admin_users WHERE email = $3`,
-        [resetToken, expiresAt, cleanEmail],
+        [hashResetToken(resetToken), expiresAt, cleanEmail],
       );
 
       const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
-      await sendPasswordResetEmail(cleanEmail, adminRow.name || cleanEmail.split('@')[0], resetLink);
+      // Envio de e-mail não-fatal: a resposta já é genérica (anti-enumeração),
+      // então falha de entrega não deve quebrar o fluxo nem vazar existência de conta.
+      await sendPasswordResetEmail(cleanEmail, adminRow.name || cleanEmail.split('@')[0], resetLink)
+        .catch((emailErr) => {
+          log.error('[Forgot Password] Falha no envio (Resend):', emailErr instanceof Error ? emailErr.message : emailErr);
+        });
       res.json({
         success: true,
         message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação em instantes.',
@@ -317,11 +355,14 @@ router.post('/forgot-password', rateLimiter(3, 60_000), async (req: Authenticate
       await query(
         `INSERT INTO public.password_reset_tokens (id, user_id, token, expires_at, created_at)
          VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
-        [studentRow.id, resetToken, expiresAt],
+        [studentRow.id, hashResetToken(resetToken), expiresAt],
       );
 
       const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
-      await sendPasswordResetEmail(cleanEmail, studentRow.name || cleanEmail.split('@')[0], resetLink);
+      await sendPasswordResetEmail(cleanEmail, studentRow.name || cleanEmail.split('@')[0], resetLink)
+        .catch((emailErr) => {
+          log.error('[Forgot Password] Falha no envio (Resend):', emailErr instanceof Error ? emailErr.message : emailErr);
+        });
     }
 
     // Generic response
@@ -339,7 +380,8 @@ router.post('/forgot-password', rateLimiter(3, 60_000), async (req: Authenticate
 // ============= RESET PASSWORD =============
 router.post(
   '/reset-password',
-  rateLimiter(3, 60_000),
+  resetIpLimiter,
+  resetAccountLimiter,
   async (req: AuthenticatedRequest, res: Response) => {
     const { password, token, email } = req.body;
 
@@ -358,7 +400,7 @@ router.post(
            LEFT JOIN public.admin_users au ON au.id = prt.user_id
            LEFT JOIN public.users u ON u.id = prt.user_id
            WHERE prt.token = $1`,
-          [token],
+          [hashResetToken(token)],
         );
 
         if (tokenRows.length === 0) {
@@ -380,6 +422,13 @@ router.post(
           `UPDATE public.${targetTable} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
           [newHash, tokenRow.user_id],
         );
+
+        // Revoga todas as sessões ativas do usuário (senhas comprometidas etc.)
+        await query(
+          `UPDATE public.${targetTable} SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`,
+          [tokenRow.user_id],
+        ).catch(() => {}); // coluna opcional até a migração rodar
+        invalidateTokenVersionCache(tokenRow.user_id);
 
         await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [tokenRow.user_id]);
 
@@ -411,7 +460,8 @@ router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
 // ============= CHANGE PASSWORD =============
 router.post(
   '/change-password',
-  rateLimiter(3, 60_000),
+  changePwIpLimiter,
+  changePwAccountLimiter,
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     const { email, currentPassword, newPassword } = req.body;
@@ -422,8 +472,10 @@ router.post(
 
     const cleanEmail = normalizeEmail(email);
 
-    if (req.user?.role !== 'admin' && req.user?.email !== cleanEmail) {
-      res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    // Política: troca de senha restrita à própria conta (admins usam fluxo
+    // próprio de redefinição em /api/admin).
+    if (req.user?.email !== cleanEmail) {
+      res.status(403).json({ error: 'Acesso negado: você só pode alterar a própria senha.' });
       return;
     }
 
@@ -457,9 +509,12 @@ router.post(
 
         const newHash = await bcrypt.hash(newPassword, 10);
         await query(
-          'UPDATE public.admin_users SET password_hash = $1, updated_at = NOW() WHERE email = $2',
+          'UPDATE public.admin_users SET password_hash = $1, updated_at = NOW(), token_version = COALESCE(token_version, 0) + 1 WHERE email = $2 RETURNING id',
           [newHash, cleanEmail],
         );
+        if (adminRow?.id) {
+          invalidateTokenVersionCache(adminRow.id as string);
+        }
 
         res.json({ success: true, message: 'Senha atualizada com sucesso.' });
         return;
@@ -490,6 +545,15 @@ router.post(
         .eq('email', cleanEmail);
 
       if (updateErr) throw updateErr;
+
+      // Revoga as outras sessões do aluno após troca de senha
+      if (studentRow?.id) {
+        await query(
+          'UPDATE public.users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1',
+          [studentRow.id],
+        ).catch(() => {});
+        invalidateTokenVersionCache(studentRow.id);
+      }
 
       res.json({ success: true, message: 'Senha atualizada com sucesso.' });
     } catch (err: unknown) {

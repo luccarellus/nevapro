@@ -17,16 +17,26 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
   const [success, setSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
 
-  const getTokensFromHash = (): { access_token?: string } => {
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    return {
-      access_token: params.get('access_token') || undefined,
-    };
+  // Suporta os dois formatos de link:
+  // 1. Atual (backend): /reset-password?token=...&email=...
+  // 2. Legado (Supabase): /reset-password#access_token=...&type=recovery
+  const getResetParams = (): { token?: string; email?: string } => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const token = queryParams.get('token') || undefined;
+    if (token) {
+      return { token, email: queryParams.get('email') || undefined };
+    }
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const legacyToken = hashParams.get('access_token') || undefined;
+    if (legacyToken && window.location.hash.includes('type=recovery')) {
+      return { token: legacyToken };
+    }
+    return {};
   };
 
   useEffect(() => {
-    const { access_token } = getTokensFromHash();
-    if (!access_token || !window.location.hash.includes('type=recovery')) {
+    const { token } = getResetParams();
+    if (!token) {
       setIsValidSession(false);
       return;
     }
@@ -47,8 +57,8 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
       return;
     }
 
-    const { access_token } = getTokensFromHash();
-    if (!access_token) {
+    const { token } = getResetParams();
+    if (!token) {
       setError('Token de recuperação ausente. O link pode ter expirado.');
       return;
     }
@@ -67,7 +77,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
         },
         body: JSON.stringify({
           password,
-          access_token,
+          token,
           recaptcha_token,
         }),
       });

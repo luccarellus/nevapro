@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { sanitizeSchema } from '../lib/markdownSchema';
 import confetti from 'canvas-confetti';
 import { 
   AlertOctagon, ArrowRight, Award, 
@@ -460,7 +462,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                             <div className="prose prose-invert max-w-none font-sans text-text-main/90 leading-relaxed text-sm sm:text-base">
                               <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
-                                rehypePlugins={[rehypeRaw]}
+                                rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
                                 components={{
                                   img: MarkdownImage,
                                   p: ({ children }) => <p className="mb-4 last:mb-0 whitespace-pre-wrap">{children}</p>

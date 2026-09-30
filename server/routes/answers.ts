@@ -8,6 +8,64 @@ import { AuthenticatedRequest } from '../types';
 import { log } from '../utils/logger';
 import { invalidateUserCache } from '../services/userCache';
 import { PERMISSIONS } from '../lib/permissions';
+import { sanitizeRichText, sanitizePlainText } from '../utils/sanitizeHtml';
+
+const MAX_OPTIONS = 10;
+
+/** Normaliza uma string de imagem para URL absoluta válida ou null. */
+function normalizeImageUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 2048) return null;
+  return trimmed;
+}
+
+/**
+ * Sanitiza o questionData enviado pelo cliente antes de persistir.
+ *
+ * O cliente controla esse payload e ele é renderizado com react-markdown +
+ * rehype-raw (sem sanitização) — sem esta camada, qualquer usuário autenticado
+ * consegue persistir HTML/JS malicioso executado no navegador de outros alunos.
+ */
+function sanitizeQuestionData(raw: Record<string, any> | undefined): Record<string, any> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+
+  const text = sanitizeRichText(raw.text);
+  if (!text) return null; // sem enunciado válido, não persistimos a questão
+
+  const correctIndexRaw = raw.correctOptionIndex;
+  const correctOptionIndex =
+    typeof correctIndexRaw === 'number' && Number.isInteger(correctIndexRaw) && correctIndexRaw >= 0
+      ? Math.min(correctIndexRaw, MAX_OPTIONS - 1)
+      : null;
+
+  const options = Array.isArray(raw.options)
+    ? raw.options.slice(0, MAX_OPTIONS).map((opt: unknown) => sanitizeRichText(opt, 2_000))
+    : [];
+
+  const optionImages = Array.isArray(raw.optionImages)
+    ? raw.optionImages.slice(0, MAX_OPTIONS).map(normalizeImageUrl)
+    : [];
+
+  return {
+    subject: sanitizePlainText(raw.subject, 120) || 'Geral',
+    text,
+    imageUrl: normalizeImageUrl(raw.imageUrl),
+    correctOptionIndex,
+    explanation: sanitizeRichText(raw.explanation, 10_000),
+    difficulty: ['fácil', 'médio', 'difícil'].includes(String(raw.difficulty || '').toLowerCase())
+      ? String(raw.difficulty).toLowerCase()
+      : 'médio',
+    xpReward: typeof raw.xpReward === 'number' && raw.xpReward >= 0 && raw.xpReward <= 1000 ? Math.round(raw.xpReward) : 50,
+    year:
+      typeof raw.year === 'number' && raw.year >= 1990 && raw.year <= 2100
+        ? Math.round(raw.year)
+        : new Date().getFullYear(),
+    index: typeof raw.index === 'number' && Number.isInteger(raw.index) && raw.index >= 0 ? Math.min(raw.index, 1_000_000) : 0,
+    options,
+    optionImages,
+  };
+}
 
 type AnswerInput = {
   userId: string;
@@ -21,31 +79,36 @@ const router = Router();
 
 router.post('/', rateLimiter(30, 60_000), requireAuth, resolveTenant, requirePermission(PERMISSIONS.QUESTIONS_ANSWER), async (req: AuthenticatedRequest, res: Response) => {
   const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
-  if (req.user?.role !== 'admin' && req.user?.userId !== userId) {
+  // Política: respostas registradas apenas para a própria conta.
+  if (req.user?.userId !== userId) {
     res.status(403).json({ error: 'Acesso negado.' });
     return;
   }
   try {
     const tenantId = req.tenantId || null;
+    const safeQuestion = sanitizeQuestionData(questionData);
+    const insertOptionPromises: Promise<unknown>[] = [];
     const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
-    if (qCheck.rows.length === 0 && questionData) {
+    if (qCheck.rows.length === 0 && safeQuestion) {
       await query(
         `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (id) DO NOTHING`,
-        [questionId, questionData.subject || 'Geral', questionData.text, questionData.imageUrl || null,
-         questionData.correctOptionIndex, questionData.explanation || '', questionData.difficulty || 'médio',
-         questionData.xpReward || 50, questionData.year || 2023, questionData.index || 0],
+        [questionId, safeQuestion.subject, safeQuestion.text, safeQuestion.imageUrl,
+         safeQuestion.correctOptionIndex, safeQuestion.explanation, safeQuestion.difficulty,
+         safeQuestion.xpReward, safeQuestion.year, safeQuestion.index],
       );
-      if (Array.isArray(questionData.options)) {
-        for (let idx = 0; idx < questionData.options.length; idx++) {
-          const letter = String.fromCharCode(65 + idx);
-          await query(
+      safeQuestion.options.forEach((opt: string, idx: number) => {
+        insertOptionPromises.push(
+          query(
             `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
              VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
-            [questionId, questionData.options[idx], questionData.optionImages?.[idx] || null, letter, idx === questionData.correctOptionIndex],
-          );
-        }
+            [questionId, opt, safeQuestion.optionImages[idx] || null, String.fromCharCode(65 + idx), idx === safeQuestion.correctOptionIndex],
+          ),
+        );
+      });
+      if (insertOptionPromises.length > 0) {
+        await Promise.all(insertOptionPromises);
       }
     }
     await query(
@@ -72,34 +135,40 @@ router.post('/batch', rateLimiter(10, 60_000), requireAuth, resolveTenant, requi
     res.status(400).json({ error: 'Lote de respostas inválido.' });
     return;
   }
-  if (req.user?.role !== 'admin' && req.user?.userId !== userId) {
+  // Política: respostas registradas apenas para a própria conta.
+  if (req.user?.userId !== userId) {
     res.status(403).json({ error: 'Acesso negado.' });
     return;
   }
 
-  const questions = answers.filter((answer) => answer.questionData).map((answer) => ({
-    id: answer.questionId,
-    subject: answer.questionData?.subject || 'Geral',
-    text: answer.questionData?.text || '',
-    image_url: answer.questionData?.imageUrl || null,
-    correct_option_index: answer.questionData?.correctOptionIndex ?? null,
-    explanation: answer.questionData?.explanation || '',
-    difficulty: answer.questionData?.difficulty || 'médio',
-    xp_reward: answer.questionData?.xpReward || 50,
-    year: answer.questionData?.year || 2023,
-    question_index: answer.questionData?.index || 0,
-  }));
-  const options = answers.flatMap((answer) =>
-    Array.isArray(answer.questionData?.options)
-      ? answer.questionData.options.map((text: string, index: number) => ({
-          question_id: answer.questionId,
-          text,
-          image_url: answer.questionData?.optionImages?.[index] || null,
-          letter: String.fromCharCode(65 + index),
-          is_correct: index === answer.questionData?.correctOptionIndex,
-        }))
-      : [],
-  );
+  type SafeEntry = { answer: AnswerInput; safe: NonNullable<ReturnType<typeof sanitizeQuestionData>> };
+  const questions = answers
+    .map((answer) => ({ answer, safe: sanitizeQuestionData(answer.questionData) }))
+    .filter((entry): entry is SafeEntry => entry.safe !== null)
+    .map(({ answer, safe }) => ({
+      id: answer.questionId,
+      subject: safe.subject,
+      text: safe.text,
+      image_url: safe.imageUrl,
+      correct_option_index: safe.correctOptionIndex,
+      explanation: safe.explanation,
+      difficulty: safe.difficulty,
+      xp_reward: safe.xpReward,
+      year: safe.year,
+      question_index: safe.index,
+    }));
+  const options = answers
+    .map((answer) => ({ answer, safe: sanitizeQuestionData(answer.questionData) }))
+    .filter((entry): entry is SafeEntry => entry.safe !== null)
+    .flatMap(({ answer, safe }) =>
+      safe.options.map((text: string, index: number) => ({
+        question_id: answer.questionId,
+        text,
+        image_url: safe.optionImages[index] || null,
+        letter: String.fromCharCode(65 + index),
+        is_correct: index === safe.correctOptionIndex,
+      })),
+    );
   const answerRows = answers.map((answer) => ({
     user_id: answer.userId,
     question_id: answer.questionId,

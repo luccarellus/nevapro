@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { sanitizeSchema } from '../lib/markdownSchema';
 import { Question, UserProfile } from '../types';
 import { ENEM_YEARS, ENEM_SUBJECTS } from '../data/mockData';
 import { enemService } from '../services/enemService';
@@ -288,7 +290,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
               <div className="text-base md:text-xl lg:text-2xl leading-relaxed text-text-main font-medium tracking-tight">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
+                  rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
                   components={{
                     img: MarkdownImage,
                     p: ({ children }) => <p className="mb-6 last:mb-0 leading-relaxed opacity-95">{children}</p>

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { log } from '../utils/logger';
 import { isRedisConfigured } from '../services/cache';
-import { getRedisClient, waitForRedisReady } from '../services/redisClient';
+import { getRedisClient, isRemoteRedis, waitForRedisReady } from '../services/redisClient';
 
 const RATE_LIMITER_CLEANUP_INTERVAL_MS = 60_000;
 const RATE_LIMITER_MAX_ENTRIES = 10_000;
@@ -41,20 +41,41 @@ end
 return current
 `;
 
+interface RateLimiterOptions {
+  /**
+   * Identidade alternativa para a chave do limite (ex.: e-mail da conta).
+   * Use para limitar POR CONTA e não por IP — imune a rotação de proxies.
+   * Retornar null/'' cai no limite por IP padrão.
+   */
+  keyBy?: (req: Request) => string | null | undefined;
+  /** Mensagem customizada do 429. */
+  message?: string;
+}
+
 /**
  * Rate Limiter — híbrido Redis ultra-rápido (Lua atômico) + fallback em memória local.
  *
- * Executa verificações no Redis em <1ms via Script Lua de ida e volta única.
+ * Redis local (docker/VPS na mesma rede): <1ms via script Lua de ida e volta única.
+ * Redis remoto (via internet, ~30ms de RTT): usar Redis aqui adicionaria 1 RTT
+ * BLOQUEANTE a TODA requisição /api — por isso, nesse modo, o rate-limit roda
+ * 100% em memória local (por instância), que é o trade-off correto de performance.
  */
-export const rateLimiter = (limit: number, windowMs: number) => {
+export const rateLimiter = (limit: number, windowMs: number, options?: RateLimiterOptions) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-    const path = req.path || req.url || '/';
+    // Identidade do sujeito do limite: conta explícita (keyBy) ou IP.
+    const identity = options?.keyBy ? options.keyBy(req) : null;
+    const subject = identity
+      ? `account:${identity}`
+      : req.ip || req.socket?.remoteAddress || 'unknown';
+    // req.path é RELATIVA ao router onde o limiter foi montado: dentro de um
+    // router, rotas distintas compartilhariam o mesmo bucket (colisão).
+    // baseUrl + path identifica a rota absoluta.
+    const path = (req.baseUrl || '') + (req.path || req.url || '/');
     const now = Date.now();
     const windowKey = Math.floor(now / windowMs);
 
-    // Tenta Redis primeiro se configurado
-    if (isRedisConfigured()) {
+    // Redis só entra no hot path se estiver no modo local (baixa latência)
+    if (isRedisConfigured() && !isRemoteRedis()) {
       const client = getRedisClient();
       if (client) {
         if (client.status !== 'ready') {
@@ -62,7 +83,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
         }
 
         if (client.status === 'ready') {
-          const redisKey = `ratelimit:${ip}:${path}:${windowKey}`;
+          const redisKey = `ratelimit:${subject}:${path}:${windowKey}`;
           const ttlSeconds = Math.ceil(windowMs / 1000);
 
           try {
@@ -72,7 +93,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
 
             if (!Number.isNaN(currentCount) && currentCount > limit) {
               res.status(429).json({
-                error: 'Muitas requisições. Tente novamente mais tarde.',
+                error: options?.message || 'Muitas requisições. Tente novamente mais tarde.',
               });
               return;
             }
@@ -86,7 +107,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
     }
 
     // Fallback in-memory
-    const memKey = `${ip}:${path}:${windowKey}`;
+    const memKey = `${subject}:${path}:${windowKey}`;
     const resetAt = (windowKey + 1) * windowMs;
     const current = inMemoryRateLimit.get(memKey) || { count: 0, resetAt };
 
@@ -96,7 +117,7 @@ export const rateLimiter = (limit: number, windowMs: number) => {
 
     if (current.count > limit) {
       res.status(429).json({
-        error: 'Muitas requisições. Tente novamente mais tarde.',
+        error: options?.message || 'Muitas requisições. Tente novamente mais tarde.',
       });
       return;
     }

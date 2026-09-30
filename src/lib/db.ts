@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import fs from 'fs';
 import * as dotenv from 'dotenv';
+import { log } from '../../server/utils/logger';
 
 dotenv.config();
 
@@ -70,27 +71,15 @@ export const query = async (text: string, params?: any[]) => {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
-  // Log slow queries (> 500ms) for performance debugging
+  // Log slow queries (> 500ms) — via logger central (B2 + Sentry em error)
   if (duration > 500) {
-    console.warn(`[SlowQuery] ${duration}ms | ${text.substring(0, 200)}`);
+    log.warn(`[SlowQuery] ${duration}ms | ${text.substring(0, 200)}`);
   }
   return res;
 };
 
 export const getClient = () => {
   return pool.connect();
-};
-
-const directConnectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
-const migrationPool = new Pool({
-  connectionString: directConnectionString,
-  ssl,
-});
-
-export const runMigrationQuery = async (text: string, params?: any[]) => {
-  const start = Date.now();
-  const res = await migrationPool.query(text, params);
-  return res;
 };
 
 export default pool;

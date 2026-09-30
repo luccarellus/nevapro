@@ -2,7 +2,7 @@
  * Ownership & Permission Check Middleware
  *
  * Consolidates the repeated pattern:
- *   if (req.user?.role !== 'admin' && req.user?.email !== email) {
+ *   if (req.user?.email !== email) {
  *     res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
  *     return;
  *   }
@@ -18,7 +18,8 @@ import { AuthenticatedRequest } from '../types';
  * Middleware that checks if the authenticated user owns the resource
  * identified by the given email (from query, body, or user session).
  *
- * Admin users bypass the check (they can access any resource).
+ * Política: acesso estrito ao PRÓPRIO recurso — sem bypass para admins.
+ * Gestão de outros usuários deve usar as rotas /api/admin (RBAC).
  */
 export const requireOwnership = (
   req: AuthenticatedRequest,
@@ -37,8 +38,8 @@ export const requireOwnership = (
     return;
   }
 
-  if (req.user?.role !== 'admin' && req.user?.email !== targetEmail) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  if (req.user?.email !== targetEmail) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar os próprios recursos.' });
     return;
   }
 

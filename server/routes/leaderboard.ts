@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
@@ -8,8 +9,8 @@ import { CACHE_KEYS } from '../types';
 
 const router = Router();
 
-// ============= LEADERBOARD =============
-router.get('/', resolveTenant, async (req, res: Response) => {
+// ============= LEADERBOARD (autenticado: expõe nomes/xp de usuários) =============
+router.get('/', requireAuth, resolveTenant, async (req, res: Response) => {
   try {
     const tenantId = (req as any).tenantId;
     const cacheKey = tenantId ? `${CACHE_KEYS.LEADERBOARD}:${tenantId}` : CACHE_KEYS.LEADERBOARD;

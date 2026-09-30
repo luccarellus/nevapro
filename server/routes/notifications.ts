@@ -39,8 +39,9 @@ async function markGlobalNotificationAsRead(notificationId: string, userId: stri
 router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
   const email = ((req.query.email as string) || req.user?.email || '').toLowerCase().trim();
 
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: notificações restritas à própria conta.
+  if (req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar as próprias notificações.' });
     return;
   }
 
@@ -82,8 +83,9 @@ router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, re
 router.post('/read-all', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const email = ((req.query.email as string) || req.user?.email || '').toLowerCase().trim();
 
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: notificações restritas à própria conta.
+  if (req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar as próprias notificações.' });
     return;
   }
 
@@ -137,7 +139,9 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     const userId = await getRequestUserId(req, req.user?.email || '');
 
-    if (req.user?.role !== 'admin' && userId && notif.user_id && notif.user_id !== userId) {
+    // Política: só o dono da notificação (ou o próprio usuário em notificação global)
+    // pode marcá-la como lida.
+    if (userId && notif.user_id && notif.user_id !== userId) {
       res.status(403).json({ error: 'Acesso negado' });
       return;
     }

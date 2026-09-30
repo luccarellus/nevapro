@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import { sanitizeSchema } from '../lib/markdownSchema';
 import { MOCK_SIMULADOS, ENEM_YEARS } from '../data/mockData';
 import { Question, UserProfile } from '../types';
 import { enemService } from '../services/enemService';
@@ -446,7 +448,7 @@ export default function Simulados({
                     <div className="text-sm md:text-base leading-relaxed text-text-main font-medium whitespace-pre-wrap">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
+                        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
                         components={{
                           img: MarkdownImage,
                           p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed whitespace-pre-wrap">{children}</p>
@@ -535,7 +537,7 @@ export default function Simulados({
             <div className="text-base md:text-lg lg:text-xl leading-relaxed text-text-main font-medium whitespace-pre-wrap">
               <ReactMarkdown
                  remarkPlugins={[remarkGfm]}
-                 rehypePlugins={[rehypeRaw]}
+                 rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
                  components={{
                    img: MarkdownImage,
                    p: ({ children }) => <p className="mb-6 last:mb-0 leading-relaxed opacity-95 whitespace-pre-wrap">{children}</p>

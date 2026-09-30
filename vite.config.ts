@@ -1,15 +1,14 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig, loadEnv} from 'vite';
+import {defineConfig} from 'vite';
 
-export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+// NOTA DE SEGURANÇA: nada de chaves de API de servidor (ex.: GEMINI_API_KEY)
+// no `define` — qualquer valor aqui é embutido no bundle público do frontend.
+// Chaves de IA devem ser usadas apenas no backend (process.env no server/).
+export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     build: {
       chunkSizeWarningLimit: 800,
       rollupOptions: {

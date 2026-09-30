@@ -91,8 +91,8 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
   const orderColumn = options.orderBy || 'created_at';
   const orderAsc = options.orderAsc ?? false;
 
-  // ===== LIST =====
-  router.get('/', resolveTenant, async (req, res: Response) => {
+  // ===== LIST (autenticado: conteúdo pode ser restrito por tenant/instituição) =====
+  router.get('/', requireAuth, resolveTenant, async (req, res: Response) => {
     try {
       const tenantScoped = options.tenantScoped !== false;
       const tenantId = req.tenantId;
@@ -117,7 +117,7 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       res.json(mapped);
     } catch (err: any) {
       log.error(`[${options.table} List] Error:`, err);
-      res.status(500).json({ error: err?.message || 'Failed to fetch data' });
+      res.status(500).json({ error: 'Erro interno ao listar.' });
     }
   });
 
@@ -201,10 +201,10 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       const invalidateKeys = [options.cacheKey];
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
-      res.json(data);
+      res.json(mapRow(data));
     } catch (err: any) {
       log.error(`[${options.table} Update] Error:`, err);
-      res.status(500).json({ error: err?.message || 'Failed to update' });
+      res.status(500).json({ error: 'Erro interno ao atualizar.' });
     }
   });
 
@@ -234,10 +234,16 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
     }
   });
 
-  // ===== GET BY ID =====
-  router.get('/:id', resolveTenant, async (req, res: Response) => {
+  // ===== GET BY ID (autenticado + mesmo tenant; sem tenant resolve → 404) =====
+  router.get('/:id', requireAuth, resolveTenant, async (req, res: Response) => {
     try {
       const { id } = req.params;
+      // Escopo por tenant garante isolamento entre instituições. Sem tenant
+      // resolvido, nega (evita furo cross-tenant pela rota por ID).
+      if (options.tenantScoped !== false && !req.tenantId) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       let builder = dbAdmin.from(options.table).select('*');
       if (options.tenantScoped !== false && req.tenantId) {
         builder = builder.eq('tenant_id', req.tenantId);
@@ -249,10 +255,10 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         res.status(404).json({ error: 'Not found' });
         return;
       }
-      res.json(data);
+      res.json(mapRow(data));
     } catch (err) {
       log.error(`[${options.table} Get] Error:`, err);
-      res.status(500).json({ error: 'Failed to fetch' });
+      res.status(500).json({ error: 'Erro interno ao buscar.' });
     }
   });
 

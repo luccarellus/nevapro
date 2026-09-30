@@ -7,31 +7,19 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import * as dotenv from 'dotenv';
-import multer from 'multer';
 
 dotenv.config({ quiet: true });
 
-
-
 import { validateEnv } from './utils/env';
 import { log } from './utils/logger';
-import { isB2LogStorageConfigured, storeB2Log } from './services/b2LogStorage';
 import { flushLogContext, runWithLogContext } from './services/logContext';
 import { csrfProtection, isAllowedOrigin } from './middleware/csrf';
 import { rateLimiter } from './middleware/rateLimiter';
-import { verifyRecaptcha } from './middleware/recaptcha';
-import { requireAuth } from './middleware/auth';
+import { HttpError } from './lib/asyncHandler';
+import { responseMaskMiddleware } from './middleware/responseMask';
 import pool from '../src/lib/db';
 import { closeRedisClient, getRedisClient } from './services/redisClient';
-import { dbAdmin } from './lib/dbQueryBuilder';
-import { query } from '../src/lib/db';
-import { sanitizeInput } from './utils/sanitize';
-import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from './services/userCache';
 import { ensurePlatformTenant } from './services/rbacService';
-import { resolveTenant } from './middleware/tenant';
-import { requirePermission } from './middleware/rbac';
-import { PERMISSIONS } from './lib/permissions';
-import { RoleCode } from './lib/permissions';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -52,6 +40,10 @@ import cronRoutes from './routes/cron';
 import clientLogRoutes from './routes/clientLogs';
 import webhookRoutes from './routes/webhooks';
 import tenantRoutes from './routes/tenants';
+import imageProxyRoutes from './routes/imageProxy';
+import lgpdRoutes from './routes/lgpd';
+import uploadRoutes from './routes/uploads';
+import errorsBookRoutes from './routes/errorsBook';
 
 
 // Validate critical environment variables before starting
@@ -102,7 +94,7 @@ app.use((req, res, next) => {
     // Log HTTP apenas em dev/DEBUG: em produção cada linha virava 1 PUT no B2
     // (flush por request) — custo de rede/event-loop desnecessário no hot path.
     if (process.env.NODE_ENV !== 'production' || process.env.DEBUG === 'true') {
-      log.info(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+      log.info(`${req.method} ${req.path}`);
     }
     next();
   });
@@ -167,6 +159,11 @@ app.use(
 // Body parsing
 app.use(express.json({ limit: '1mb' }));
 
+// ===== Mascaramento global de respostas (defense-in-depth) =====
+// Redige recursivamente credenciais/tokens/hashes de TODA resposta JSON,
+// em qualquer rota, mesmo que algum handler esqueça de remover o campo.
+app.use(responseMaskMiddleware);
+
 // ===== Rate Limiting (global) =====
 app.use('/api', rateLimiter(300, 15 * 60 * 1000));
 
@@ -201,6 +198,10 @@ app.use('/api/tenants', tenantRoutes);
 // rejeitava qualquer 3xx e nao permitia imagens da EnemHub, quebrando muitas
 // imagens de enunciados e alternativas.
 const IMAGE_PROXY_MAX_REDIRECTS = 5;
+// Limites de defesa contra DoS/OOM: sem cap, um host allowlisted pode servir
+// um arquivo gigante e a resposta inteira era carregada em memória.
+const IMAGE_PROXY_MAX_BYTES = 5 * 1024 * 1024;
+const IMAGE_PROXY_TIMEOUT_MS = 8_000;
 
 const isAllowedImageHost = (hostname: string): boolean => {
   const h = hostname.toLowerCase();
@@ -225,6 +226,7 @@ const fetchImageWithRedirects = async (rawUrl: string): Promise<Response> => {
     const response = await fetch(parsed.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NevaApp/1.0)', Referer: 'https://enem.dev/' },
       redirect: 'manual',
+      signal: AbortSignal.timeout(IMAGE_PROXY_TIMEOUT_MS),
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
@@ -238,7 +240,7 @@ const fetchImageWithRedirects = async (rawUrl: string): Promise<Response> => {
   throw new Error('limite de redirecionamentos excedido');
 };
 
-app.get('/api/imagem', async (req, res) => {
+app.get('/api/imagem', rateLimiter(120, 60_000), async (req, res) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) {
     res.status(400).send('URL missing');
@@ -250,9 +252,25 @@ app.get('/api/imagem', async (req, res) => {
       res.status(response.status).send('Fetch error');
       return;
     }
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    // Só serve conteúdo de imagem de verdade
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/')) {
+      res.status(415).send('Unsupported media type');
+      return;
+    }
+    // Cap de tamanho: rejeita cedo via Content-Length e valida de novo no buffer
+    const declaredLength = Number(response.headers.get('content-length') || 0);
+    if (declaredLength > IMAGE_PROXY_MAX_BYTES) {
+      res.status(413).send('Image too large');
+      return;
+    }
     const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > IMAGE_PROXY_MAX_BYTES) {
+      res.status(413).send('Image too large');
+      return;
+    }
+    res.setHeader('Content-Type', contentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(buffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : '';
@@ -260,7 +278,7 @@ app.get('/api/imagem', async (req, res) => {
       res.status(403).send(message);
       return;
     }
-    res.status(500).send('Proxy error');
+    res.status(504).send('Proxy error');
   }
 });
 
@@ -304,12 +322,8 @@ app.get('/api/storage/object', requireAuth, async (req: any, res: any) => {
 });
 
 // ===== Errors Book =====
-app.get('/api/user/errors', requireAuth, async (req, res) => {
+app.get('/api/user/errors', requireAuth, requireOwnership, async (req, res) => {
   const email = ((req.query.email as string) || req.user?.email || '').toLowerCase().trim();
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
-    return;
-  }
   try {
     const errorsCacheKey = userCacheKeys.errors(email);
     const cachedErrors = await getUserCache<unknown[]>(errorsCacheKey);
@@ -499,10 +513,20 @@ if (fs.existsSync(indexPath)) {
   })();
 }
 
+// ===== API desconhecida: 404 JSON (sem expor a SPA nem detalhes internos) =====
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Recurso não encontrado.' });
+});
+
 // ===== Centralized Error Handler =====
 Sentry.setupExpressErrorHandler(app);
 
-app.use((err: any, req: any, res: any, _next: any) => {
+app.use((err: any, _req: any, res: any, _next: any) => {
+  // HttpError: erro de aplicação esperado — não polui o log de erros internos
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
   log.error('[Unhandled Error]', err?.message || err);
   if (err instanceof SyntaxError && 'body' in err) {
     res.status(400).json({ error: 'JSON mal formatado no corpo da requisição.' });

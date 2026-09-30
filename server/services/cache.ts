@@ -1,7 +1,7 @@
 import { CACHE_KEYS, CACHE_TTL } from '../types';
 import { log } from '../utils/logger';
 import { Command } from 'ioredis';
-import { getRedisClient, waitForRedisReady } from './redisClient';
+import { getRedisClient, isRemoteRedis, waitForRedisReady } from './redisClient';
 
 /**
  * Arquitetura de Cache de Dupla Camada Ultra-Rápida (L1 In-Memory + L2 Redis).
@@ -17,8 +17,10 @@ interface MemoryCacheEntry {
   expiresAt: number;
 }
 
-const L1_CACHE_MAX_ITEMS = 2_000;
-const L1_DEFAULT_TTL_MS = 5_000; // 5 segundos em memória local
+// Modo remoto (Redis via internet, ~30ms de RTT por comando): compensamos com uma
+// camada L1 muito mais agressiva — cada hit no L1 é um RTT evitado.
+const L1_CACHE_MAX_ITEMS = isRemoteRedis() ? 20_000 : 2_000;
+const L1_DEFAULT_TTL_MS = isRemoteRedis() ? 60_000 : 5_000; // 60s remoto | 5s local
 const l1Cache = new Map<string, MemoryCacheEntry>();
 
 function getL1<T>(key: string): T | null {
@@ -55,6 +57,22 @@ function deleteL1(...keys: string[]): void {
 export const isRedisConfigured = (): boolean => {
   return Boolean(process.env.REDIS_URL || process.env.REDIS_HOST);
 };
+
+/**
+ * Teto de espera para comandos Redis no modo remoto: se o comando demorar mais que
+ * isso (rede degradada), devolve null e a chamada cai no fallback imediatamente —
+ * a requisição do usuário nunca fica presa a um RTT de internet;
+ * o commandTimeout (2.5s) cobre apenas falhas duras de conexão.
+ */
+const REMOTE_COMMAND_CAP_MS = 150;
+
+function withRemoteCap<T>(promise: Promise<T>): Promise<T | null> {
+  if (!isRemoteRedis()) return promise;
+  return Promise.race([
+    promise.catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), REMOTE_COMMAND_CAP_MS)),
+  ]);
+}
 
 /**
  * Executa um comando Redis direto (com suporte a fallback e auto-conexão).
@@ -134,8 +152,8 @@ export const cacheGet = async <T>(key: string): Promise<T | null> => {
       if (!ready) return null;
     }
 
-    // 2. Tenta L2 Cache (Redis direto — <1ms)
-    const raw = await client.get(key);
+    // 2. Tenta L2 Cache (Redis — <1ms local, 1 RTT remoto com teto de espera)
+    const raw = await withRemoteCap(client.get(key));
     if (!raw) return null;
 
     const data = JSON.parse(raw) as T;
@@ -153,8 +171,11 @@ export const cacheGet = async <T>(key: string): Promise<T | null> => {
 export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number): Promise<void> => {
   const ttl = ttlSeconds || CACHE_TTL[key] || 300;
 
+  // No modo remoto o L1 retém por mais tempo (capa 60s): cada hit evita um RTT.
+  const l1CapMs = isRemoteRedis() ? 60_000 : 15_000;
+
   // Popula L1 em memória
-  setL1(key, data, Math.min(ttl * 1000, 15_000));
+  setL1(key, data, Math.min(ttl * 1000, l1CapMs));
 
   if (!isRedisConfigured()) return;
 
@@ -166,7 +187,13 @@ export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number):
       if (!ready) return;
     }
 
-    // Grava no Redis em 1 único comando atômico
+    // Grava no Redis em 1 único comando atômico.
+    // Remoto: fire-and-forget — a resposta não pode pagar um RTT de escrita;
+    // o L1 local já foi populado acima, e o SET alcança o Redis em paralelo.
+    if (isRemoteRedis()) {
+      void client.set(key, JSON.stringify(data), 'EX', ttl).catch(() => {});
+      return;
+    }
     await client.set(key, JSON.stringify(data), 'EX', ttl);
   } catch (err) {
     log.warn('[Cache] Falha ao gravar no Redis:', err instanceof Error ? err.message : err);

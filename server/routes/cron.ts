@@ -24,7 +24,13 @@ function verifyCronSecret(req: Request, res: Response, next: () => void) {
       return;
     }
   } else if (process.env.NODE_ENV === 'production') {
-    log.warn('[Cron] CRON_SECRET não definido no ambiente.');
+    // Fail-closed: em produção, endpoints de destruição em massa (limpeza de
+    // tabelas, backup) não podem ficar abertos por falta de configuração.
+    log.error('[Cron] CRON_SECRET não definido em produção — endpoint bloqueado.');
+    res.status(401).json({ error: 'Não autorizado. CRON_SECRET não configurado.' });
+    return;
+  } else {
+    log.warn('[Cron] CRON_SECRET não definido — liberado apenas em desenvolvimento.');
   }
 
   next();

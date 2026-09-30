@@ -14,9 +14,51 @@ import { log } from '../utils/logger';
  */
 let client: Redis | null = null;
 
+// ===== Modo de conexão: local (rede interna, ~0.3ms) vs remoto (internet, ~30ms+) =====
+// No modo remoto o app minimiza RTTs: rate-limit local, L1 maior, timeouts folgados.
+// Auto-detecção: host na mesma rede/privado => local; senão remoto.
+// Override manual: REDIS_REMOTE_MODE="true" | "false"
+export const isRemoteRedis = (): boolean => {
+  const override = process.env.REDIS_REMOTE_MODE;
+  if (override === 'true') return true;
+  if (override === 'false') return false;
+  const url = process.env.REDIS_URL;
+  const host = url ? hostFromRedisUrl(url) : process.env.REDIS_HOST || '';
+  return !isPrivateHost(host);
+};
+
+function hostFromRedisUrl(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function isPrivateHost(host: string): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') return true;
+  if (h === 'redis' || h === 'nevapro_redis' || h.endsWith('.local')) return true; // docker-compose / mDNS
+  // RFC1918 + CGNAT (rede privada => latência ~sub-ms)
+  if (/^10\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return true;
+  return false; // IP público => presumir internet (latência alta)
+}
+
 // Tempo máximo de espera por reconexão antes de desistir da requisição atual.
 // Requisições nunca bloqueiam mais que isso: caem no fallback (memória/banco).
 const RECONNECT_WAIT_MS = 500;
+
+// RTT medido no boot (ativa keep-alive e dimensiona timeouts). 0 = ainda não medido.
+let measuredRttMs = 0;
+
+/** RTT (round-trip) médio até o Redis, medido no boot. 0 se ainda não medido. */
+export function getRedisRttMs(): number {
+  return measuredRttMs;
+}
 
 export function getRedisClient(): Redis | null {
   const url = process.env.REDIS_URL;
@@ -30,8 +72,10 @@ export function getRedisClient(): Redis | null {
 
   const redisOptions: RedisOptions = {
     lazyConnect: true,
-    connectTimeout: 2_000,
-    commandTimeout: 300,
+    // Timeout de comando adaptativo: local é rígido (300ms); remoto é folgado
+    // (2.5s ~ 8x o RTT típico de internet ~30ms) para sobreviver a jitter de rede.
+    commandTimeout: isRemoteRedis() ? 2_500 : 300,
+    connectTimeout: isRemoteRedis() ? 5_000 : 2_000,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
     enableAutoPipelining: true,
@@ -79,8 +123,16 @@ export function getRedisClient(): Redis | null {
     log.info(`[Redis] Reconectando em ${delay}ms...`);
   });
 
-  // Conecta sem bloquear o boot do servidor
-  void client.connect().catch(() => {
+  // Conecta sem bloquear o boot do servidor; no modo remoto, aquece a conexão
+  // medindo o RTT (também cria o socket cedo para a primeira requisição não pagar o handshake).
+  void client.connect().then(async () => {
+    if (isRemoteRedis()) {
+      const t0 = Date.now();
+      await client!.ping();
+      measuredRttMs = Date.now() - t0;
+      log.info(`[Redis] RTT medido no boot: ${measuredRttMs}ms (modo remoto)`);
+    }
+  }).catch(() => {
     // retryStrategy vai reagendar a reconexão automaticamente
   });
 

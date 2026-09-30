@@ -20,8 +20,9 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
-    if (req.user?.role !== 'admin' && req.user?.email !== email) {
-      res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    // Política: plano de estudos restrito à própria conta.
+    if (req.user?.email !== email) {
+      res.status(403).json({ error: 'Acesso negado: você só pode acessar o próprio plano de estudos.' });
       return;
     }
 
@@ -202,7 +203,7 @@ router.put(
         return;
       }
 
-      if (existing.user_id !== user.id && req.user?.role !== 'admin') {
+      if (existing.user_id !== user.id) {
         res.status(403).json({ error: 'Acesso negado: você não é o dono desta tarefa.' });
         return;
       }
@@ -263,7 +264,7 @@ router.delete(
         .eq('id', id)
         .maybeSingle();
 
-      if (existing && existing.user_id !== user.id && req.user?.role !== 'admin') {
+      if (existing && existing.user_id !== user.id) {
         res.status(403).json({ error: 'Acesso negado.' });
         return;
       }

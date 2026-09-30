@@ -8,6 +8,8 @@ export interface AuthenticatedUser {
   /** Papel legado (admin | student) — mantido para compatibilidade com o frontend atual. */
   role: 'admin' | 'student';
   authUserId?: string;
+  /** Versão do token no momento da emissão (revogação de sessão). */
+  tokenVersion?: number;
   /** Papéis RBAC efetivos do usuário (união global + por tenant). */
   roles?: RoleCode[];
   /** Permissões RBAC efetivas. */

@@ -18,10 +18,49 @@ const getSessionSecret = (): string | null =>
   process.env.JWT_SECRET || null;
 
 /**
+ * Versão do token por usuário: incrementada quando a senha muda, o que
+ * invalida TODAS as sessões emitidas antes (revogação de sessão).
+ * Consulta direta no banco com cache curto para não pesar o hot path.
+ */
+const tokenVersionCache = new Map<string, { version: number; expiresAt: number }>();
+const TOKEN_VERSION_CACHE_TTL_MS = 60_000;
+
+export async function getTokenVersion(userId: string): Promise<number> {
+  const cached = tokenVersionCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.version;
+
+  let version = 0;
+  try {
+    // Coluna opcional: ausente => versão 0 (comportamento legado)
+    const { rows } = await query(
+      `SELECT COALESCE(
+         (SELECT token_version FROM public.users WHERE id = $1),
+         (SELECT token_version FROM public.admin_users WHERE id = $1),
+         0
+       ) AS version`,
+      [userId],
+    );
+    version = Number(rows[0]?.version) || 0;
+  } catch (err) {
+    // Coluna ainda não migrada: mantém 0 e evita derrubar sessões legítimas
+    log.warn('[Auth] token_version indisponível (migração pendente?):', err instanceof Error ? err.message : err);
+    version = 0;
+  }
+
+  tokenVersionCache.set(userId, { version, expiresAt: Date.now() + TOKEN_VERSION_CACHE_TTL_MS });
+  return version;
+}
+
+/** Invalida a versão em cache (chamar após bump de token_version). */
+export function invalidateTokenVersionCache(userId: string): void {
+  tokenVersionCache.delete(userId);
+}
+
+/**
  * Creates a signed session token for a user (admin or student).
  * Format: role_prefix.payload_base64url.signature_hmac
  */
-const createSessionToken = (user: AuthenticatedUser): string => {
+export const createSessionToken = (user: AuthenticatedUser): string => {
   const secret = getSessionSecret();
   if (!secret) {
     throw new Error('JWT_SECRET é obrigatório para assinar sessões.');
@@ -35,6 +74,7 @@ const createSessionToken = (user: AuthenticatedUser): string => {
     email: user.email,
     role: user.role,
     exp: Math.floor(Date.now() / 1000) + ttl,
+    tv: user.tokenVersion ?? 0,
   })).toString('base64url');
   const signature = createHmac('sha256', secret).update(payload).digest('base64url');
   return `${prefix}.${payload}.${signature}`;
@@ -44,7 +84,7 @@ const createSessionToken = (user: AuthenticatedUser): string => {
  * Verifies a signed session token.
  * Returns the authenticated user or null if invalid/expired.
  */
-const verifySessionToken = (token: string): AuthenticatedUser | null => {
+export const verifySessionToken = (token: string): AuthenticatedUser | null => {
   const secret = getSessionSecret();
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -65,6 +105,7 @@ const verifySessionToken = (token: string): AuthenticatedUser | null => {
       email?: string;
       role?: string;
       exp?: number;
+      tv?: number;
     };
     if (
       !decoded.userId || !decoded.email ||
@@ -76,6 +117,7 @@ const verifySessionToken = (token: string): AuthenticatedUser | null => {
       userId: decoded.userId,
       email: decoded.email,
       role: decoded.role as 'admin' | 'student',
+      tokenVersion: decoded.tv ?? 0,
     };
   } catch {
     return null;
@@ -102,6 +144,12 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
 
     const user = verifySessionToken(token);
     if (!user) return null;
+
+    // Revogação: sessões emitidas antes de um bump de token_version morrem aqui.
+    const currentVersion = await getTokenVersion(user.userId);
+    if ((user as any).tokenVersion !== undefined && (user as any).tokenVersion !== currentVersion) {
+      return null;
+    }
 
     if (user.role === 'student') {
       // Carrega o contexto RBAC UMA vez e cacheia junto com a sessão.

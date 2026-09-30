@@ -12,8 +12,11 @@ import { CACHE_KEYS } from '../types';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { getUserCache, invalidateUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 import { extractObjectKey } from '../utils/extractObjectKey';
+import { awardXp, levelFromXp, XP_PER_CORRECT_ANSWER, XP_PER_INCORRECT_ANSWER } from '../services/xpService';
 
 const B2_BUCKET = process.env.B2_BUCKET_NAME || 'neva-avatars';
+/** Recompensa fixa do flash quiz, concedida exclusivamente pelo servidor. */
+const FLASH_QUIZ_XP_REWARD = 50;
 
 const router = Router();
 
@@ -22,8 +25,10 @@ router.get('/profile', requireAuth, async (req: AuthenticatedRequest, res: Respo
   let email = (req.query.email as string) || req.user?.email || '';
   const cleanEmail = normalizeEmail(email);
 
-  if (req.user?.role !== 'admin' && req.user?.email !== cleanEmail) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: cada usuário acessa APENAS o próprio perfil. Admins gerenciam
+  // usuários exclusivamente pelas rotas /api/admin (RBAC).
+  if (req.user?.email !== cleanEmail) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar o próprio perfil.' });
     return;
   }
 
@@ -83,15 +88,27 @@ router.post(
       return;
     }
 
-    if (req.user?.role !== 'admin' && req.user?.email !== email) {
-      res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    // Política: cada usuário atualiza APENAS o próprio perfil. Admins gerenciam
+    // usuários exclusivamente pelas rotas /api/admin (RBAC).
+    if (req.user?.email !== email) {
+      res.status(403).json({ error: 'Acesso negado: você só pode atualizar o próprio perfil.' });
       return;
     }
 
-    // Mass assignment protection
-    if (updateData.role !== undefined && req.user?.role !== 'admin') {
+    // Mass assignment protection: ninguém altera o papel via esta rota
+    if (updateData.role !== undefined) {
       delete updateData.role;
     }
+
+    // Integridade da gamificação: XP/level/streak/contadores NUNCA são aceitos
+    // do cliente — são derivados das respostas registradas no servidor.
+    // Sem isso, qualquer aluno manipula o leaderboard via POST /profile.
+    delete updateData.xp;
+    delete updateData.level;
+    delete updateData.streak;
+    delete updateData.answeredQuestions;
+    delete updateData.correctAnswers;
+    delete updateData.flashQuizCompleted;
 
     // Multi-Tenancy: apenas administradores podem alterar o tenant padrão do usuário
     if (updateData.tenant_id !== undefined && !req.user?.isAdmin) {
@@ -108,6 +125,8 @@ router.post(
     const targetTable = isAdmin ? 'admin_users' : 'users';
 
     // Field mapping (camelCase → snake_case)
+    // NOTA: sem xp/level/streak/answeredQuestions/correctAnswers — o XP é
+    // concedido exclusivamente via awardXp() (server/services/xpService.ts).
     const fieldMapping: Record<string, string> = {
       name: 'name',
       city: 'city',
@@ -116,16 +135,7 @@ router.post(
       showInLeaderboard: 'show_in_leaderboard',
       languagePreference: 'language_preference',
       avatarUrl: 'avatar_url',
-      answeredQuestions: 'answered_questions',
-      correctAnswers: 'correct_answers',
-      streak: 'streak',
-      xp: 'xp',
-      level: 'level',
     };
-
-    if (req.user?.role === 'admin') {
-      fieldMapping.role = 'role';
-    }
 
     const dbUpdate: Record<string, unknown> = { email };
 
@@ -137,31 +147,24 @@ router.post(
 
     const isFlashQuizUpdate = !!updateData.isFlashQuizUpdate;
 
-    // Fetch old user for XP diff calculation
-    let xpDiff = 0;
+    // Fetch user row (necessário para o guard do flash quiz)
     let userId: string | null = null;
-    let oldXp = 0;
-    let oldLevel = 1;
 
     try {
       const { data: oldUser } = await dbAdmin
         .from(targetTable)
-        .select('id, xp, level')
+        .select('id')
         .eq('email', email)
         .maybeSingle();
       if (oldUser) {
         userId = oldUser.id;
-        oldXp = oldUser.xp || 0;
-        oldLevel = oldUser.level || 1;
-        if (typeof dbUpdate.xp === 'number' && dbUpdate.xp > oldXp) {
-          xpDiff = dbUpdate.xp - oldXp;
-        }
       }
     } catch (e) {
       log.error('[Profile Update] Error fetching old user:', e);
     }
 
-    // Flash quiz protection - atomic guard (eliminates TOCTOU race condition)
+    // Flash quiz protection - atomic guard (eliminates TOCTOU race condition).
+    // O XP do flash quiz é concedido pelo SERVIDOR (valor fixo), nunca do body.
     if (isFlashQuizUpdate && userId) {
       const { rows: locked } = await query(
         `UPDATE ${targetTable}
@@ -174,9 +177,11 @@ router.post(
 
       if (locked.length === 0) {
         log.info(`[Flash Quiz] Atomic guard blocked duplicate XP for ${email}`);
-        dbUpdate.xp = oldXp;
-        dbUpdate.level = oldLevel;
-        xpDiff = 0;
+      } else if (!isAdmin) {
+        await awardXp(userId, req.tenantId || null, {
+          amount: FLASH_QUIZ_XP_REWARD,
+          reason: 'Flash Quiz: Maranhão',
+        });
       }
       dbUpdate.flash_quiz_completed = true;
     }
@@ -207,14 +212,6 @@ router.post(
 
       if (error) throw error;
 
-      // XP log entry
-      if (userId && xpDiff > 0) {
-        const reason = updateData.xpReason || (isFlashQuizUpdate ? 'Flash Quiz: Maranhão' : 'Conclusão de Simulado / Atividade');
-        await dbAdmin
-          .from('xp_logs')
-          .insert({ user_id: userId, amount: xpDiff, reason, created_at: new Date().toISOString() });
-      }
-
       await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
       await invalidateUserCache(email, userId || undefined);
       res.json({ success: true, user: formatUserProfile(data, isAdmin ? 'admin' : 'student') });
@@ -233,8 +230,10 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
     return;
   }
 
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: cada usuário remove APENAS a própria conta. Admins removem
+  // usuários exclusivamente pelas rotas /api/admin (RBAC).
+  if (req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: você só pode remover a própria conta.' });
     return;
   }
 
@@ -289,8 +288,9 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
 router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   let email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: cada usuário vê APENAS as próprias estatísticas.
+  if (req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar as próprias estatísticas.' });
     return;
   }
 
@@ -365,6 +365,60 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
   } catch (err) {
     log.error('[Stats] Error:', err);
     res.status(500).json({ error: 'Erro ao processar estatísticas' });
+  }
+});
+
+// ============= SYNC PROGRESS (server-side XP, substitui xp do body) =============
+/**
+ * Recalcula answered/correct/xp do usuário a partir das respostas REALMENTE
+ * registradas no banco e aplica de forma atômica. O cliente nunca envia
+ * valores: apenas dispara a sincronização após um simulado/atividade.
+ */
+router.post('/progress/sync', rateLimiter(10, 60_000), requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const email = normalizeEmail(req.user?.email || '');
+  try {
+    const { data: user } = await dbAdmin.from('users').select('id').eq('email', email).maybeSingle();
+    if (!user) {
+      res.status(404).json({ error: 'Usuário não encontrado.' });
+      return;
+    }
+
+    // Fonte de verdade: tabela answers (a última resposta por questão).
+    const { rows } = await query(
+      `WITH latest AS (
+         SELECT DISTINCT ON (question_id) question_id, is_correct
+         FROM public.answers
+         WHERE user_id = $1
+         ORDER BY question_id, created_at DESC
+       )
+       SELECT COUNT(*)::int AS answered,
+              COALESCE(SUM(CASE WHEN is_correct THEN 1 ELSE 0 END), 0)::int AS correct
+       FROM latest`,
+      [user.id],
+    );
+
+    const answered = Number(rows[0]?.answered) || 0;
+    const correct = Number(rows[0]?.correct) || 0;
+    const incorrect = Math.max(answered - correct, 0);
+    const totalXp = correct * XP_PER_CORRECT_ANSWER + incorrect * XP_PER_INCORRECT_ANSWER;
+
+    await query(
+      `UPDATE public.users
+         SET answered_questions = $1,
+             correct_answers = $2,
+             xp = $3,
+             level = $4,
+             updated_at = NOW()
+       WHERE id = $5`,
+      [answered, correct, totalXp, levelFromXp(totalXp), user.id],
+    );
+
+    await cacheInvalidate(CACHE_KEYS.LEADERBOARD, CACHE_KEYS.ADMIN_USERS);
+    await invalidateUserCache(email, user.id);
+    res.json({ success: true, answered, correct, xp: totalXp, level: levelFromXp(totalXp) });
+  } catch (err) {
+    log.error('[Progress Sync] Error:', err);
+    res.status(500).json({ error: 'Erro ao sincronizar progresso.' });
   }
 });
 

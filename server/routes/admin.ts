@@ -30,7 +30,8 @@ router.get(
       return;
     }
 
-    let builder = dbAdmin.from('users').select('*');
+    // Seleção explícita: NUNCA expor password_hash/internal metrics na listagem
+    let builder = dbAdmin.from('users').select('id, email, name, role, avatar_url, city, school, gremio, answered_questions, correct_answers, xp, level, streak, points, rank, tenant_id, show_in_leaderboard, language_preference, flash_quiz_completed, created_at, updated_at');
     if (tenantId) {
       builder = builder.eq('tenant_id', tenantId);
     }

@@ -13,6 +13,10 @@ crop.ps1
 certbot/
 public/icon-512.png.bak
 
+# Logs de desenvolvimento
+*.log
+!/.gitkeep
+
 # Scripts temporários de migração/refatoração
 /scripts/
 

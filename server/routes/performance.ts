@@ -22,8 +22,9 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
   const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
-  if (req.user?.role !== 'admin' && req.user?.email !== email) {
-    res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+  // Política: desempenho restrito à própria conta.
+  if (req.user?.email !== email) {
+    res.status(403).json({ error: 'Acesso negado: você só pode acessar o próprio desempenho.' });
     return;
   }
 
@@ -120,8 +121,9 @@ router.get(
   async (req: AuthenticatedRequest, res: Response) => {
     const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
-    if (req.user?.role !== 'admin' && req.user?.email !== email) {
-      res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    // Política: desempenho restrito à própria conta.
+    if (req.user?.email !== email) {
+      res.status(403).json({ error: 'Acesso negado: você só pode acessar o próprio desempenho.' });
       return;
     }
 
@@ -229,8 +231,9 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     const email = normalizeEmail((req.query.email as string) || req.user?.email || '');
 
-    if (req.user?.role !== 'admin' && req.user?.email !== email) {
-      res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+    // Política: desempenho restrito à própria conta.
+    if (req.user?.email !== email) {
+      res.status(403).json({ error: 'Acesso negado: você só pode acessar o próprio desempenho.' });
       return;
     }
 
