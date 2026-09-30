@@ -27,7 +27,7 @@ const isAllowedImageHost = (hostname: string): boolean => {
   return extraHosts.includes(h);
 };
 
-const fetchImageWithRedirects = async (rawUrl: string): Promise<Response> => {
+const fetchImageWithRedirects = async (rawUrl: string) => {
   let currentUrl = rawUrl.trim();
   for (let hop = 0; hop <= IMAGE_PROXY_MAX_REDIRECTS; hop++) {
     const parsed = new URL(currentUrl);
