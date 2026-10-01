@@ -1,4 +1,7 @@
-FROM node:22-alpine AS frontend
+# Tags fixadas por versão do Alpine para builds determinísticos.
+# CVEs reportados nestas bases são upstream: resolvidos com rebuild periódico
+# (o apk upgrade nos estágios de runtime pega os patches de SO do momento).
+FROM node:22-alpine3.24 AS frontend
 
 WORKDIR /app
 
@@ -16,16 +19,18 @@ RUN npm ci
 COPY . .
 RUN npm run build:frontend
 
-FROM composer:2 AS vendor
+FROM composer:2.10 AS vendor
 
 WORKDIR /app
 
 COPY backend/ ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-FROM php:8.4-fpm-alpine AS api
+FROM php:8.4-fpm-alpine3.22 AS api
 
-RUN apk add --no-cache curl libpq libzip oniguruma postgresql-client \
+# Patches de segurança do SO no momento do build (reduce CVEs da base)
+RUN apk upgrade --no-cache \
+    && apk add --no-cache curl libpq libzip oniguruma postgresql-client \
     && apk add --no-cache --virtual .build-dependencies $PHPIZE_DEPS curl-dev libzip-dev oniguruma-dev postgresql-dev \
     && docker-php-ext-install curl mbstring opcache pcntl pdo_pgsql zip \
     && apk del .build-dependencies
@@ -44,9 +49,10 @@ EXPOSE 9000
 
 CMD ["php-fpm", "-F"]
 
-FROM nginx:stable-alpine AS web
+FROM nginx:1.28-alpine3.24 AS web
 
-RUN apk add --no-cache curl
+RUN apk upgrade --no-cache \
+    && apk add --no-cache curl
 
 COPY --from=frontend /app/dist/ /usr/share/nginx/html/
 
@@ -54,7 +60,8 @@ COPY --from=frontend /app/dist/ /usr/share/nginx/html/
 # The Compose deployment continues to use the separate "web" and "api" targets.
 FROM api AS app
 
-RUN apk add --no-cache nginx supervisor
+RUN apk upgrade --no-cache \
+    && apk add --no-cache nginx supervisor
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
