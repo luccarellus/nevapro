@@ -7,7 +7,7 @@ x-laravel-environment: &laravel-environment
   APP_URL: ${APP_URL:?APP_URL obrigatoria}
   DB_CONNECTION: pgsql
   DB_URL: ${DATABASE_URL:?DATABASE_URL obrigatoria}
-  DB_SSLMODE: ${DB_SSLMODE:-require}
+  DB_SSLMODE: ${DB_SSLMODE:-disable}
   CACHE_STORE: database
   SESSION_DRIVER: array
   QUEUE_CONNECTION: database
