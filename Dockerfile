@@ -1,6 +1,5 @@
-# Tags fixadas por versão do Alpine para builds determinísticos.
-# CVEs reportados nestas bases são upstream: resolvidos com rebuild periódico
-# (o apk upgrade nos estágios de runtime pega os patches de SO do momento).
+# node:22-alpine3.24 é a publicação mais recente ( CVEs reportados são upstream, sem tag nova disponível;
+# Dependabot abre PR automaticamente quando sair atualização).
 FROM node:22-alpine3.24 AS frontend
 
 WORKDIR /app
@@ -19,14 +18,17 @@ RUN npm ci
 COPY . .
 RUN npm run build:frontend
 
-FROM composer:2.10 AS vendor
+# composer:2.10 já é a imagem mais recente publicada (2.10.3 = mesmo digest).
+# CVEs apontados pelo scanner são da base e NÃO chegam à imagem final:
+# este estágio só roda `composer install` em build-time (artefato copiado via COPY --from=vendor).
+FROM composer:2.10.3 AS vendor
 
 WORKDIR /app
 
 COPY backend/ ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-FROM php:8.4-fpm-alpine3.22 AS api
+FROM php:8.4-fpm-alpine3.24 AS api
 
 # Patches de segurança do SO no momento do build (reduce CVEs da base)
 RUN apk upgrade --no-cache \
