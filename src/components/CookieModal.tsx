@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState } from 'react';
+import { motion } from 'motion/react';
 import { X, Shield, Check, Info } from 'lucide-react';
 import { useConsent } from '../hooks/useConsent';
 import { ConsentPreferences } from '../types/consent';

@@ -1,4 +1,4 @@
-import { calculateLevelAndProgression } from '../../utils/xpUtils';
+export { formatDateToBR, formatShortDate, toTimestamp } from '../../utils/dateUtils';
 
 export const normalizeString = (str: string | null | undefined): string => {
   if (!str) return '';
@@ -36,18 +36,6 @@ export const getUniqueNormalized = (items: (string | undefined | null)[]): strin
   }
   
   return uniqueItems.sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
-};
-
-export const toTimestamp = (value?: string): number => {
-  if (!value) return 0;
-  const timestamp = new Date(value).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-};
-
-export const formatShortDate = (value?: string): string => {
-  const timestamp = toTimestamp(value);
-  if (!timestamp) return 'Sem data';
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(timestamp));
 };
 
 export const getSignificantTokens = (name: string): string[] => {
@@ -102,14 +90,4 @@ export const getStudentRankInfo = (level: number) => {
   if (level >= 4) return { label: 'Ouro', classes: 'bg-text-main/5 text-text-secondary border border-border-color' };
   if (level >= 2) return { label: 'Prata', classes: 'bg-text-main/5 text-text-secondary border border-border-color' };
   return { label: 'Bronze', classes: 'bg-text-main/5 text-text-secondary border border-border-color opacity-80' };
-};
-
-export const formatDateToBR = (dateStr: string): string => {
-  if (!dateStr) return '-';
-  const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const parts = dateOnly.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return dateStr;
 };

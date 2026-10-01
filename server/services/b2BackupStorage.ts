@@ -199,9 +199,6 @@ export async function runDatabaseBackup(): Promise<{
 
   // 3. Define a chave do objeto no B2
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(now.getUTCDate()).padStart(2, '0');
   const timestampStr = now.toISOString().replace(/[:.]/g, '-');
   const shortId = randomUUID().substring(0, 8);
 

@@ -383,7 +383,7 @@ router.post(
   resetIpLimiter,
   resetAccountLimiter,
   async (req: AuthenticatedRequest, res: Response) => {
-    const { password, token, email } = req.body;
+    const { password, token } = req.body;
 
     if (!password || password.length < 6) {
       res.status(400).json({ error: 'A senha deve conter no mínimo 6 caracteres.' });
@@ -446,7 +446,7 @@ router.post(
 );
 
 // ============= LOGOUT =============
-router.post('/logout', async (req: AuthenticatedRequest, res: Response) => {
+router.post('/logout', async (_req: AuthenticatedRequest, res: Response) => {
   // Clear session cookie
   res.clearCookie('session_token', {
     httpOnly: true,

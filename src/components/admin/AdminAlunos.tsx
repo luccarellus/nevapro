@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Users, X, CheckCircle2, Trash2, ChevronRight, TrendingUp, ChevronDown,
-  ShieldAlert, Crown, UserCircle, Send, Clock, Trophy, Building2
+  Users, X, CheckCircle2, Trash2, TrendingUp, ChevronDown,
+  ShieldAlert, Crown, UserCircle, Clock, Trophy, Building2
 } from 'lucide-react';
 import Spinner from '../Spinner';
 import { UserProfile } from '../../types';

@@ -17,7 +17,7 @@ class TriScore extends Model
 
     protected $fillable = [
         'id', 'user_id', 'tenant_id', 'estimated_score',
-        'math_score', 'nature_score', 'humanities_score', 'languages_score',
+        'math_score', 'nature_score', 'humanities_score', 'languages_score', 'calculated_at',
     ];
 
     protected $casts = [

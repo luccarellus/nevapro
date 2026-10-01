@@ -35,7 +35,7 @@ export const initConsentMode = () => {
   // Define gtag if not present
   const win = window as any;
   win.dataLayer = win.dataLayer || [];
-  function gtag(...args: any[]) {
+  function gtag(..._args: any[]) {
     win.dataLayer.push(arguments);
   }
   win.gtag = gtag;

@@ -3,11 +3,13 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AnswerController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\BootstrapController;
 use App\Http\Controllers\ClientLogController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\ErrorsBookController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\ImageProxyController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\LgpdController;
 use App\Http\Controllers\MaterialController;
@@ -15,6 +17,7 @@ use App\Http\Controllers\MuralController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\StorageObjectController;
 use App\Http\Controllers\StudyPlanController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UploadController;
@@ -36,6 +39,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/health/details', [HealthController::class, 'details'])
     ->middleware(['auth.custom', 'role:admin']);
+Route::get('imagem', [ImageProxyController::class, 'show'])
+    ->middleware(['auth.custom', 'throttle.custom:120,60']);
+Route::get('storage/object', [StorageObjectController::class, 'show'])
+    ->middleware(['auth.custom', 'throttle.custom:120,60']);
 
 // ===== Auth (público + rate limit) =====
 Route::prefix('auth')->group(function () {
@@ -55,10 +62,14 @@ Route::prefix('auth')->group(function () {
 // ===== Rotas autenticadas (cookie session_token) =====
 Route::middleware(['auth.custom', 'tenant'])->group(function () {
 
+    Route::get('bootstrap', [BootstrapController::class, 'index']);
+
     // Perfil
     Route::get('user/profile', [UserController::class, 'profile']);
     Route::post('user/profile', [UserController::class, 'updateProfile'])
         ->middleware(['throttle.custom:10,60', 'recaptcha']);
+    Route::delete('user/profile', [UserController::class, 'deleteProfile'])
+        ->middleware(['throttle.custom:3,60', 'recaptcha']);
 
     // XP / gamificação
     Route::post('user/award-xp', [UserController::class, 'awardXp']);
@@ -66,6 +77,7 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     // Erros book
     Route::post('user/errors-book', [ErrorsBookController::class, 'store']);
     Route::get('user/errors-book', [ErrorsBookController::class, 'index']);
+    Route::get('user/errors', [ErrorsBookController::class, 'index']);
 
     // Leaderboard (top 20 por XP, cache 60s)
     Route::get('leaderboard', [LeaderboardController::class, 'index']);
@@ -73,6 +85,7 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     // Notificações
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/read', [NotificationController::class, 'markRead']);
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markOneRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead']);
 
     // CRUD: materiais, eventos, mural (leitura p/ todos autenticados; escrita role)
@@ -101,7 +114,10 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
         ->middleware(['role:admin,tenant_admin,teacher']);
 
     // Questões: listagem do tenant + criação (professor/admin)
+    Route::get('questoes/enemhub/subjects', [QuestionController::class, 'enemHubSubjects']);
+    Route::get('questoes/enemhub', [QuestionController::class, 'enemHub']);
     Route::get('questoes/tenant', [QuestionController::class, 'tenant']);
+    Route::get('questoes', [QuestionController::class, 'enem']);
     Route::post('questoes', [QuestionController::class, 'store'])
         ->middleware(['throttle.custom:10,60', 'role:admin,tenant_admin,teacher']);
 
@@ -112,23 +128,38 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
         ->middleware('throttle.custom:10,60');
 
     // Plano de estudos
-    Route::get('study-plans', [StudyPlanController::class, 'index']);
-    Route::post('study-plans', [StudyPlanController::class, 'store']);
-    Route::put('study-plans/{id}', [StudyPlanController::class, 'update']);
-    Route::delete('study-plans/{id}', [StudyPlanController::class, 'destroy']);
+    Route::get('study-plans/tasks', [StudyPlanController::class, 'index']);
+    Route::post('study-plans/tasks', [StudyPlanController::class, 'store']);
+    Route::put('study-plans/tasks/{id}', [StudyPlanController::class, 'update']);
+    Route::delete('study-plans/tasks/{id}', [StudyPlanController::class, 'destroy']);
 
     // Performance (TRI + estatísticas)
     Route::get('performance', [PerformanceController::class, 'index']);
+    Route::get('performance/tri-scores', [PerformanceController::class, 'index']);
+    Route::get('performance/subject-mastery', [PerformanceController::class, 'subjectMastery']);
+    Route::post('performance/calculate-tri', [PerformanceController::class, 'calculateTri']);
 
     // Tenants (troca de instituição)
     Route::get('tenants', [TenantController::class, 'index']);
+    Route::post('tenants', [TenantController::class, 'store'])
+        ->middleware('throttle.custom:10,60');
+    Route::get('tenants/{id}/roles', [TenantController::class, 'roles']);
+    Route::get('tenants/{id}/members', [TenantController::class, 'members']);
+    Route::post('tenants/{id}/members', [TenantController::class, 'assignMember'])
+        ->middleware('throttle.custom:10,60');
+    Route::delete('tenants/{id}/members/{userId}', [TenantController::class, 'removeMember']);
+    Route::get('tenants/{id}', [TenantController::class, 'show']);
+    Route::put('tenants/{id}', [TenantController::class, 'update'])
+        ->middleware('throttle.custom:10,60');
+    Route::delete('tenants/{id}', [TenantController::class, 'destroy'])
+        ->middleware('throttle.custom:5,60');
 
     // LGPD
     Route::post('lgpd/consent-log', [LgpdController::class, 'consentLog']);
 
     // Upload de avatar (multipart)
     Route::post('upload', [UploadController::class, 'store'])
-        ->middleware('throttle.custom:5,60');
+        ->middleware(['throttle.custom:5,60', 'recaptcha']);
 
     // Logs do cliente (observabilidade, rate limit próprio)
     Route::post('client-logs', [ClientLogController::class, 'store'])

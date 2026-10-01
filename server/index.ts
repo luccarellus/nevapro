@@ -232,14 +232,14 @@ if (fs.existsSync(indexPath)) {
 }
 
 // ===== API desconhecida: 404 JSON (sem expor a SPA nem detalhes internos) =====
-app.use('/api', (req, res) => {
+app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Recurso não encontrado.' });
 });
 
 // ===== Centralized Error Handler =====
 Sentry.setupExpressErrorHandler(app);
 
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err: any, _request: any, res: any, _next: any) => {
   // HttpError: erro de aplicação esperado — não polui o log de erros internos
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });

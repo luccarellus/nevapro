@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sun, Moon, Bell, Check, X, ClipboardList, BookOpen, MessageSquare, Calendar as CalendarIcon } from 'lucide-react';
+import { Sun, Moon, Bell, X, BookOpen, MessageSquare, Calendar as CalendarIcon } from 'lucide-react';
 import Logo from './Logo';
 import TenantSwitcher from './TenantSwitcher';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';

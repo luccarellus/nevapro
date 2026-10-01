@@ -4,15 +4,15 @@
 
 - [ ] **Firewall (UFW):** `ufw allow 80/tcp && ufw allow 443/tcp && ufw enable`
 - [ ] **HTTPS:** Certificados instalados via Certbot.
-- [ ] **JWT:** Secret gerada com pelo menos 256 bits e rotacionada a cada 3 meses.
+- [ ] **APP_KEY:** Chave Laravel persistente e exclusiva por ambiente.
 - [ ] **Cookies:** Flag `Secure=true` e `HttpOnly=true` em todas as rotas de auth.
-- [ ] **Rate Limit:** Configurado no NGINX e via Redis (rate limiter do Express).
+- [ ] **Rate Limit:** Configurado no NGINX e no middleware Laravel.
 
 ## 📦 Estratégia de Deploy (VPS)
 
-A aplicação é um único container Express que serve **API + frontend estático**,
-atrás de um Nginx com SSL. O Redis roda como serviço próprio no docker-compose
-(cache, rate-limit e sessões) e um container `cron` substitui o **Vercel Cron**.
+A aplicação usa Laravel/PHP-FPM para a API, Nginx para TLS e frontend estático,
+e containers Laravel separados para filas e agendamentos. Cache, filas e rate
+limit usam o PostgreSQL; não é necessário um serviço Redis.
 
 ### Pré-requisitos
 
@@ -30,7 +30,7 @@ O script `deploy.sh` (ou os atalhos de `make`) automatiza todo o fluxo:
 # 2. Emitir o certificado SSL (primeira vez; requer domínio já apontando p/ a VPS)
 ./deploy.sh ssl
 
-# 3. Build e subir todo o stack (nginx + api + redis + cron)
+# 3. Build, migrations compatíveis e subida do stack Laravel
 ./deploy.sh up
 
 # 4. Conferir saúde da aplicação
@@ -49,7 +49,7 @@ No dia-a-dia:
 ```
 
 > Os mesmos comandos funcionam com `make` (`make setup`, `make up`, ...).
-> Para escalar a API (múltiplas réplicas atrás do Nginx): `docker compose up -d --build --scale api=3`
+> Réplicas adicionais da API não estão documentadas/testadas; valide DNS do upstream Nginx e armazenamento compartilhado antes de escalar.
 
 ### 🔧 Fluxo manual (referência)
 
@@ -70,8 +70,8 @@ nano nginx/conf.d/default.conf
 # 4. Emitir os certificados SSL (somente na primeira vez) — veja a seção
 #    "HTTPS (Certbot)" abaixo antes de prosseguir
 
-# 5. Build e subir todos os serviços
-docker compose up -d --build
+# 5. Build, aplicar migrations seguras e iniciar os serviços
+./deploy.sh up
 
 # 6. Verificar o status
 docker compose ps
@@ -82,35 +82,28 @@ docker compose logs -f api
 
 ### 2. Variáveis obrigatórias no `.env`
 
-O docker-compose injeta **todo o `.env`** no container `api` (`env_file`) e usa
-o `REDIS_URL` definido nele (com credenciais: `redis://default:[SENHA]@nevapro_redis:6379`).
+O Compose injeta as variáveis do `.env` nos containers Laravel. `DATABASE_URL`
+é mapeada para `DB_URL`; `APP_KEY` deve permanecer estável entre deploys.
 
 ```env
-# Banco (Supabase)
-DATABASE_URL="postgresql://postgres:[SENHA]@db.[PROJECT_REF].supabase.co:5432/postgres"
-DISABLE_DB_SSL="false"
-DB_SSL_REJECT_UNAUTHORIZED="false"
-
-# Supabase Auth/Storage
-SUPABASE_URL="https://[PROJECT_REF].supabase.co"
-SUPABASE_ANON_KEY="[anon key]"
-SUPABASE_SERVICE_ROLE_KEY="[service role key]"
+# Banco PostgreSQL
+DATABASE_URL="postgresql://usuario:senha@host:5432/banco"
+DB_SSLMODE="require"
 
 # URL pública e CORS
 APP_URL="https://seu-dominio.com"
 FRONTEND_URL="https://seu-dominio.com"
 
 # Segredos
-JWT_SECRET="[min 32 caracteres]"
-CRON_SECRET="[segredo usado pelos jobs de cron]"
+APP_KEY="base64:[chave gerada pelo setup]"
+CRON_SECRET="[segredo aleatório]"
 EVENTEASE_WEBHOOK_SECRET="[segredo do webhook]"
 
-# Gemini, Resend, Backblaze B2, Sentry, reCAPTCHA — como no .env.example
+# Backblaze B2, EnemHub, Resend, Sentry e reCAPTCHA — conforme .env.example
 ```
 
-> **Redis:** defina `REDIS_URL` no `.env` com as credenciais do serviço
-> (ex.: `redis://default:[SENHA]@nevapro_redis:6379`). Em dev local sem Docker,
-> aponte para `localhost`, ou deixe o app operar com fallback em memória.
+> **PostgreSQL:** `DB_SSLMODE` usa `require` por padrão no Compose. Defina `prefer`
+> se o servidor de banco não oferecer TLS.
 
 ### 3. HTTPS (Certbot / Let's Encrypt)
 
@@ -184,69 +177,64 @@ docker compose run --rm certbot renew --dry-run
 > **Segurança:** o diretório `certbot/` contém chaves privadas e está no
 > `.gitignore` — nunca o envie para o repositório.
 
-### 4. Cron Jobs (substitui o Vercel Cron)
-
-O serviço `cron` do compose dispara os endpoints internos diariamente (horário **UTC**):
+### 4. Tarefas agendadas
 
 | Horário (UTC) | Endpoint | Função |
 |---|---|---|
-| 03:00 | `POST /api/cron/cleanup` | Limpeza de logs/tokens (`clean_unnecessary_logs`) |
-| 04:00 | `POST /api/cron/backup` | Backup do banco no Backblaze B2 |
+| 03:00 | Laravel `CronService::cleanup()` | Limpeza de logs/tokens expirados |
+| 04:00 | Laravel `DatabaseBackupJob` | Backup PostgreSQL no Backblaze B2 |
 
-Os horários estão em `cron/crontab`. A autenticação usa o header
-`X-Cron-Secret` com o valor de `CRON_SECRET`.
+O serviço `scheduler` executa `php artisan schedule:work`; não é necessário
+configurar um container cron nem chamadas HTTP periódicas.
 
-## 🔋 Configuração de Banco (Supabase)
+## 🔋 Banco de dados
 
 ```env
-DATABASE_URL="postgresql://postgres:[SENHA]@db.[PROJECT_REF].supabase.co:5432/postgres"
-DISABLE_DB_SSL="false"
+DATABASE_URL="postgresql://usuario:senha@host:5432/banco"
+DB_SSLMODE="require"
 ```
 
-- Admins devem ser criados no Supabase Auth com `app_metadata.role = admin` ou associados a `public.admin_users`.
-- No primeiro login válido, o backend sincroniza `public.admin_users.auth_user_id`.
+Cadastre administradores em `public.admin_users`; o login Laravel valida essa
+tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 
-## 🧱 Autenticação (JWT + Refresh Token)
+## 🧱 Autenticação
 
-- **Access Token:** JWT de vida curta (15 min) enviado via HttpOnly Cookie.
-- **Refresh Token:** Armazenado em banco (PostgreSQL) e enviado via Cookie HttpOnly com path `/api/auth/refresh`.
-- **Estratégia:** Na expiração do Access Token, o frontend tenta bater na rota de refresh. Se o token foi rotacionado ou invalidado, o usuário é deslogado.
+- Laravel Sanctum emite tokens com validade de 24 horas, guardados em `personal_access_tokens`.
+- O cookie `session_token` é HttpOnly e seguro em produção; logout revoga o token atual.
+- A troca de senha invalida sessões anteriores via `token_version`.
 
-## 🧠 Redis (cache e rate-limit)
+## 🧠 Cache, filas e agendamentos
 
-- O cache usa exclusivamente o **Redis self-hosted** (`REDIS_URL`, injetado pelo docker-compose).
-- Sem Redis configurado, o app opera com fallback em memória (cache opcional e rate-limit por instância).
-- O estado do Redis aparece em `GET /api/health` (`dependencies.redis`).
+- O cache e as filas Laravel usam tabelas PostgreSQL.
+- O serviço `worker` processa e-mails, notificações e backups.
+- O serviço `scheduler` executa a limpeza diária às 03:00 UTC e o backup às 04:00 UTC.
+- As migrations são executadas pelo `./deploy.sh up`; tabelas existentes são preservadas.
 
 ## 📊 Monitoramento Recomendado
 
-1. **Logging:** Winston + CloudWatch ou ELK Stack.
+1. **Logging:** Laravel Monolog (stdout/stderr) + CloudWatch ou ELK Stack.
 2. **Uptime:** [Uptime Kuma](https://github.com/louislam/uptime-kuma) (Auto-hospedado na própria VPS).
 3. **Observabilidade:** [Sentry.io](https://sentry.io) para captura de erros em tempo real.
 4. **Performance:** [Prometheus](https://prometheus.io/) + [Grafana] para métricas de CPU/RAM dos containers.
 
 ## 💾 Estratégia de Backup (Backblaze B2)
 
-- **PostgreSQL no Backblaze B2:**
-  - **Automação:** container `cron` do compose dispara `POST /api/cron/backup` diariamente às `04:00 UTC`.
-  - **Manual via CLI:** Execute `npm run backup:db` na VPS ou ambiente local.
-  - **Validação de Conexão:** Execute `npm run test:backblaze-backup` para testar escrita e leitura no bucket de backup.
-  - **Retenção Automática:** Arquivos com mais de `B2_BACKUP_RETENTION_DAYS` (padrão: 30 dias) são expurgados automaticamente do bucket.
-  - **Localização dos arquivos:** `backups/db/nevapro_db_YYYY-MM-DD_HHmmss.sql.gz`.
-  - O dump usa `pg_dump` nativo quando disponível (instalado no container); caso contrário, usa o fallback Node.js.
+- O scheduler envia diariamente às 04:00 UTC um dump customizado do `pg_dump`
+  para `backups/db/nevapro_YYYY-MM-DD_HHmmss.dump` no B2.
+- Para executar manualmente: `docker compose exec api php artisan backup:run`.
+- O dump customizado não é `.sql.gz`; não o descomprima com `gzip`.
 
 ### 🔄 Como Restaurar um Backup
 
-1. Baixe o arquivo `.sql.gz` do Backblaze B2.
-2. Descomprima o arquivo: `gzip -d nevapro_db_...sql.gz`.
-3. Restaure no PostgreSQL:
+1. Baixe o arquivo `.dump` do Backblaze B2.
+2. Restaure em um banco PostgreSQL de destino vazio:
 
    ```bash
-   psql "$DATABASE_URL" < nevapro_db_...sql
+   pg_restore --no-owner --no-privileges --dbname="$DATABASE_URL" nevapro_....dump
    ```
 
-## ☁️ Deploy na Vercel (opcional / staging)
+## ☁️ Runtime Node legado
 
-- O backend continua compatível com a Vercel via [`api/index.ts`](api/index.ts) e `vercel.json` (crons + rewrites).
-- No ambiente da Vercel o cache fica sem Redis (fallback em memória por instância); o Redis self-hosted é usado na VPS.
-- Use as variáveis `APP_URL`, `FRONTEND_URL`, `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` no projeto da Vercel.
+O deploy de produção documentado aqui usa Laravel em Docker. Os artefatos
+Express/Vercel restantes são compatibilidade legada e não devem ser usados para
+um novo deploy sem uma validação de paridade e configuração independentes.

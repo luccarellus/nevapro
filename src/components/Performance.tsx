@@ -1,18 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { UserProfile } from '../types';
 import {
-  TrendingUp, AlertTriangle, ArrowUpRight, Sparkles,
-  ArrowRight, CheckCircle2, Zap, Target, Search,
-  Award, Activity, Calculator, Atom, Globe, Languages,
-  BarChart3, PieChart as PieChartIcon, ShieldCheck, Filter,
-  BookOpen, Check, X
+  TrendingUp, AlertTriangle, ArrowRight, Zap, Target, Search,
+  Activity, Calculator, Atom, Globe, Languages,
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { performanceService, TriScore, SubjectMastery, MasteryEvolution } from '../services/performanceService';
+import { performanceService, TriScore, SubjectMastery } from '../services/performanceService';
 import Spinner from './Spinner';
 
 interface PerformanceProps {
@@ -94,10 +91,8 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   const [triTarget, setTriTarget] = useState(750);
   const [stats, setStats] = useState({ hit_rate: 0, answered: 0, correct: 0, xp: 0 });
   const [subjectsMastery, setSubjectsMastery] = useState<SubjectMastery[]>([]);
-  const [evolution, setEvolution] = useState<MasteryEvolution[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculatingTri, setCalculatingTri] = useState(false);
-  const [triCalculationMessage, setTriCalculationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Filter & Search States
@@ -119,7 +114,6 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
         setTriTarget(triData.tri_target || 750);
         setStats(triData.stats || { hit_rate: 0, answered: 0, correct: 0, xp: 0 });
         setSubjectsMastery(masteryData.subjects || []);
-        setEvolution(masteryData.evolution || []);
 
         // Auto-trigger TRI calculation based on latest answers
         setCalculatingTri(true);
@@ -135,8 +129,6 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
               languages_score: triResult.by_subject?.languages_score || null,
               calculated_at: triResult.overall.calculated_at,
             });
-          } else if (triResult.reason) {
-            setTriCalculationMessage(triResult.reason);
           }
         } catch (calcErr) {
           console.error('[Performance] Erro no cálculo TRI:', calcErr);
@@ -154,9 +146,6 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
   }, [user.email]);
 
   const estimatedTri = latestTriScore?.estimated_score || 0;
-  const triGoal = triTarget || 750;
-  const triProgress = triGoal > 0 ? Math.min(100, Math.round((estimatedTri / triGoal) * 100)) : 0;
-
   // Categories list for filtering
   const categoriesList = useMemo(() => {
     const cats = Array.from(new Set(subjectsMastery.map(s => s.category))).filter(Boolean);

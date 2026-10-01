@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ApiCache;
 use App\Services\NotificationService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -104,7 +105,7 @@ abstract class CrudController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $row = $this->model()::findOrFail($id);
+        $row = $this->findForTenant($request, $id);
         $row->update($request->only($this->writableFields()));
 
         $this->invalidateCaches($request);
@@ -114,7 +115,7 @@ abstract class CrudController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $row = $this->model()::findOrFail($id);
+        $row = $this->findForTenant($request, $id);
 
         $this->onBeforeDelete($row);
         $row->delete();
@@ -131,6 +132,18 @@ abstract class CrudController extends Controller
             $keys[] = $this->cacheKey().":{$tenantId}";
         }
         $this->cache->invalidate(...$keys);
+    }
+
+    protected function findForTenant(Request $request, string $id): Model
+    {
+        $query = $this->model()::query()->whereKey($id);
+        $tenantId = $this->tenantScoped() ? $request->attributes->get('tenant_id') : null;
+
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        return $query->firstOrFail();
     }
 
     protected function notificationType(): string

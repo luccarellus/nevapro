@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('tenants', function (Blueprint $table) {
+        $this->createIfMissing('tenants', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name');
             $table->string('slug', 120)->unique();
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->timestampTz('updated_at')->useCurrent();
         });
 
-        Schema::create('roles', function (Blueprint $table) {
+        $this->createIfMissing('roles', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('code', 50);
             $table->string('name', 100);
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
         });
 
-        Schema::create('admin_users', function (Blueprint $table) {
+        $this->createIfMissing('admin_users', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('email')->unique();
             $table->string('password_hash');
@@ -57,7 +57,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('users', function (Blueprint $table) {
+        $this->createIfMissing('users', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('email')->unique();
             $table->string('password_hash');
@@ -85,7 +85,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('user_tenant_roles', function (Blueprint $table) {
+        $this->createIfMissing('user_tenant_roles', function (Blueprint $table) {
             $table->uuid('user_id');
             $table->uuid('tenant_id');
             $table->uuid('role_id');
@@ -95,14 +95,14 @@ return new class extends Migration
             $table->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
         });
 
-        Schema::create('login_attempts', function (Blueprint $table) {
+        $this->createIfMissing('login_attempts', function (Blueprint $table) {
             $table->string('email')->primary();
             $table->integer('attempts')->default(0);
             $table->timestampTz('lock_until')->nullable();
             $table->timestampTz('updated_at')->useCurrent();
         });
 
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
+        $this->createIfMissing('password_reset_tokens', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->string('token', 128)->unique();
@@ -111,7 +111,7 @@ return new class extends Migration
             $table->index('user_id');
         });
 
-        Schema::create('materials', function (Blueprint $table) {
+        $this->createIfMissing('materials', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('title');
             $table->string('subject')->nullable();
@@ -127,7 +127,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('events', function (Blueprint $table) {
+        $this->createIfMissing('events', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('title');
             $table->text('description')->nullable();
@@ -145,7 +145,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('mural', function (Blueprint $table) {
+        $this->createIfMissing('mural', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('title');
             $table->text('content');
@@ -159,7 +159,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('questions', function (Blueprint $table) {
+        $this->createIfMissing('questions', function (Blueprint $table) {
             $table->string('id', 64)->primary();
             $table->string('subject')->nullable();
             $table->text('text');
@@ -176,7 +176,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('question_options', function (Blueprint $table) {
+        $this->createIfMissing('question_options', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('question_id', 64);
             $table->text('text');
@@ -187,7 +187,7 @@ return new class extends Migration
             $table->foreign('question_id')->references('id')->on('questions')->cascadeOnDelete();
         });
 
-        Schema::create('answers', function (Blueprint $table) {
+        $this->createIfMissing('answers', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->string('question_id', 64);
@@ -202,7 +202,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('xp_logs', function (Blueprint $table) {
+        $this->createIfMissing('xp_logs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->integer('amount')->default(0);
@@ -214,7 +214,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('notifications', function (Blueprint $table) {
+        $this->createIfMissing('notifications', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id')->nullable();
             $table->string('title');
@@ -228,7 +228,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('notification_reads', function (Blueprint $table) {
+        $this->createIfMissing('notification_reads', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->uuid('notification_id');
@@ -238,7 +238,7 @@ return new class extends Migration
             $table->foreign('notification_id')->references('id')->on('notifications')->cascadeOnDelete();
         });
 
-        Schema::create('user_study_tasks', function (Blueprint $table) {
+        $this->createIfMissing('user_study_tasks', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->string('title');
@@ -253,7 +253,7 @@ return new class extends Migration
             $table->foreign('tenant_id')->references('id')->on('tenants');
         });
 
-        Schema::create('user_tri_scores', function (Blueprint $table) {
+        $this->createIfMissing('user_tri_scores', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->uuid('tenant_id')->nullable();
@@ -269,28 +269,15 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    private function createIfMissing(string $tableName, Closure $definition): void
     {
-        Schema::dropIfExists('user_tri_scores');
-        Schema::dropIfExists('user_study_tasks');
-        Schema::dropIfExists('notification_reads');
-        Schema::dropIfExists('notifications');
-        Schema::dropIfExists('xp_logs');
-        Schema::dropIfExists('answers');
-        Schema::dropIfExists('question_options');
-        Schema::dropIfExists('questions');
-        Schema::dropIfExists('mural');
-        Schema::dropIfExists('events');
-        Schema::dropIfExists('materials');
-        Schema::dropIfExists('password_reset_tokens');
-        Schema::dropIfExists('login_attempts');
-        Schema::dropIfExists('user_tenant_roles');
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('admin_users');
-        Schema::dropIfExists('roles');
-        Schema::dropIfExists('tenants');
+        if (! Schema::hasTable($tableName)) {
+            Schema::create($tableName, $definition);
+        }
     }
+
+    /**
+     * Existing domain tables may contain production data; this baseline is intentionally irreversible.
+     */
+    public function down(): void {}
 };

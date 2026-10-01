@@ -3,14 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mail, 
   Bell, 
-  Calendar as CalendarIcon, 
+
   BookOpen, 
   HelpCircle, 
   Layers,
-  MessageSquare,
   ArrowRight,
   Info,
-  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

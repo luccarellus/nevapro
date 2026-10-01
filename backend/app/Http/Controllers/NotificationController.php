@@ -61,6 +61,27 @@ class NotificationController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function markOneRead(Request $request, string $id): JsonResponse
+    {
+        $user = $request->attributes->get('auth_user');
+        $notification = Notification::query()
+            ->whereKey($id)
+            ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', $user->id))
+            ->where(fn ($query) => $query->whereNull('tenant_id')->orWhere('tenant_id', $request->attributes->get('tenant_id')))
+            ->first();
+
+        if (! $notification) {
+            return response()->json(['error' => 'Notificação não encontrada.'], 404);
+        }
+
+        NotificationRead::firstOrCreate(
+            ['user_id' => $user->id, 'notification_id' => $notification->id],
+            ['id' => (string) Str::uuid(), 'read_at' => now()],
+        );
+
+        return response()->json(['success' => true]);
+    }
+
     public function markAllRead(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');

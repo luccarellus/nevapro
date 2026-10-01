@@ -44,7 +44,7 @@ class MaterialController extends CrudController
             'subject' => $row->subject,
             'foco' => $row->foco,
             'description' => $row->description,
-            'url' => $row->url,
+            'url' => B2StorageService::resolveStoredUrl($row->url),
             'type' => $row->type,
             'uploadedAt' => $row->uploaded_at?->toISOString() ?? $row->created_at?->toISOString(),
         ];

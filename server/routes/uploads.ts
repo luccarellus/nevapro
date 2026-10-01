@@ -5,7 +5,7 @@
  *   GET  /api/storage/object → serve arquivo privado do B2 (autenticado)
  */
 
-import { Router, Response } from 'express';
+import { Router } from 'express';
 import multer from 'multer';
 import { log } from '../utils/logger';
 import { rateLimiter } from '../middleware/rateLimiter';
@@ -76,7 +76,7 @@ router.post('/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, verif
     const fileExt = req.file.originalname.split('.').pop() || 'jpg';
     const prefix = req.query.kind === 'material' ? 'materials' : 'avatars';
     const fileName = `${prefix}/${crypto.randomUUID()}.${fileExt.toLowerCase()}`;
-    const { data, error } = await dbAdmin.storage.from(bucketName).upload(fileName, req.file.buffer, {
+    const { error } = await dbAdmin.storage.from(bucketName).upload(fileName, req.file.buffer, {
       contentType: req.file.mimetype,
     });
     if (error) throw error;

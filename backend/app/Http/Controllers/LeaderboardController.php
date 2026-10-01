@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentUser;
 use App\Services\ApiCache;
+use App\Services\B2StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,7 +33,7 @@ class LeaderboardController extends Controller
                     'city' => $u->city,
                     'xp' => $u->xp ?? 0,
                     'level' => $u->level ?? 1,
-                    'avatarUrl' => $u->avatar_url,
+                    'avatarUrl' => B2StorageService::resolveStoredUrl($u->avatar_url),
                 ])->values()->all();
         });
 

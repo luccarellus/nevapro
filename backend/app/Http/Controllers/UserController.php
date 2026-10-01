@@ -5,9 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\AdminUser;
 use App\Models\StudentUser;
 use App\Services\ApiCache;
+use App\Services\B2StorageService;
 use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Perfil — espelha routes/users.ts da API Express:
@@ -23,6 +27,9 @@ class UserController extends Controller
         $authUser = $request->attributes->get('auth_user');
         $type = $request->attributes->get('auth_type');
         $email = $request->query('email', $authUser->email);
+        if (! is_string($email)) {
+            return response()->json(['error' => 'E-mail inválido.'], 400);
+        }
 
         // Política: cada usuário acessa APENAS o próprio perfil
         if ($authUser->email !== strtolower($email)) {
@@ -93,7 +100,59 @@ class UserController extends Controller
 
         $fresh = $model::where('email', $authUser->email)->first();
 
-        return response()->json($fresh->toProfileArray());
+        return response()->json(['success' => true, 'user' => $fresh->toProfileArray()]);
+    }
+
+    public function deleteProfile(Request $request): JsonResponse
+    {
+        $authUser = $request->attributes->get('auth_user');
+        $type = $request->attributes->get('auth_type');
+        $email = $request->query('email') ?? $request->input('email', $authUser->email);
+        if (! is_string($email)) {
+            return response()->json(['error' => 'E-mail inválido.'], 400);
+        }
+        $email = strtolower(trim($email));
+
+        if ($email !== strtolower($authUser->email)) {
+            return response()->json(['error' => 'Acesso negado: você só pode remover a própria conta.'], 403);
+        }
+
+        $model = $type === 'admin' ? AdminUser::class : StudentUser::class;
+        $user = $model::where('email', $email)->first();
+        if (! $user) {
+            return response()->json(['error' => 'Usuário não encontrado.'], 404);
+        }
+
+        $objectKey = $user->avatar_url ? B2StorageService::extractObjectKey($user->avatar_url) : null;
+        DB::transaction(function () use ($user, $model): void {
+            foreach (['answers', 'xp_logs', 'notifications', 'user_study_tasks', 'user_tenant_roles', 'notification_reads', 'password_reset_tokens'] as $table) {
+                DB::table($table)->where('user_id', $user->id)->delete();
+            }
+
+            PersonalAccessToken::where('tokenable_id', $user->id)
+                ->where('tokenable_type', $model)
+                ->delete();
+            $user->delete();
+        });
+
+        if ($objectKey) {
+            try {
+                if (! app(B2StorageService::class)->delete($objectKey)) {
+                    Log::warning("[Profile Delete] Não foi possível remover o avatar de {$email} do B2.");
+                }
+            } catch (\Throwable $exception) {
+                Log::warning("[Profile Delete] Falha ao remover avatar de {$email}: ".$exception->getMessage());
+            }
+        }
+
+        $this->cache->invalidate(
+            "profile:{$email}",
+            'bootstrap:'.$user->id.':'.($user->tenant_id ?? 'platform'),
+            ApiCache::LEADERBOARD,
+            ApiCache::ADMIN_ACTIVITIES,
+        );
+
+        return response()->json(['success' => true]);
     }
 
     public function awardXp(Request $request): JsonResponse

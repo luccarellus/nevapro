@@ -13,7 +13,6 @@ import { dbAdmin } from '../lib/dbQueryBuilder';
 import { log } from '../utils/logger';
 import { cacheInvalidate, cacheGet, cacheSet } from '../services/cache';
 import { addNotification } from '../services/notification';
-import { CACHE_KEYS } from '../types';
 import { PermissionCode } from './permissions';
 
 type Row = Record<string, unknown>;

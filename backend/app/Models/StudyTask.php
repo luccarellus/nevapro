@@ -16,7 +16,7 @@ class StudyTask extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'id', 'user_id', 'title', 'estimated_time', 'target_tab', 'done', 'task_date', 'tenant_id',
+        'id', 'user_id', 'title', 'estimated_time', 'target_tab', 'done', 'task_date', 'tenant_id', 'created_at',
     ];
 
     protected $casts = [

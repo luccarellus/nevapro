@@ -7,8 +7,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import { sanitizeSchema } from '../lib/markdownSchema';
 import confetti from 'canvas-confetti';
 import { 
-  AlertOctagon, ArrowRight, Award, 
-  Check, X, ChevronDown, MessageSquare, 
+  AlertOctagon, X, ChevronDown, MessageSquare,
   BarChart2, CheckCircle2, Frown, Sparkles, Search, RotateCcw
 } from 'lucide-react';
 import { MarkdownImage } from './ProxiedImage';
@@ -40,7 +39,6 @@ interface ErrorsBookProps {
 export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
   const [errors, setErrors] = useState<ErrorQuestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +58,6 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
 
   const fetchErrors = async () => {
     setLoading(true);
-    setErrorMsg(null);
     try {
       const res = await fetch(`/api/user/errors?email=${encodeURIComponent(user.email || '')}`);
       if (!res.ok) {
@@ -70,7 +67,6 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
       setErrors(data);
     } catch (err) {
       console.error(err);
-      setErrorMsg('Não foi possível carregar o seu caderno de erros. Tente novamente mais tarde.');
     } finally {
       setLoading(false);
     }
@@ -151,7 +147,7 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
       setRetryStatus(prev => ({ ...prev, [question.id]: isCorrect ? 'correct' : 'wrong' }));
 
       // Envia resposta para a API
-      const res = await fetch('/api/answers', {
+      await fetch('/api/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +268,6 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
                 <p className="text-[10px] text-text-secondary/50 font-bold italic py-4">Sem dados para análise.</p>
               ) : (
                 Object.entries(stats.subjectCounts).slice(0, 3).map(([subj, count]) => {
-                  const percent = Math.round((count.solved / count.total) * 100) || 0;
                   return (
                     <div key={subj} className="space-y-1">
                       <div className="flex justify-between text-[9px] font-bold text-text-secondary">

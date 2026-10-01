@@ -46,11 +46,13 @@ class StudyPlanController extends Controller
         return response()->json([
             'tasks' => $tasks->map(fn ($t) => [
                 'id' => $t->id,
+                'user_id' => $t->user_id,
                 'title' => $t->title,
                 'estimated_time' => $t->estimated_time,
                 'target_tab' => $t->target_tab,
                 'done' => $t->done,
-                'taskDate' => $t->task_date?->toDateString(),
+                'task_date' => $t->task_date?->toDateString(),
+                'created_at' => $t->created_at,
             ]),
             'weekly_goal' => [
                 'questions_answered' => $user->answered_questions ?? 0,
@@ -67,20 +69,22 @@ class StudyPlanController extends Controller
             'estimated_time' => ['nullable', 'string', 'max:50'],
             'target_tab' => ['nullable', 'string', 'max:50'],
             'date' => ['nullable', 'date'],
+            'task_date' => ['nullable', 'date'],
         ]);
 
         $task = StudyTask::create([
             'id' => (string) Str::uuid(),
             'user_id' => $user->id,
             'title' => $data['title'],
-            'estimated_time' => $data['estimated_time'] ?? null,
-            'target_tab' => $data['target_tab'] ?? null,
+            'estimated_time' => $data['estimated_time'] ?? '30 min',
+            'target_tab' => $data['target_tab'] ?? 'questions',
             'done' => false,
-            'task_date' => $data['date'] ?? now()->toDateString(),
+            'task_date' => $data['task_date'] ?? $data['date'] ?? now()->toDateString(),
             'tenant_id' => $request->attributes->get('tenant_id'),
+            'created_at' => now(),
         ]);
 
-        return response()->json(['id' => $task->id], 201);
+        return response()->json($task, 201);
     }
 
     public function update(Request $request, string $id): JsonResponse
@@ -91,11 +95,17 @@ class StudyPlanController extends Controller
         $data = $request->validate([
             'done' => ['sometimes', 'boolean'],
             'title' => ['sometimes', 'string', 'max:255'],
+            'estimated_time' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'target_tab' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
+
+        if ($data === []) {
+            return response()->json(['error' => 'Nenhum campo válido para atualizar.'], 400);
+        }
 
         $task->update($data);
 
-        return response()->json(['success' => true]);
+        return response()->json($task->fresh());
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -104,6 +114,6 @@ class StudyPlanController extends Controller
 
         StudyTask::where('user_id', $user->id)->findOrFail($id)->delete();
 
-        return response()->json(null, 204);
+        return response()->json(['success' => true]);
     }
 }

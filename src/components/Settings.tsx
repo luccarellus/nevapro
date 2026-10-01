@@ -31,7 +31,7 @@ type SettingsTab = 'perfil' | 'notificacoes' | 'aparencia' | 'privacidade';
 export default function Settings({ user, onUpdateUser, onClose, theme, onThemeChange }: SettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
   const [displayName, setDisplayName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || 'admin@neva.pro');
+  const [email] = useState(user?.email || 'admin@neva.pro');
   const [city, setCity] = useState(user?.city || '');
   const [school, setSchool] = useState(user?.school || '');
   const [gremio, setGremio] = useState(user?.gremio || '');

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Settings, Check, X, ShieldAlert, Key } from 'lucide-react';
+import { Shield, Settings } from 'lucide-react';
 import { useConsent } from '../hooks/useConsent';
 import { ALL_CONSENT, MINIMAL_CONSENT } from '../lib/consentManager';
 import CookieModal from './CookieModal';

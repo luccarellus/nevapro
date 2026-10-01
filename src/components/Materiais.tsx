@@ -10,7 +10,6 @@ import {
   Library,
   ArrowRight,
   Database,
-  Loader2,
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';

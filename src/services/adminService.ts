@@ -47,6 +47,19 @@ export const adminService = {
     return request<UserProfile[]>('/api/admin/users');
   },
 
+  async updateStudent(id: string, data: Partial<UserProfile>): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/api/admin/users/${id}`, {
+      method: 'PUT',
+      body: data,
+    });
+  },
+
+  async deleteStudent(id: string): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>(`/api/admin/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   async getActivities(): Promise<AdminActivitiesResponse> {
     return request<AdminActivitiesResponse>('/api/admin/activities');
   },

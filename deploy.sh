@@ -50,7 +50,7 @@ require_env() {
 
 check_env_vars() {
   local missing=()
-  for var in DATABASE_URL JWT_SECRET REDIS_PASSWORD CRON_SECRET; do
+  for var in DATABASE_URL APP_KEY CRON_SECRET; do
     if ! grep -qE "^${var}=." .env 2>/dev/null; then
       missing+=("$var")
     fi
@@ -81,10 +81,17 @@ cmd_setup() {
   if [[ ! -f .env ]]; then
     cp .env.example .env
     warn ".env criado a partir do .env.example."
-    warn "ABRA E PREENCHA: nano .env — obrigatórios: DATABASE_URL, JWT_SECRET, REDIS_PASSWORD, CRON_SECRET."
+    warn "ABRA E PREENCHA: nano .env — obrigatórios: DATABASE_URL, APP_KEY, CRON_SECRET."
+    warn "Gere APP_KEY com: printf 'base64:%s' \"\$(openssl rand -base64 32)\""
     warn "Gere segredos com: openssl rand -base64 32"
   else
     info ".env já existe — mantido."
+  fi
+
+  if grep -q '^APP_KEY=$' .env; then
+    app_key="base64:$(openssl rand -base64 32 | tr -d '\n')"
+    sed -i "s|^APP_KEY=.*|APP_KEY=\"$app_key\"|" .env
+    info "APP_KEY Laravel gerada e gravada no .env local."
   fi
 
   if grep -q 'seu-dominio.com' "$NGINX_CONF_DIR/default.conf" 2>/dev/null; then
@@ -160,8 +167,12 @@ cmd_up() {
   check_docker
   require_env
   check_env_vars
-  info "Build e subida de todos os serviços..."
-  $COMPOSE up -d --build
+  info "Build das imagens Laravel e frontend..."
+  $COMPOSE build
+  info "Aplicando migrations (sem sobrescrever tabelas de domínio existentes)..."
+  $COMPOSE run --rm --no-deps api php artisan migrate --force --seed
+  info "Subindo Laravel, worker, scheduler e nginx..."
+  $COMPOSE up -d
   $COMPOSE ps
   info "Concluído. Logs: ./deploy.sh logs"
 }
@@ -186,13 +197,15 @@ cmd_logs() {
 cmd_backup() {
   check_docker
   require_env
-  info "Executando backup do banco via container api (tsx está disponível nela)..."
-  $COMPOSE exec -e NODE_ENV=production api npx tsx server/scripts/runBackup.ts
+  info "Executando backup manual pelo job Laravel..."
+  $COMPOSE exec api php artisan backup:run
 }
 
 cmd_health() {
-  info "Consultando /api/health no container api..."
-  $COMPOSE exec api node -e "fetch('http://127.0.0.1:3000/api/health').then(async r=>{console.log(r.status, await r.text());process.exit(r.ok?0:1)}).catch(e=>{console.error(e.message);process.exit(1)})"
+  detect_domain
+  info "Consultando /api/health via nginx/Laravel..."
+  $COMPOSE exec nginx curl --insecure --fail --silent --show-error \
+    --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health"
 }
 
 # --- Main --------------------------------------------------------------------

@@ -37,6 +37,12 @@ export default defineConfig(() => {
       host: '0.0.0.0',
       hmr: false,
       allowedHosts: ['nevapro-app-prod.mo1m2d.easypanel.host', 'localhost'],
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

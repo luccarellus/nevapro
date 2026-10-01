@@ -1,9 +1,31 @@
 version: '3.8'
 
+x-laravel-environment: &laravel-environment
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?APP_KEY obrigatoria}
+  APP_URL: ${APP_URL:?APP_URL obrigatoria}
+  DB_CONNECTION: pgsql
+  DB_URL: ${DATABASE_URL:?DATABASE_URL obrigatoria}
+  DB_SSLMODE: ${DB_SSLMODE:-require}
+  CACHE_STORE: database
+  SESSION_DRIVER: array
+  QUEUE_CONNECTION: database
+  DB_QUEUE_RETRY_AFTER: "3600"
+  LOG_CHANNEL: stderr
+
 services:
-  # Reverse Proxy & Load Balancer
+  # Reverse Proxy, static frontend and TLS termination
   nginx:
-    image: nginx:stable-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+      args:
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
+    image: neva-web:latest
     container_name: neva_nginx
     ports:
       - "80:80"
@@ -32,70 +54,70 @@ services:
       - neva_network
     restart: "no"
 
-  # Backend Express (serve API + frontend estático). Escale com: --scale api=N
+  # Laravel PHP-FPM API
   api:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # Variáveis embutidas no bundle do frontend durante o vite build
-        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
-        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
-        VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
-    image: neva-api:latest
+      target: api
+    image: neva-laravel-api:latest
     env_file:
       - .env
     environment:
-      - NODE_ENV=production
-      # Redis (sobrescreve qualquer REDIS_URL do .env apenas se este não definir uma)
-      # O .env deve trazer a URL completa com credenciais: redis://default:[SENHA]@nevapro_redis:6379
-      - REDIS_URL=${REDIS_URL:-redis://default:${REDIS_PASSWORD:?REDIS_PASSWORD obrigatoria}@redis:6379}
-    networks:
-      - neva_network
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      # Node puro (a imagem Chainguard runtime não tem curl/wget/shell)
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    expose:
-      - "3000"
-    restart: always
-
-  # Redis self-hosted (cache, rate-limit e sessões) — autenticado via REDIS_PASSWORD
-  redis:
-    image: redis:7-alpine
-    container_name: neva_redis
-    # REDIS_PASSWORD é OBRIGATÓRIA (sem default): segredo com fallback commitado
-    # é credencial pública. Defina no .env antes de subir o stack.
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD obrigatoria}"]
-    volumes:
-      - redis_data:/data
+      <<: *laravel-environment
+      SESSION_SECURE_COOKIE: "true"
     networks:
       - neva_network
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      test: ["CMD", "php", "-r", "$$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    volumes:
+      - laravel_storage:/var/www/html/storage
     restart: always
 
-  # Cron jobs (substitui o Vercel Cron): /api/cron/cleanup e /api/cron/backup
-  cron:
+  # Laravel scheduler replaces the former HTTP-calling cron container.
+  scheduler:
+    image: neva-laravel-api:latest
     build:
-      context: ./cron
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    env_file:
+      - .env
     environment:
-      - CRON_SECRET=${CRON_SECRET}
-      - API_URL=http://api:3000
+      <<: *laravel-environment
+    command: ["php", "artisan", "schedule:work"]
     networks:
       - neva_network
     depends_on:
       api:
         condition: service_healthy
+    volumes:
+      - laravel_storage:/var/www/html/storage
+    restart: always
+
+  # Executes Laravel queued emails, notifications and database backups.
+  worker:
+    image: neva-laravel-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    env_file:
+      - .env
+    environment:
+      <<: *laravel-environment
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=3500"]
+    networks:
+      - neva_network
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - laravel_storage:/var/www/html/storage
     restart: always
 
 networks:
@@ -103,4 +125,4 @@ networks:
     driver: bridge
 
 volumes:
-  redis_data:
+  laravel_storage:

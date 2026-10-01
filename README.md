@@ -26,7 +26,8 @@ A **Neva Pro** é uma plataforma web full-stack voltada para a preparação de e
 
 ```
 nevapro/
-├── server.ts            # Servidor Express (Backend + API REST)
+├── backend/             # API Laravel (runtime de produção)
+├── server.ts            # API Express (compatibilidade/desenvolvimento)
 ├── src/
 │   ├── App.tsx          # Componente raiz do React
 │   ├── components/      # Componentes React da interface
@@ -43,9 +44,9 @@ nevapro/
 │   ├── types/           # Tipos e interfaces TypeScript
 │   └── utils/           # Funções utilitárias (XP, cálculos)
 ├── nginx/               # Configuração do Nginx (proxy reverso)
-├── cron/                # Container de cron jobs (cleanup/backup diários)
+├── cron/                # Scripts legados de cron
 ├── schema.sql           # Schema completo do banco de dados
-├── docker-compose.yml   # Orquestração de containers (nginx + api + redis + cron)
+├── docker-compose.yml   # Nginx + Laravel + worker + scheduler
 ├── Dockerfile           # Build multi-stage da aplicação
 └── vite.config.ts       # Configuração do bundler Vite
 ```
@@ -63,7 +64,8 @@ nevapro/
 
 **Backend**
 
-- **Express.js** com TypeScript
+- **Laravel 13** com PHP 8.3 para produção
+- **Express.js** com TypeScript para desenvolvimento e compatibilidade
 - **PostgreSQL** como banco de dados principal
 - **bcryptjs** para hash de senhas
 - **Helmet** para segurança HTTP
@@ -71,8 +73,7 @@ nevapro/
 
 **Infraestrutura**
 
-- **Docker + Docker Compose** (nginx + api + redis + cron)
-- **Redis** self-hosted para cache, rate-limit e sessões
+- **Docker + Docker Compose** (Nginx + Laravel PHP-FPM + worker + scheduler)
 - **Nginx** como reverse proxy e load balancer
 - **Let's Encrypt / Certbot** para HTTPS
 - **Node.js 20** (Alpine)
@@ -135,9 +136,10 @@ O schema PostgreSQL contém **24 tabelas** (incluindo Multi-Tenancy & RBAC):
 
 ### Pré-requisitos
 
-- [Node.js 20+](https://nodejs.org)
-- [PostgreSQL](https://www.postgresql.org) (local ou serviço gerenciado)
-- npm
+- [PHP 8.3+](https://www.php.net/) com suporte a PostgreSQL/SQLite
+- [Composer](https://getcomposer.org/)
+- [Node.js 20+](https://nodejs.org) e npm
+- PostgreSQL ou SQLite para desenvolvimento local
 
 ### 1. Clone o repositório
 
@@ -146,15 +148,24 @@ git clone https://github.com/seu-usuario/nevapro.git
 cd nevapro/nevapro
 ```
 
-### 2. Instale as dependências
+### 2. Instale as dependências do backend e frontend
 
 ```bash
-npm install
+cd backend
+composer install
+cp .env.example .env
+touch database/database.sqlite
+php artisan key:generate
+php artisan migrate --seed
+cd ..
+npm ci
 ```
 
-### 3. Configure as variáveis de ambiente
+### Configuração legada (Express/Supabase — não usar no runtime Laravel)
 
-Copie o arquivo de exemplo e preencha com seus valores:
+Para o runtime Laravel, configure `backend/.env` a partir de
+`backend/.env.example`; as variáveis abaixo pertencem apenas ao backend Express
+legado.
 
 ```bash
 cp .env.example .env
@@ -191,7 +202,13 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 - A primeira autenticação do admin sincroniza `admin_users.auth_user_id` automaticamente.
 - O login e a troca de senha do admin dependem exclusivamente do Supabase Auth.
 
-### Deploy na VPS (Docker Compose + Redis)
+### Runtime local Laravel
+
+Inicie a API Laravel em `http://127.0.0.1:8000` e o frontend com
+`npm run dev:frontend` em dois terminais. O Vite encaminha `/api` para Laravel;
+`npm run dev` permanece apenas para desenvolvimento/compatibilidade Express.
+
+### Deploy na VPS (Docker Compose + Laravel)
 
 1. Copie e preencha o `.env` (veja o `.env.example`):
 
@@ -201,17 +218,16 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 
 2. Edite `nginx/conf.d/default.conf` e troque `seu-dominio.com` pelo domínio real.
 
-3. Suba os serviços (nginx + api + redis + cron):
+3. Suba os serviços Laravel (Nginx + API + worker + scheduler):
 
    ```bash
-   docker compose up -d --build
+   ./deploy.sh up
    ```
 
 4. Emita o certificado SSL (primeira vez) e renove via cron no host.
    Veja o passo a passo completo em [`PRODUCTION.md`](PRODUCTION.md).
 
-> O container `cron` substitui o Vercel Cron: executa diariamente
-> `/api/cron/cleanup` (03:00 UTC) e `/api/cron/backup` (04:00 UTC).
+> O scheduler Laravel executa a limpeza às 03:00 UTC e os backups às 04:00 UTC.
 
 ### Deploy na Vercel (opcional / staging)
 
@@ -229,8 +245,7 @@ SUPABASE_SERVICE_ROLE_KEY="[service role key]"
 JWT_SECRET="[seu-secret]"
 ```
 
-> O cache em ambiente Vercel fica sem Redis (fallback em memória por instância).
-> O Redis self-hosted é usado no deploy da VPS.
+> O deploy Docker usa tabelas PostgreSQL para cache e filas; Redis não é obrigatório.
 
 ### 4. Configure o banco de dados
 
@@ -248,7 +263,7 @@ npm run dev
 
 O servidor ficará disponível em `http://localhost:3000`.
 
-> **Nota:** Em desenvolvimento, o Vite serve o frontend com HMR na porta padrão e o Express serve a API. O `tsx` executa `server.ts` diretamente.
+> **Nota:** `npm run dev` continua iniciando o Express para compatibilidade local; a API implantada pelo Compose é Laravel.
 
 ---
 
@@ -257,8 +272,8 @@ O servidor ficará disponível em `http://localhost:3000`.
 ### Produção com Docker Compose
 
 ```bash
-# Build e subir todos os serviços (nginx + api + redis + cron)
-docker compose up -d --build
+# Build, migrations e subida do stack Laravel
+./deploy.sh up
 
 # Verificar status dos containers
 docker compose ps
@@ -270,9 +285,9 @@ docker image prune -f
 ### Estrutura Docker
 
 - **`neva_nginx`** — Reverse proxy na porta 80/443, SSL via Certbot
-- **`neva-api`** — Backend Express (API + frontend estático), escalável com `--scale api=N`
-- **`neva_redis`** — Redis self-hosted com persistência (cache, rate-limit, sessões)
-- **`cron`** — Dispara os jobs diários de cleanup e backup (substitui o Vercel Cron)
+- **`neva-laravel-api`** — API Laravel/PHP-FPM
+- **`neva-web`** — Nginx com frontend Vite, TLS e proxy FastCGI
+- **`worker` / `scheduler`** — filas e tarefas agendadas Laravel
 - Rede interna `neva_network` isolando os serviços
 
 ---
@@ -282,7 +297,8 @@ docker image prune -f
 | Comando | Descrição |
 |---|---|
 | `npm run dev` | Inicia o servidor em modo desenvolvimento com hot-reload |
-| `npm run build` | Compila o frontend (Vite) e o backend (esbuild) para produção |
+| `npm run build:frontend` | Compila o frontend Vite para servir pelo Nginx |
+| `npm run build` | Compila o frontend e a API Express de compatibilidade |
 | `npm start` | Inicia o servidor em modo produção (`dist/server.cjs`) |
 | `npm run lint` | Verifica tipos TypeScript sem emitir arquivos |
 | `npm run clean` | Remove a pasta `dist/` |
@@ -377,6 +393,3 @@ Este projeto é proprietário. Todos os direitos reservados © Neva Pro.
 <div align="center">
   <p><strong>Neva Pro • Educando com Inteligência</strong></p>
 </div>
-
-
-

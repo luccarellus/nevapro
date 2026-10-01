@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { 
   Target, CheckCircle2, Clock, Sparkles, ArrowRight, 
-  Calendar, Award, BookOpen, RotateCcw, Flame, Check,
+  BookOpen, RotateCcw, Flame, Check,
   Calculator, Plus, Trash2, Zap, Play, RefreshCw,
-  Trophy, TrendingUp, Bot, Lightbulb, Globe, FileText
+  Trophy, Bot, Lightbulb, Globe, FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { studyPlanService, StudyTask } from '../services/studyPlanService';
@@ -291,13 +291,6 @@ export default function StudyPlan({ user, onTabChange, onEarnXp }: StudyPlanProp
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } }
   };
-
-  const weekDayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const todayIndex = new Date().getDay();
-  const weeklyDays = weekDayNames.map((day, i) => ({
-    day,
-    status: i < todayIndex ? 'past' as const : i === todayIndex ? 'today' as const : 'upcoming' as const,
-  }));
 
   return (
     <div className="max-w-6xl mx-auto pt-24 pb-32 px-4 md:px-8">

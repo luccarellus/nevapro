@@ -55,9 +55,6 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
     ],
     summary: { average: 0, best: 0, total: 0 }
   });
-  const [loading, setLoading] = useState(true);
-  const [secondsLeft, setSecondsLeft] = useState(0);
-
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -65,7 +62,6 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
         setRecentMaterials((data.materials || []).slice(0, 4));
         if (data.stats?.weekly?.length > 0) setStats(data.stats);
         setDailyChallengeDone(Boolean(data.stats?.flashQuizCompleted));
-        setSecondsLeft(Number(data.stats?.quizSecondsRemaining || 0));
         if (Array.isArray(data.leaderboard) && data.leaderboard.length > 0) {
           setLeaderboard(data.leaderboard);
         } else {
@@ -74,7 +70,6 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
       } catch (err) {
         console.error('Erro geral ao carregar dados do dashboard:', err);
       } finally {
-        setLoading(false);
       }
     };
 
@@ -135,7 +130,6 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
   const handleQuizComplete = () => {
     fireConfetti();
     setDailyChallengeDone(true);
-    setSecondsLeft(0);
     setShowQuiz(false);
     if (onEarnXp) {
       onEarnXp(50, 0, 0, true, 'Flash Quiz: Maranhão');
@@ -588,7 +582,7 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
           </motion.div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {recentMaterials.length > 0 ? (
-              recentMaterials.map((material, i) => (
+              recentMaterials.map((material) => (
                 <motion.div
                   key={material.id}
                   variants={itemVariants}

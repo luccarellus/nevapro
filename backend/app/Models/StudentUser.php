@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\B2StorageService;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -85,7 +86,7 @@ class StudentUser extends Authenticatable
             'id' => $this->id,
             'email' => $this->email,
             'name' => $this->name,
-            'avatarUrl' => $this->avatar_url,
+            'avatarUrl' => B2StorageService::resolveStoredUrl($this->avatar_url),
             'role' => $this->role ?: 'student',
             'isAdmin' => false,
             'tenantId' => $this->tenant_id,
@@ -96,6 +97,7 @@ class StudentUser extends Authenticatable
             'level' => $this->level,
             'streak' => $this->streak,
             'points' => $this->points,
+            'rank' => $this->rank,
             'answeredQuestions' => $this->answered_questions,
             'correctAnswers' => $this->correct_answers,
             'flashQuizCompleted' => $this->flash_quiz_completed,

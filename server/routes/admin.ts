@@ -1,7 +1,6 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
-import { rateLimiter } from '../middleware/rateLimiter';
-import { requireAuth, requireAdmin } from '../middleware/auth';
+import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
 import { requirePermission } from '../middleware/rbac';
 import { dbAdmin } from '../lib/dbQueryBuilder';

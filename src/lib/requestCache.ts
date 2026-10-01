@@ -14,14 +14,6 @@ const ENDPOINT_TTLS: Record<string, number> = {
   '/api/performance': 60_000,    // Performance: 60s
 };
 
-// Patterns that should NEVER be cached (mutating endpoints)
-const NO_CACHE_PATTERNS = [
-  '/api/auth/login',
-  '/api/auth/logout',
-  '/api/auth/register',
-  '/api/user/profile', // POST only
-];
-
 function getEndpointTtl(url: string): number {
   // Extract the base path (first 2 segments) for matching
   const pathParts = url.split('?')[0].split('/');
@@ -33,12 +25,6 @@ function getEndpointTtl(url: string): number {
     }
   }
   return 60_000; // default 60s
-}
-
-function shouldCache(url: string, method?: string): boolean {
-  if (method && method !== 'GET') return false;
-  const cleanUrl = url.split('?')[0];
-  return !NO_CACHE_PATTERNS.some(p => cleanUrl.startsWith(p));
 }
 
 export async function cachedFetchJson<T>(url: string, ttlMs?: number): Promise<T> {

@@ -294,7 +294,7 @@ export const dbAdmin = {
             return { data: null, error };
           }
         },
-        getPublicUrl(path: string, options?: any) {
+        getPublicUrl(path: string, _options?: any) {
           const endpointHost = process.env.B2_ENDPOINT?.replace(/^https?:\/\//, '');
           const publicUrl = `https://${bucket}.${endpointHost}/${path}`;
           return { data: { publicUrl } };

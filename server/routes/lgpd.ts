@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { log } from '../utils/logger';
-import { isB2LogStorageConfigured, storeB2Log } from '../services/b2LogStorage';
+import { storeB2Log } from '../services/b2LogStorage';
 
 const router = Router();
 

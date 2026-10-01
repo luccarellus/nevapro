@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\B2StorageService;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -66,7 +67,7 @@ class AdminUser extends Authenticatable
             'id' => $this->id,
             'email' => $this->email,
             'name' => $this->name,
-            'avatarUrl' => $this->avatar_url,
+            'avatarUrl' => B2StorageService::resolveStoredUrl($this->avatar_url),
             'role' => $this->role ?: 'admin',
             'isAdmin' => true,
             'tenantId' => $this->tenant_id,

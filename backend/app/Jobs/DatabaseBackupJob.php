@@ -8,12 +8,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 /**
  * Backup do PostgreSQL enviado ao Backblaze B2.
- * Usa pg_dump no host; o .sql.gz é enviado ao bucket B2.
+ * Usa pg_dump no container; o dump customizado é enviado ao B2.
  * Agendado diariamente via routes/console.php (schedule).
  */
 class DatabaseBackupJob implements ShouldQueue
@@ -22,35 +23,46 @@ class DatabaseBackupJob implements ShouldQueue
 
     public function handle(): void
     {
-        $database = config('database.connections.pgsql.database');
-        $host = config('database.connections.pgsql.host');
-        $port = config('database.connections.pgsql.port');
-        $user = config('database.connections.pgsql.username');
-        $password = config('database.connections.pgsql.password');
+        $connection = DB::connection()->getConfig();
+        $database = $connection['database'];
+        $host = $connection['host'];
+        $port = $connection['port'];
+        $user = $connection['username'];
+        $password = $connection['password'];
 
-        $file = storage_path('app/backups/nevapro_'.now()->format('Y-m-d_His').'.sql.gz');
-        @mkdir(dirname($file), 0755, true);
-
-        $env = http_build_query([
-            'PGPASSWORD' => $password,
-        ]);
-
-        $process = Process::run("PGPASSWORD='{$password}' pg_dump -h {$host} -p {$port} -U {$user} -d {$database} -F c -f {$file}");
-
-        if (! $process->successful()) {
-            Log::error('[Backup] pg_dump falhou: '.$process->errorOutput());
-
-            return;
+        $file = storage_path('app/backups/nevapro_'.now()->format('Y-m-d_His').'.dump');
+        $directory = dirname($file);
+        if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            throw new \RuntimeException('Não foi possível criar o diretório temporário de backup.');
         }
 
-        // Comprime e envia ao B2
-        $gzFile = $file.'.gz';
-        exec("gzip -c {$file} > {$gzFile}");
-        unlink($file);
+        $process = Process::env([
+            'PGPASSWORD' => $password,
+            'PGSSLMODE' => $connection['sslmode'] ?? 'prefer',
+        ])->run([
+            'pg_dump',
+            '-h', (string) $host,
+            '-p', (string) $port,
+            '-U', (string) $user,
+            '-d', (string) $database,
+            '-F', 'c',
+            '-f', $file,
+        ]);
 
-        B2StorageService::put('backups/db/'.basename($gzFile), file_get_contents($gzFile));
-        unlink($gzFile);
+        if (! $process->successful()) {
+            throw new \RuntimeException('[Backup] pg_dump falhou: '.$process->errorOutput());
+        }
 
-        Log::info('[Backup] Banco enviado ao B2: '.basename($gzFile));
+        try {
+            if (! app(B2StorageService::class)->putFile('backups/db/'.basename($file), $file)) {
+                throw new \RuntimeException('Não foi possível enviar o backup para o Backblaze B2.');
+            }
+        } finally {
+            if (is_file($file) && ! unlink($file)) {
+                Log::warning('[Backup] Não foi possível remover o arquivo temporário: '.$file);
+            }
+        }
+
+        Log::info('[Backup] Banco enviado ao B2: '.basename($file));
     }
 }

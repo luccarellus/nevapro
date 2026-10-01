@@ -29,4 +29,6 @@ return [
         'key' => env('ENEMHUB_API_KEY'),
     ],
 
+    'allowed_image_hosts' => array_filter(array_map('trim', explode(',', (string) env('ALLOWED_IMAGE_HOSTS', '')))),
+
 ];

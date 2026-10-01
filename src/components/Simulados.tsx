@@ -84,7 +84,7 @@ export default function Simulados({
           if (remainingSeconds <= 0) {
             clearInterval(interval);
             timerStartRef.current = null;
-            handleFinishSimulation(true);
+            handleFinishSimulation();
           }
         }
       }, 250); // Verifica 4x/segundo para precisão
@@ -178,7 +178,7 @@ export default function Simulados({
     }));
   };
 
-  const handleFinishSimulation = (isCompleted: boolean = false) => {
+  const handleFinishSimulation = () => {
     let correctOnes = 0;
     questions.forEach((q, idx) => {
       if (userAnswers[idx] === q.correctOptionIndex) {
@@ -299,7 +299,7 @@ export default function Simulados({
   if (view === 'result') {
     const totalQuestions = questions.length;
     let blankAnswersCount = 0;
-    questions.forEach((q, idx) => {
+    questions.forEach((_question, idx) => {
       if (userAnswers[idx] === undefined) {
         blankAnswersCount++;
       }
@@ -606,7 +606,7 @@ export default function Simulados({
             </button>
           ) : (
             <button
-              onClick={() => handleFinishSimulation(true)}
+              onClick={handleFinishSimulation}
               className="px-6 sm:px-10 py-4 sm:py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
             >
               Finalizar Simulado

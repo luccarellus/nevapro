@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { ShieldCheck, Trophy, Crown, Library, Users, Megaphone, Calendar, Flame, Medal, School } from 'lucide-react';
+import { ShieldCheck, Trophy, Library, Users, Megaphone, Flame, Medal, School } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Material, Notice, StudyEvent, UserProfile } from '../../types';
 import { calculateLevelAndProgression } from '../../utils/xpUtils';
-import { toTimestamp, formatShortDate, getStudentRankInfo } from './AdminUtils';
+import { toTimestamp, formatShortDate } from './AdminUtils';
 
 interface AdminPanoramaProps {
   materials: Material[];
@@ -44,16 +44,6 @@ export default function AdminPanorama({
 
   const topStudents = useMemo(() => {
     return [...students].sort((a, b) => (b.xp || 0) - (a.xp || 0)).slice(0, 6);
-  }, [students]);
-
-  const displayRanking = useMemo(() => {
-    const sorted = [...students].sort((a, b) => (b.xp || 0) - (a.xp || 0));
-    const placeholders = [
-      { name: 'Em breve...', xp: 0, level: 0, id: 'p1' },
-      { name: 'Em breve...', xp: 0, level: 0, id: 'p2' },
-      { name: 'Em breve...', xp: 0, level: 0, id: 'p3' },
-    ];
-    return sorted.length >= 3 ? sorted : [...sorted, ...placeholders].slice(0, 3);
   }, [students]);
 
   const recentMaterials = useMemo(

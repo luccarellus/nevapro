@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Trophy, Medal, Crown } from 'lucide-react';
+import { Trophy, Crown } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { calculateLevelAndProgression } from '../utils/xpUtils';
@@ -239,4 +239,3 @@ export default function Leaderboard({ user }: LeaderboardProps) {
     </div>
   );
 }
-

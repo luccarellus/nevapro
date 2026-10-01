@@ -13,7 +13,6 @@ import {
   LogOut,
   PanelLeftClose,
   Upload,
-  GraduationCap,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import Logo from '../Logo';
@@ -57,10 +56,6 @@ export default function AdminHeader({
   const [avatarUploadError, setAvatarUploadError] = useState('');
   const adminAvatarUrl = user.avatarUrl || user.avatar || '';
 
-  const isSuperAdmin = user.roles?.includes('super_admin') || user.role === 'admin';
-  const isTenantAdmin = user.roles?.includes('tenant_admin');
-  const isTeacher = user.roles?.includes('teacher');
-
   const roleLabel = 'Admin';
 
   const baseTabs = [
@@ -99,31 +94,6 @@ export default function AdminHeader({
       setIsUploadingAvatar(false);
     }
   };
-
-  const renderNav = (onSelect?: () => void) => (
-    <nav className="flex flex-col gap-1.5">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => {
-            onTabChange(tab.id);
-            onSelect?.();
-          }}
-          className={`w-full h-12 px-4 rounded-full text-sm font-black transition-all flex items-center gap-3 cursor-pointer ${
-            activeTab === tab.id
-              ? 'bg-text-main/10 text-text-main shadow-sm'
-              : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
-          }`}
-        >
-          <tab.icon size={18} />
-          <span className="flex-1 text-left">{tab.label}</span>
-          {tab.count !== null && tab.count > 0 && (
-            <span className="bg-text-main/10 text-text-main text-[9px] px-1.5 py-0.5 rounded-md">{tab.count}</span>
-          )}
-        </button>
-      ))}
-    </nav>
-  );
 
   const profileMenu = (
     <AnimatePresence>

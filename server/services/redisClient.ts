@@ -48,10 +48,6 @@ function isPrivateHost(host: string): boolean {
   return false; // IP público => presumir internet (latência alta)
 }
 
-// Tempo máximo de espera por reconexão antes de desistir da requisição atual.
-// Requisições nunca bloqueiam mais que isso: caem no fallback (memória/banco).
-const RECONNECT_WAIT_MS = 500;
-
 // RTT medido no boot (ativa keep-alive e dimensiona timeouts). 0 = ainda não medido.
 let measuredRttMs = 0;
 

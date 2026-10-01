@@ -2,6 +2,7 @@
 
 use App\Jobs\DatabaseBackupJob;
 use App\Services\CronService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -17,3 +18,7 @@ Schedule::call(fn () => app(CronService::class)->cleanup())
     ->dailyAt('03:00')->timezone('UTC')->name('cleanup');
 
 Schedule::job(new DatabaseBackupJob)->dailyAt('04:00')->timezone('UTC')->name('backup');
+
+Artisan::command('backup:run', function (): void {
+    app(DatabaseBackupJob::class)->handle();
+})->purpose('Gera e envia um backup do banco de dados para o Backblaze B2');

@@ -8,6 +8,7 @@ use App\Services\ApiCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 /**
@@ -60,6 +61,124 @@ class QuestionController extends Controller
         });
 
         return response()->json($data);
+    }
+
+    public function enem(Request $request): JsonResponse
+    {
+        $year = filter_var($request->query('year'), FILTER_VALIDATE_INT);
+        if ($year === false || $year < 1) {
+            return response()->json(['error' => 'Year parameter is required'], 400);
+        }
+
+        $limit = filter_var($request->query('limit', 50), FILTER_VALIDATE_INT);
+        $offset = filter_var($request->query('offset', 0), FILTER_VALIDATE_INT);
+        if ($limit === false || $limit < 1 || $offset === false || $offset < 0) {
+            return response()->json(['error' => 'Parâmetros limit ou offset inválidos.'], 400);
+        }
+        $cacheKey = "questions:{$year}:{$limit}:{$offset}";
+        $payload = $this->cache->remember($cacheKey, 600, function () use ($year, $limit, $offset) {
+            $response = Http::timeout(15)->get(
+                "https://api.enem.dev/v1/exams/{$year}/questions",
+                ['limit' => $limit, 'offset' => $offset],
+            );
+
+            if (! $response->successful()) {
+                return ['_status' => $response->status(), 'error' => 'ENEM API error: '.$response->reason()];
+            }
+
+            $data = $response->json();
+
+            return ['questions' => $data['questions'] ?? $data];
+        });
+
+        if (isset($payload['_status'])) {
+            $status = $payload['_status'];
+            unset($payload['_status']);
+            $this->cache->invalidate($cacheKey);
+
+            return response()->json($payload, $status);
+        }
+
+        return response()->json($payload);
+    }
+
+    public function enemHubSubjects(): JsonResponse
+    {
+        $key = config('services.enemhub.key');
+        if (! $key) {
+            return response()->json(['error' => 'EnemHub não configurada (ENEMHUB_API_KEY ausente).'], 503);
+        }
+
+        $payload = $this->cache->remember('enemhub:subjects', 3600, function () use ($key) {
+            $response = Http::withHeaders(['X-API-Key' => $key])
+                ->timeout(15)
+                ->get('https://api.enemhub.com.br/v1/enem/subjects');
+
+            if (! $response->successful()) {
+                return ['_status' => $response->status(), 'error' => 'EnemHub API error: '.$response->reason()];
+            }
+
+            return ['subjects' => $response->json('data') ?? []];
+        });
+
+        if (isset($payload['_status'])) {
+            $status = $payload['_status'];
+            unset($payload['_status']);
+            $this->cache->invalidate('enemhub:subjects');
+
+            return response()->json($payload, $status);
+        }
+
+        return response()->json($payload);
+    }
+
+    public function enemHub(Request $request): JsonResponse
+    {
+        $year = (int) $request->query('year', 0);
+        if ($year < 2009 || $year > 2025) {
+            return response()->json(['error' => 'Parâmetro year inválido (2009-2025).'], 400);
+        }
+
+        $key = config('services.enemhub.key');
+        if (! $key) {
+            return response()->json(['error' => 'EnemHub não configurada (ENEMHUB_API_KEY ausente).'], 503);
+        }
+
+        $limit = min(max((int) $request->query('limit', 50), 1), 200);
+        $page = max((int) $request->query('page', 1), 1);
+        $cacheKey = "enemhub:questions:{$year}:{$limit}:{$page}";
+        $payload = $this->cache->remember($cacheKey, 600, function () use ($key, $year, $limit, $page) {
+            $url = 'https://api.enemhub.com.br/v1/enem/questions';
+            $response = Http::withHeaders(['X-API-Key' => $key])
+                ->timeout(20)
+                ->get($url, ['year' => $year, 'limit' => $limit, 'page' => $page]);
+
+            if ($response->status() === 429) {
+                usleep(2_500_000);
+                $response = Http::withHeaders(['X-API-Key' => $key])
+                    ->timeout(20)
+                    ->get($url, ['year' => $year, 'limit' => $limit, 'page' => $page]);
+            }
+
+            if (! $response->successful()) {
+                return ['_status' => $response->status(), 'error' => 'EnemHub API error: '.$response->reason()];
+            }
+
+            return [
+                'questions' => $response->json('data') ?? [],
+                'meta' => $response->json('meta'),
+            ];
+        });
+
+        if (isset($payload['_status'])) {
+            $status = $payload['_status'];
+            unset($payload['_status']);
+            $this->cache->invalidate($cacheKey);
+
+            return response()->json($payload, $status);
+        }
+
+        return response()->json($payload);
     }
 
     public function store(Request $request): JsonResponse

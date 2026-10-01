@@ -1,8 +1,6 @@
 
 import { Question } from '../types';
 
-const BASE_URL = '/api';
-
 export interface EnemQuestion {
   title: string;
   index: number;
@@ -122,7 +120,6 @@ const enemhubService = {
         const { text } = stripHtml(q.statement || '');
         const alts = q.alternatives || [];
         const subjectName = q.subject?.name || 'Geral';
-        const discNorm = normalizeStr(subjectName);
         const difficulty = (q.difficulty || 'médio').toLowerCase() as Question['difficulty'];
 
         return {
@@ -175,23 +172,6 @@ export const enemService = {
 
       // Merge com EnemHub (fonte 2): converte e concatena
       const hubQuestions = await hubPromise;
-      const hubAsEnem: EnemQuestion[] = hubQuestions.map((q) => ({
-        title: '',
-        index: parseInt(q.id.split('-')[2] || '0', 10) || 0,
-        discipline: q.subject,
-        year,
-        context: q.text,
-        alternativesIntroduction: '',
-        files: q.imageUrl ? [q.imageUrl] : [],
-        alternatives: q.options.map((opt, i) => ({
-          letter: String.fromCharCode(65 + i),
-          text: opt,
-          file: q.optionImages?.[i] || null,
-          isCorrect: i === q.correctOptionIndex,
-        })),
-        correctAlternative: String.fromCharCode(65 + (q.correctOptionIndex >= 0 ? q.correctOptionIndex : 0)),
-      }));
-
       console.log(`[ENEM Service] Total questions collected: ${allApiQuestions.length}`);
       
       if (allApiQuestions.length === 0) {
@@ -220,9 +200,6 @@ export const enemService = {
         // Adiciona informações de língua estrangeira se detectado para ajudar no filtro
         const disc = q.discipline || 'geral';
         const discNorm = normalizeStr(disc);
-        const isEng = discNorm.includes('ing') || discNorm.includes('english');
-        const isEsp = discNorm.includes('esp') || discNorm.includes('spanish');
-
         // Se a imagem principal já está inline no markdown do texto, não seta
         // imageUrl — os componentes renderizam imageUrl em bloco e a imagem duplicaria.
         // Compara pelo basename do arquivo (sobrevive ao URL-encoding do proxy).

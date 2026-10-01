@@ -6,7 +6,6 @@ import { materialService } from '../services/materialService';
 import { muralService } from '../services/muralService';
 import { eventService } from '../services/eventService';
 import { adminService } from '../services/adminService';
-import { userService } from '../services/userService';
 import { uploadService } from '../services/uploadService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
 import cidadesEscolasData from '../data/cidades_escolas.json';
@@ -311,8 +310,7 @@ export default function AdminDashboard({
   };
 
   const handleUpdateAccuracy = async (student: UserProfile, answeredQuestions: number, correctAnswers: number): Promise<void> => {
-    const response = await userService.updateProfile({
-      email: student.email,
+    const response = await adminService.updateStudent(student.id, {
       answeredQuestions,
       correctAnswers
     });
@@ -324,7 +322,7 @@ export default function AdminDashboard({
   };
 
   const handleDeleteStudent = async (student: UserProfile): Promise<void> => {
-    const response = await userService.deleteProfile(student.email);
+    const response = await adminService.deleteStudent(student.id);
     if (response.success) { setStudents(prev => prev.filter(s => s.id !== student.id)); }
     else { throw new Error('Falha ao excluir perfil'); }
   };
