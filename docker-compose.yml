@@ -15,7 +15,8 @@ x-laravel-environment: &laravel-environment
   LOG_CHANNEL: stderr
 
 services:
-  # Reverse Proxy, static frontend and TLS termination
+  # Reverse Proxy, static frontend e FastCGI para a API Laravel.
+  # No EasyPanel o TLS é terminado no proxy do painel: exponha apenas a 80.
   nginx:
     build:
       context: .
@@ -28,8 +29,7 @@ services:
     image: neva-web:latest
     container_name: neva_nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
