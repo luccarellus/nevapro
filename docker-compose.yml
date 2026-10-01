@@ -8,12 +8,34 @@ x-laravel-environment: &laravel-environment
   DB_CONNECTION: pgsql
   DB_URL: ${DATABASE_URL:?DATABASE_URL obrigatoria}
   DB_SSLMODE: ${DB_SSLMODE:-disable}
-  SESSION_DRIVER: array
-  QUEUE_CONNECTION: database
-  DB_QUEUE_RETRY_AFTER: "3600"
+  CACHE_STORE: redis
+  SESSION_DRIVER: redis
+  QUEUE_CONNECTION: redis
+  REDIS_CLIENT: predis
+  REDIS_URL: ""
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+  REDIS_QUEUE_RETRY_AFTER: "3600"
   LOG_CHANNEL: stderr
 
 services:
+  # Cache compartilhado, sessões Laravel e filas.
+  redis:
+    image: redis:7-alpine
+    container_name: neva_redis
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+    networks:
+      - neva_network
+    restart: always
+
   # Reverse Proxy, static frontend e FastCGI para a API Laravel.
   # No EasyPanel o TLS é terminado no proxy do painel: exponha apenas a 80.
   nginx:
@@ -73,6 +95,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
     restart: always
@@ -93,6 +118,8 @@ services:
       - neva_network
     depends_on:
       api:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
@@ -115,6 +142,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
     restart: always
@@ -125,3 +154,4 @@ networks:
 
 volumes:
   laravel_storage:
+  redis_data:

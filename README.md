@@ -74,6 +74,7 @@ nevapro/
 **Infraestrutura**
 
 - **Docker + Docker Compose** (Nginx + Laravel PHP-FPM + worker + scheduler)
+- **Redis** (cache compartilhado, sessões e filas no deploy Compose)
 - **Nginx** como reverse proxy e load balancer
 - **Let's Encrypt / Certbot** para HTTPS
 - **Node.js 20** (Alpine)

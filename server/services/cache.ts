@@ -5,6 +5,7 @@ import { getRedisClient, isRemoteRedis, waitForRedisReady } from './redisClient'
 
 /** Canal pub/sub para propagar invalidações de L1 entre instâncias. */
 const CACHE_INVALIDATION_CHANNEL = 'cache:invalidate';
+let cacheInvalidationSubscriber: Redis | null = null;
 
 /**
  * Arquitetura de Cache de Dupla Camada Ultra-Rápida (L1 In-Memory + L2 Redis).
@@ -309,20 +310,12 @@ export const cacheInvalidateAllContent = async (): Promise<void> => {
  * anterior (L1 expira pelo TTL).
  */
 export function startCacheInvalidationSubscriber(): void {
-  if (!isRedisConfigured()) return;
+  if (!isRedisConfigured() || cacheInvalidationSubscriber) return;
+  const client = getRedisClient();
+  if (!client) return;
 
-  const url = process.env.REDIS_URL;
-  const subscriber = url
-    ? new Redis(url, {
-        lazyConnect: true,
-        connectTimeout: isRemoteRedis() ? 5_000 : 2_000,
-        maxRetriesPerRequest: null,
-        retryStrategy: (times: number) => Math.min(times * 200, 2_000),
-        noDelay: true,
-      })
-    : null;
-
-  if (!subscriber) return;
+  const subscriber = client.duplicate();
+  cacheInvalidationSubscriber = subscriber;
 
   subscriber.on('error', (err: Error) => {
     log.warn('[Cache] Subscriber de invalidação:', err?.message);
@@ -344,4 +337,16 @@ export function startCacheInvalidationSubscriber(): void {
   });
 
   log.info('[Cache] Subscriber de invalidação multi-instância ativo');
+}
+
+export async function closeCacheInvalidationSubscriber(): Promise<void> {
+  if (!cacheInvalidationSubscriber) return;
+
+  const subscriber = cacheInvalidationSubscriber;
+  cacheInvalidationSubscriber = null;
+  try {
+    await subscriber.quit();
+  } catch {
+    subscriber.disconnect();
+  }
 }

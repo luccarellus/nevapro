@@ -11,11 +11,10 @@
 ## 📦 Estratégia de Deploy (VPS)
 
 A aplicação usa Laravel/PHP-FPM (PHP 8.4.1+) para a API, Nginx para TLS e frontend estático,
-com containers Laravel separados para filas e agendamentos no deploy Compose.
-No EasyPanel também é possível usar o target padrão do Dockerfile: ele reúne
-frontend, Nginx, PHP-FPM, worker e scheduler em um único container. O cache Laravel
-usa PostgreSQL por padrão; Redis é opcional e pode ser habilitado pelas variáveis
-de ambiente do serviço.
+com containers Laravel separados para filas e agendamentos e Redis persistente
+para cache, sessões e filas no deploy Compose. No EasyPanel também é possível usar
+o target padrão do Dockerfile: ele reúne frontend, Nginx, PHP-FPM, worker e
+scheduler em um único container; nesse modo, configure um Redis externo.
 
 ### Pré-requisitos
 
@@ -220,14 +219,18 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 - O cookie `session_token` é HttpOnly e seguro em produção; logout revoga o token atual.
 - A troca de senha invalida sessões anteriores via `token_version`.
 
-## 🧠 Cache, filas e agendamentos
+## 🧠 Redis, cache, filas e agendamentos
 
-- O cache Laravel usa PostgreSQL por padrão. Para usar Redis, configure no serviço
-  da VPS/EasyPanel `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e `REDIS_URL` (ou
-  `REDIS_HOST`, `REDIS_PORT` e as credenciais correspondentes). O projeto usa
-  Predis, incluído nas dependências PHP, sem exigir a extensão `phpredis`.
-- O Compose respeita `CACHE_STORE` definido no ambiente ou no `.env`; sem essa
-  variável, Laravel mantém o cache PostgreSQL.
+- O Compose sobe Redis sem publicar a porta na internet, habilita AOF e persiste
+  dados no volume `redis_data`. API, worker e scheduler aguardam Redis saudável.
+- No Compose, Laravel usa Redis para cache, sessões e filas (`CACHE_STORE=redis`,
+  `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis`). Predis já está incluído nas
+  dependências PHP, sem exigir a extensão `phpredis`.
+- No EasyPanel ou em outro runtime fora do Compose, forneça um Redis externo e
+  configure `REDIS_CLIENT=predis`, `REDIS_HOST`/`REDIS_PORT` (ou `REDIS_URL`),
+  `CACHE_STORE=redis`, `SESSION_DRIVER=redis` e `QUEUE_CONNECTION=redis`.
+- A API Express legada usa o mesmo Redis para cache compartilhado e rate limit
+  distribuído quando configurada; sem ele, mantém o fallback local.
 - O serviço `worker` processa e-mails, notificações e backups.
 - O serviço `scheduler` executa a limpeza diária às 03:00 UTC e o backup às 04:00 UTC.
 - As migrations são executadas pelo `./deploy.sh up`; tabelas existentes são preservadas.

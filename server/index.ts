@@ -44,7 +44,7 @@ import imageProxyRoutes from './routes/imageProxy';
 import lgpdRoutes from './routes/lgpd';
 import uploadRoutes from './routes/uploads';
 import errorsBookRoutes from './routes/errorsBook';
-import { startCacheInvalidationSubscriber } from './services/cache';
+import { closeCacheInvalidationSubscriber, startCacheInvalidationSubscriber } from './services/cache';
 
 
 // Validate critical environment variables before starting
@@ -283,7 +283,7 @@ export const startServer = () => {
     log.info(`[Server] ${signal} recebido. Encerrando graciosamente...`);
     server.close(async () => {
       try {
-        await Promise.allSettled([pool.end(), closeRedisClient()]);
+        await Promise.allSettled([pool.end(), closeRedisClient(), closeCacheInvalidationSubscriber()]);
         log.info('[Server] Pool do Postgres e Redis encerrados. Processo finalizado.');
         process.exit(0);
       } catch (shutdownErr) {
