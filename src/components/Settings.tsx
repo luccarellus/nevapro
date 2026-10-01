@@ -567,13 +567,13 @@ export default function Settings({ user, onUpdateUser, onClose, theme, onThemeCh
                   {[
                     { 
                       id: 'default', 
-                      name: 'Padrão', 
-                      description: 'Utiliza os esquemas originais Claro e Escuro do aplicativo.',
-                      primaryBgClass: 'bg-[#00b094]',
-                      borderClass: 'border-[#00b094]',
-                      bgPreviewClass: 'bg-[#0a0f1a]',
-                      cardPreviewClass: 'bg-[#1e293b]',
-                      glowClass: 'bg-[#00b094]',
+                      name: 'Pixel Retrô', 
+                      description: 'Estética pixel art vibrante com cores primárias e interface de computador retrô.',
+                      primaryBgClass: 'bg-[#2f6df6]',
+                      borderClass: 'border-[#2f6df6]',
+                      bgPreviewClass: 'bg-[#191a32]',
+                      cardPreviewClass: 'bg-[#26284a]',
+                      glowClass: 'bg-[#ffd23f]',
                     },
                     { 
                       id: 'neva', 

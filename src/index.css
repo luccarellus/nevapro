@@ -1,96 +1,95 @@
 @import "tailwindcss";
 
 /* =============================================================
-   LINGUAGEM BICOLOR — teal da marca + areia quente
-   A UI é neutra ou teal. Areia/mel aparece APENAS em conquistas
-   (ranking, streak, XP acumulado). Coral é exclusivo de erro/
-   destrutivo; azul-aço de informação. As demais famílias do
-   Tailwind são ALIASES destas quatro — nunca novos matizes.
+   LINGUAGEM PIXEL RETRÔ — cores primárias vibrantes, flat
+   Verde = sucesso/XP; amarelo-ouro = conquistas/ranking;
+   vermelho vivo = erro; azul-céu = informação; violeta = IA.
    Regra: 400 = texto/ícones, 500 = badges/ação, 600 = hover.
    ============================================================= */
 @theme {
-  /* Sucesso / progresso — teal da marca */
-  --color-emerald-300: #8ad4c4;
-  --color-emerald-400: #4aab96;
-  --color-emerald-500: #35917d;
-  --color-emerald-600: #2a7565;
-  --color-emerald-950: #06231c;
+  /* Sucesso / progresso — verde vibrante */
+  --color-emerald-300: #7ee2a8;
+  --color-emerald-400: #3ecf6e;
+  --color-emerald-500: #2ab358;
+  --color-emerald-600: #1f9247;
+  --color-emerald-950: #062312;
 
-  /* Erro — coral dessaturado (único vermelho do sistema) */
-  --color-red-300: #e8a698;
-  --color-red-400: #d98a7a;
-  --color-red-500: #c76b5c;
-  --color-red-600: #a85448;
+  /* Erro — vermelho vivo (único vermelho do sistema) */
+  --color-red-300: #ffaba3;
+  --color-red-400: #ff6b5e;
+  --color-red-500: #f04e3e;
+  --color-red-600: #cc382a;
+  /* Pendência / revisão — coral vivo */
+  --color-rose-300: #ffadb8;
+  --color-rose-400: #ff7587;
+  --color-rose-500: #f0526b;
+  --color-rose-600: #cc3a55;
 
-  /* Pendência / revisão — o mesmo coral, leitura rosada */
-  --color-rose-300: #e5a8a4;
-  --color-rose-400: #d2807c;
-  --color-rose-500: #bd6561;
-  --color-rose-600: #9e4f4c;
+  /* Recompensa / streak / ranking — amarelo-ouro vibrante */
+  --color-amber-300: #ffe28a;
+  --color-amber-400: #ffd23f;
+  --color-amber-500: #f5b81e;
+  --color-amber-600: #d99a0f;
+  --color-amber-700: #b57d0c;
+  --color-amber-800: #8f610a;
+  --color-amber-850: #7a5208;
+  --color-amber-950: #452e05;
 
-  /* Recompensa / streak / ranking — areia-mel (2º acento) */
-  --color-amber-300: #ecd9ac;
-  --color-amber-400: #d8b478;
-  --color-amber-500: #c39c5e;
-  --color-amber-600: #a17e49;
-  --color-amber-700: #82633a;
-  --color-amber-800: #674d2e;
-  --color-amber-850: #5a4329;
-  --color-amber-950: #332818;
+  /* Ouro do 1º lugar — mesma família do âmbar */
+  --color-yellow-300: #ffe896;
+  --color-yellow-400: #ffd94d;
+  --color-yellow-500: #f2c322;
+  --color-yellow-600: #d0a015;
+  --color-yellow-750: #a87f10;
+  --color-yellow-950: #453505;
 
-  /* Ouro do 1º lugar — areia mais clara (mesma família do âmbar) */
-  --color-yellow-300: #e8d6a4;
-  --color-yellow-400: #d4bd7c;
-  --color-yellow-500: #c2a95f;
-  --color-yellow-600: #a08848;
-  --color-yellow-750: #856f3c;
-  --color-yellow-950: #332b16;
+  /* Frequência/streak — laranja vivo (família quente) */
+  --color-orange-400: #ffa94d;
+  --color-orange-500: #ff8c1a;
+  --color-orange-600: #d96f0a;
 
-  /* Frequência/streak — areia queimada (família quente) */
-  --color-orange-400: #d4a173;
-  --color-orange-500: #bf8857;
-  --color-orange-600: #9d6d45;
+  /* Informação — azul-céu vivo (dados, links, datas) */
+  --color-blue-300: #9bdaff;
+  --color-blue-400: #5ec8ff;
+  --color-blue-500: #38aef5;
+  --color-blue-600: #1e8fd2;
 
-  /* Informação — azul-aço neutro (dados, links, datas) */
-  --color-blue-300: #a3b8cc;
-  --color-blue-400: #7f97ad;
-  --color-blue-500: #647c92;
-  --color-blue-600: #516478;
+  /* IA / professor IA — violeta vibrante */
+  --color-indigo-300: #b18cff;
+  --color-indigo-400: #8f6bf7;
+  --color-indigo-500: #7a5af5;
+  --color-indigo-600: #6447d6;
 
-  /* IA / professor IA — alias do teal (a marca responde tudo) */
-  --color-indigo-300: #8ad4c4;
-  --color-indigo-400: #4aab96;
-  --color-indigo-500: #35917d;
-  --color-indigo-600: #2a7565;
+  /* Mural — violeta vibrante */
+  --color-purple-300: #b18cff;
+  --color-purple-400: #8f6bf7;
+  --color-purple-500: #7a5af5;
+  --color-purple-600: #6447d6;
 
-  /* Mural — alias do teal */
-  --color-purple-300: #8ad4c4;
-  --color-purple-400: #4aab96;
-  --color-purple-500: #35917d;
-  --color-purple-600: #2a7565;
+  /* Destaques claros — ciano vivo */
+  --color-cyan-300: #7de8f2;
+  --color-cyan-400: #3fd6e6;
+  --color-cyan-500: #1fc0d4;
+  --color-cyan-600: #0f9fb3;
+  --color-sky-300: #9bdaff;
+  --color-sky-400: #5ec8ff;
+  --color-sky-500: #38aef5;
+  --color-sky-600: #1e8fd2;
 
-  /* Destaques claros — alias do teal */
-  --color-cyan-300: #8ad4c4;
-  --color-cyan-400: #4aab96;
-  --color-cyan-500: #35917d;
-  --color-cyan-600: #2a7565;
-  --color-sky-300: #8ad4c4;
-  --color-sky-400: #4aab96;
-  --color-sky-500: #35917d;
-  --color-sky-600: #2a7565;
-
-  /* Neutros de destaque — slate levemente frio (mantém contraste) */
-  --color-slate-300: #b8c0cc;
-  --color-slate-400: #8b95a5;
-  --color-slate-500: #6b7686;
-  --color-slate-800: #232b3a;
-  --color-slate-900: #161d29;
+  /* Neutros de destaque — slate azulado do tema */
+  --color-slate-300: #b9c0ea;
+  --color-slate-400: #9aa3d2;
+  --color-slate-500: #7b84bb;
+  --color-slate-800: #26284a;
+  --color-slate-900: #1d1e3a;
 }
 
 @theme {
-  --font-sans: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
-  --font-numbers: "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "VT323", "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Press Start 2P", "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-numbers: "VT323", "Ubuntu", ui-sans-serif, system-ui, sans-serif;
+  --font-pixel: "Press Start 2P", monospace;
+  --font-terminal: "VT323", monospace;
   
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
@@ -116,47 +115,47 @@
 }
 
 :root {
-  --brand-primary: #00b094;
-  --brand-secondary: #00d1b0;
-  --brand-primary-rgb: 0 176 148;
-  --bg-main: #060a12;
-  --bg-card: #0f1725;
-  --bg-card-rgb: 15 23 37;
-  --bg-sidebar: #080c18;
+  --brand-primary: #2f6df6;
+  --brand-secondary: #ffd23f;
+  --brand-primary-rgb: 47 109 246;
+  --bg-main: #191a32;
+  --bg-card: #26284a;
+  --bg-card-rgb: 38 40 74;
+  --bg-sidebar: #1d1e3a;
   --text-main: #ffffff;
   --text-main-rgb: 255 255 255;
-  --text-secondary: #8b93a1;
-  --border-color: rgb(255 255 255 / 6%);
+  --text-secondary: #9aa3d2;
+  --border-color: rgb(255 255 255 / 14%);
 
-  --input-bg: #101a2c;
-  --card-shadow: rgba(0, 0, 0, 0.3);
+  --input-bg: #1d1e3a;
+  --card-shadow: rgba(0, 0, 0, 0.35);
 
-  --xp-green: #3aa08a;
-  --level-purple: #8b95a5;
-  --rank-gold: #d4b478;
-  --info-blue: #7f97ad;
-  --alert-red: #d98a7a;
+  --xp-green: #3ecf6e;
+  --level-purple: #b18cff;
+  --rank-gold: #ffd23f;
+  --info-blue: #5ec8ff;
+  --alert-red: #ff6b5e;
 }
 
 [data-theme='light'] {
-  --bg-main: #f8fafc;
+  --bg-main: #f4f6ff;
   --bg-card: #ffffff;
   --bg-card-rgb: 255 255 255;
-  --bg-sidebar: #ffffff;
-  --text-main: #1e293b;
-  --text-main-rgb: 30 41 59;
-  --text-secondary: #64748b;
-  --border-color: rgb(15 23 42 / 8%);
-  --brand-primary: #059669;
-  --brand-secondary: #10b981;
-  --brand-primary-rgb: 5 150 105;
+  --bg-sidebar: #eef1ff;
+  --text-main: #23255a;
+  --text-main-rgb: 35 37 90;
+  --text-secondary: #6a6f9e;
+  --border-color: rgb(35 37 90 / 14%);
+  --brand-primary: #2f6df6;
+  --brand-secondary: #ffb43f;
+  --brand-primary-rgb: 47 109 246;
   --input-bg: #ffffff;
-  --card-shadow: rgba(15, 23, 42, 0.08);
-  --xp-green: #00846b;
-  --level-purple: #64748b;
-  --rank-gold: #9c7a35;
-  --info-blue: #4d6a80;
-  --alert-red: #b05744;
+  --card-shadow: rgba(35, 37, 90, 0.1);
+  --xp-green: #1fa85a;
+  --level-purple: #7a5af5;
+  --rank-gold: #d9a013;
+  --info-blue: #2f8fd6;
+  --alert-red: #d84a3e;
 }
 
 [data-theme='cyberpunk'] {
@@ -471,29 +470,36 @@ button:disabled,
 }
 
 @utility apple-card {
-  @apply rounded-[32px] p-6 shadow-sm transition-all duration-300;
+  @apply p-6 transition-all duration-300;
   background-color: var(--bg-card);
-  box-shadow: 0 4px 20px -2px var(--card-shadow);
-  
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 4px 4px 0 rgb(0 0 0 / 35%);
+
   &:hover {
-    @apply scale-[1.01];
-    box-shadow: 0 25px 50px -12px rgb(var(--brand-primary-rgb) / 15%);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 rgb(var(--brand-primary-rgb) / 35%);
   }
 }
 
 @utility apple-button {
-  @apply px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2;
+  @apply px-6 py-3 font-black uppercase text-[10px] tracking-widest transition-all active:translate-y-0.5 disabled:opacity-50 flex items-center justify-center gap-2;
+  border-radius: 4px;
+  border: 2px solid rgb(0 0 0 / 25%);
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 35%);
 }
 
 @utility apple-button-primary {
-  @apply apple-button bg-brand-primary text-white hover:bg-brand-secondary shadow-lg;
-  box-shadow: 0 10px 15px -3px rgb(var(--brand-primary-rgb) / 20%), 0 4px 6px -4px rgb(var(--brand-primary-rgb) / 20%);
+  @apply apple-button bg-brand-primary text-white hover:brightness-110;
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 35%), 0 0 12px rgb(var(--brand-primary-rgb) / 30%);
 }
 
 @utility apple-button-secondary {
   @apply apple-button transition-colors;
   background-color: rgb(var(--text-main-rgb) / 5%);
   color: var(--text-secondary);
+  border: 2px solid var(--border-color);
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 35%);
   &:hover {
     background-color: rgb(var(--text-main-rgb) / 10%);
     color: var(--text-main);
@@ -509,14 +515,15 @@ button:disabled,
    .select-pill-sm (badges/compactos).
    ============================================================= */
 @utility select-pill {
-  @apply rounded-full border border-border-color bg-input-bg text-text-main font-bold cursor-pointer appearance-none transition-all;
+  @apply border border-border-color bg-input-bg text-text-main font-bold cursor-pointer appearance-none transition-all;
+  border-radius: 4px;
   @apply focus:outline-none focus:border-brand-primary/60 focus:ring-2 focus:ring-brand-primary/20;
   @apply hover:border-brand-primary/40 disabled:opacity-50 disabled:cursor-not-allowed;
   @apply px-5 pr-11 py-3 text-xs;
 }
 
 @utility select-pill-lg {
-  @apply px-6 pr-12 py-4 text-sm rounded-2xl;
+  @apply px-6 pr-12 py-4 text-sm;
 }
 
 @utility select-pill-sm {
@@ -547,51 +554,106 @@ button:disabled,
 /* Badge de XP — verde */
 @utility gam-xp {
   @apply inline-flex items-center gap-1 font-numbers font-bold text-xp;
-  @apply bg-xp/10 border border-xp/20 rounded-full px-2.5 py-0.5 text-[10px];
+  @apply bg-xp/10 border border-xp/20 px-2.5 py-0.5 text-[10px];
 }
 
 /* Badge de nível — roxo */
 @utility gam-level {
   @apply inline-flex items-center gap-1 font-numbers font-bold text-level;
-  @apply bg-level/10 border border-level/20 rounded-full px-2.5 py-0.5 text-[10px];
+  @apply bg-level/10 border border-level/20 px-2.5 py-0.5 text-[10px];
 }
 
 /* Badge de ranking/conquista — dourado */
 @utility gam-rank {
   @apply inline-flex items-center gap-1 font-numbers font-bold text-rank;
-  @apply bg-rank/10 border border-rank/20 rounded-full px-2.5 py-0.5 text-[10px];
+  @apply bg-rank/10 border border-rank/20 px-2.5 py-0.5 text-[10px];
 }
 
 /* Badge informativo — azul */
 @utility gam-info {
   @apply inline-flex items-center gap-1 font-numbers font-bold text-info;
-  @apply bg-info/10 border border-info/20 rounded-full px-2.5 py-0.5 text-[10px];
+  @apply bg-info/10 border border-info/20 px-2.5 py-0.5 text-[10px];
 }
 
 /* Badge de alerta — vermelho */
 @utility gam-alert {
   @apply inline-flex items-center gap-1 font-numbers font-bold text-alert;
-  @apply bg-alert/10 border border-alert/20 rounded-full px-2.5 py-0.5 text-[10px];
+  @apply bg-alert/10 border border-alert/20 px-2.5 py-0.5 text-[10px];
 }
 
-/* Barra de progresso genérica (container) */
+/* Barra de progresso genérica (container) — estilo pixel retrô */
 @utility gam-progress {
-  @apply w-full h-1.5 rounded-full bg-text-main/10 overflow-hidden;
+  @apply w-full h-2 bg-text-main/10 overflow-hidden;
+  border-radius: 2px;
+  border: 1px solid var(--border-color);
 }
 
-/* Preenchimento da barra (usar com style width %) */
+/* Preenchimento da barra em degraus pixelados (usar com style width %) */
 @utility gam-progress-fill {
-  @apply h-full rounded-full bg-brand-primary transition-all duration-500;
+  @apply h-full bg-brand-primary transition-all duration-500;
+  border-radius: 1px;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 20%);
 }
 
 /* Ícone com fundo colorido suave — hero dos cards de métrica */
 @utility gam-icon {
-  @apply w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0;
+  @apply w-10 h-10 border flex items-center justify-center shrink-0;
+  border-radius: 4px;
 }
 
 /* Oculta o badge do Google reCAPTCHA v3 (mantendo a proteção ativa) */
 .grecaptcha-badge {
   display: none;
+}
+
+/* =============================================================
+   PIXEL RETRÔ — utilitários do design system
+   Títulos em Press Start 2P, corpo em VT323 (terminal),
+   cards/bordas duras com sombra deslocada (flat, sem gradiente).
+   ============================================================= */
+
+/* Título pixel (usar em headers de página e destaques) */
+@utility pixel-title {
+  font-family: var(--font-pixel);
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+
+/* Painel de terminal — fundo escuro com texto estilo CRT */
+@utility pixel-terminal {
+  font-family: var(--font-terminal);
+  background-color: rgb(0 0 0 / 30%);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+/* Borda pixel dura — substitui cantos arredondados decorativos */
+@utility pixel-border {
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 30%);
+}
+
+/* Varredura CRT sutil (opcional, usar em hero/headers) */
+@utility pixel-scanlines {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0 2px,
+      rgb(0 0 0 / 6%) 2px 4px
+    );
+  }
+}
+
+/* Cantos globalmente menos arredondados: estética de pixel art */
+:where([class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[32px]"], [class*="rounded-xl"]) {
+  border-radius: 4px;
 }
 
 /* Custom scrollbar */
