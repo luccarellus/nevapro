@@ -57,6 +57,36 @@ export function invalidateTokenVersionCache(userId: string): void {
 }
 
 /**
+ * Invalida TODAS as sessões em cache de um usuário (todas as variações de
+ * token hash não são enumeráveis, então marcamos o userId como revogado até
+ * o bump propagar: verifySession rejeita tokens com versão antiga mesmo se
+ * a entrada de cache auth ainda existir no L1).
+ */
+const revokedUsers = new Map<string, { version: number; expiresAt: number }>();
+
+/** Chama após bump de token_version: grava a nova versão e revoga caches de sessão. */
+export async function revokeUserSessions(userId: string): Promise<void> {
+  invalidateTokenVersionCache(userId);
+  const version = await getTokenVersion(userId);
+  revokedUsers.set(userId, { version, expiresAt: Date.now() + TOKEN_VERSION_CACHE_TTL_MS });
+}
+
+/**
+ * Verificação de revogação no hot path: se o usuário foi marcado como revogado
+ * e o token carrega uma versão menor que a atual, a sessão está inválida
+ * mesmo que exista entrada no cache L1 de auth.
+ */
+export function isSessionRevoked(userId: string, tokenVersion: number | undefined): boolean {
+  const revoked = revokedUsers.get(userId);
+  if (!revoked) return false;
+  if (revoked.expiresAt < Date.now()) {
+    revokedUsers.delete(userId);
+    return false;
+  }
+  return tokenVersion !== undefined && tokenVersion < revoked.version;
+}
+
+/**
  * Creates a signed session token for a user (admin or student).
  * Format: role_prefix.payload_base64url.signature_hmac
  */
@@ -146,6 +176,11 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
     if (!user) return null;
 
     // Revogação: sessões emitidas antes de um bump de token_version morrem aqui.
+    // isSessionRevoked cobre o caso de bump recente, quando a entrada em cache
+    // de auth (L1 até 5 min) ainda existir com a versão antiga do token.
+    if (isSessionRevoked(user.userId, (user as any).tokenVersion)) {
+      return null;
+    }
     const currentVersion = await getTokenVersion(user.userId);
     if ((user as any).tokenVersion !== undefined && (user as any).tokenVersion !== currentVersion) {
       return null;

@@ -44,6 +44,7 @@ import imageProxyRoutes from './routes/imageProxy';
 import lgpdRoutes from './routes/lgpd';
 import uploadRoutes from './routes/uploads';
 import errorsBookRoutes from './routes/errorsBook';
+import { startCacheInvalidationSubscriber } from './services/cache';
 
 
 // Validate critical environment variables before starting
@@ -265,6 +266,9 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 export const startServer = () => {
   if (process.env.VERCEL) return;
+
+  // Ativa o subscriber pub/sub que propaga invalidações de L1 entre instâncias
+  startCacheInvalidationSubscriber();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     log.info(`[Server] Running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);

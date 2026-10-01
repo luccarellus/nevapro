@@ -1,7 +1,10 @@
 import { CACHE_KEYS, CACHE_TTL } from '../types';
 import { log } from '../utils/logger';
-import { Command } from 'ioredis';
+import Redis, { Command } from 'ioredis';
 import { getRedisClient, isRemoteRedis, waitForRedisReady } from './redisClient';
+
+/** Canal pub/sub para propagar invalidações de L1 entre instâncias. */
+const CACHE_INVALIDATION_CHANNEL = 'cache:invalidate';
 
 /**
  * Arquitetura de Cache de Dupla Camada Ultra-Rápida (L1 In-Memory + L2 Redis).
@@ -52,6 +55,11 @@ function deleteL1(...keys: string[]): void {
     l1Cache.delete(key);
   }
 }
+
+// Single-flight: requisições concorrentes pela mesma chave compartilham
+// uma única ida ao Redis. No modo remoto (~31ms de RTT), um burst de N
+// requisições de cache miss pagaria N RTTs sem isso.
+const inflightFetches = new Map<string, Promise<unknown>>();
 
 /** Verifica se o Redis está configurado no ambiente */
 export const isRedisConfigured = (): boolean => {
@@ -142,40 +150,65 @@ export const cacheGet = async <T>(key: string): Promise<T | null> => {
   const l1Result = getL1<T>(key);
   if (l1Result !== null) return l1Result;
 
+  // 1.5 Single-flight: se outra requisição já está buscando essa chave no Redis,
+  // aguarda o mesmo resultado em vez de pagar outro RTT.
+  const inflight = inflightFetches.get(key);
+  if (inflight) {
+    return (await inflight) as T | null;
+  }
+
   if (!isRedisConfigured()) return null;
 
-  try {
-    const client = getRedisClient();
-    if (!client) return null;
-    if (client.status !== 'ready') {
-      const ready = await waitForRedisReady();
-      if (!ready) return null;
+  const fetchPromise = (async (): Promise<unknown> => {
+    try {
+      const client = getRedisClient();
+      if (!client) return null;
+      if (client.status !== 'ready') {
+        const ready = await waitForRedisReady();
+        if (!ready) return null;
+      }
+
+      // 2. Tenta L2 Cache (Redis — <1ms local, 1 RTT remoto com teto de espera)
+      const raw = await withRemoteCap(client.get(key));
+      if (!raw) return null;
+
+      const data = JSON.parse(raw as string) as T;
+      // Popula L1 para requisições subsequentes
+      setL1(key, data);
+      return data;
+    } catch {
+      return null;
+    } finally {
+      inflightFetches.delete(key);
     }
+  })();
 
-    // 2. Tenta L2 Cache (Redis — <1ms local, 1 RTT remoto com teto de espera)
-    const raw = await withRemoteCap(client.get(key));
-    if (!raw) return null;
-
-    const data = JSON.parse(raw) as T;
-    // Popula L1 para requisições subsequentes
-    setL1(key, data);
-    return data;
-  } catch {
-    return null;
-  }
+  inflightFetches.set(key, fetchPromise);
+  return (await fetchPromise) as T | null;
 };
 
 /**
  * Armazena dados no cache L1 e L2 com comando atômico SET ... EX.
  */
+/**
+ * TTL estendido no L1 para chaves de sessão/auth (`cache:auth:*`).
+ * Sessões válidas têm TTL de 24h no Redis; estender o L1 para 5 min evita
+ * pagar 1 RTT remoto (~31ms) por minuto de tráfego do usuário. Invalidação
+ * de sessão continua funcionando: logout/bump de versão chamam cacheInvalidate,
+ * que remove do L1 e do Redis neste processo.
+ */
+const AUTH_L1_TTL_MS = 5 * 60_000;
+
 export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number): Promise<void> => {
   const ttl = ttlSeconds || CACHE_TTL[key] || 300;
 
   // No modo remoto o L1 retém por mais tempo (capa 60s): cada hit evita um RTT.
   const l1CapMs = isRemoteRedis() ? 60_000 : 15_000;
+  // Sessões de auth retêm 5 min no L1 (seguro: invalidação explícita limpa o L1)
+  const effectiveL1TtlMs = key.startsWith('cache:auth:') ? AUTH_L1_TTL_MS : Math.min(ttl * 1000, l1CapMs);
 
   // Popula L1 em memória
-  setL1(key, data, Math.min(ttl * 1000, l1CapMs));
+  setL1(key, data, effectiveL1TtlMs);
 
   if (!isRedisConfigured()) return;
 
@@ -202,6 +235,11 @@ export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number):
 
 /**
  * Invalida chaves específicas nos caches L1 e L2.
+ *
+ * Multi-instância: publica as chaves inválidas num canal Redis pub/sub.
+ * Outras instâncias escutam o canal e limpam seu L1 local — sem isso, uma
+ * revogação de sessão/troca de dados levaria até o TTL do L1 (até 5 min em
+ * cache:auth:*) para propagar entre processos.
  */
 export const cacheInvalidate = async (...keys: string[]): Promise<void> => {
   if (keys.length === 0) return;
@@ -218,6 +256,11 @@ export const cacheInvalidate = async (...keys: string[]): Promise<void> => {
       const ready = await waitForRedisReady();
       if (!ready) return;
     }
+
+    // Publica para as outras instâncias limparem o L1 local delas (fire-and-forget)
+    void client
+      .publish(CACHE_INVALIDATION_CHANNEL, JSON.stringify(keys))
+      .catch(() => {});
 
     // Invalida no Redis em 1 único comando DEL
     await client.del(...keys);
@@ -257,3 +300,48 @@ export const cacheInvalidateAllContent = async (): Promise<void> => {
     CACHE_KEYS.ADMIN_ACTIVITIES,
   );
 };
+
+/**
+ * Escuta o canal de invalidação e limpa o L1 local quando outra instância
+ * invalida chaves. Usa uma conexão dedicada em modo subscriber (obrigatório
+ * no Redis: conexão em modo subscribe não executa comandos normais).
+ * Falha silenciosamente — sem subscriber, o comportamento volta ao estado
+ * anterior (L1 expira pelo TTL).
+ */
+export function startCacheInvalidationSubscriber(): void {
+  if (!isRedisConfigured()) return;
+
+  const url = process.env.REDIS_URL;
+  const subscriber = url
+    ? new Redis(url, {
+        lazyConnect: true,
+        connectTimeout: isRemoteRedis() ? 5_000 : 2_000,
+        maxRetriesPerRequest: null,
+        retryStrategy: (times: number) => Math.min(times * 200, 2_000),
+        noDelay: true,
+      })
+    : null;
+
+  if (!subscriber) return;
+
+  subscriber.on('error', (err: Error) => {
+    log.warn('[Cache] Subscriber de invalidação:', err?.message);
+  });
+
+  subscriber.subscribe(CACHE_INVALIDATION_CHANNEL).catch((err: unknown) => {
+    log.warn('[Cache] Falha ao assinar canal de invalidação:', err instanceof Error ? err.message : err);
+  });
+
+  subscriber.on('message', (_channel: string, message: string) => {
+    try {
+      const keys = JSON.parse(message) as string[];
+      if (Array.isArray(keys) && keys.length > 0) {
+        deleteL1(...keys);
+      }
+    } catch {
+      // mensagem malformada: ignora
+    }
+  });
+
+  log.info('[Cache] Subscriber de invalidação multi-instância ativo');
+}

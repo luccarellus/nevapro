@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { requireAuth, authenticateUser, invalidateTokenVersionCache } from '../middleware/auth';
+import { requireAuth, authenticateUser, invalidateTokenVersionCache, revokeUserSessions } from '../middleware/auth';
 import { query } from '../../src/lib/db';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
@@ -429,6 +429,7 @@ router.post(
           [tokenRow.user_id],
         ).catch(() => {}); // coluna opcional até a migração rodar
         invalidateTokenVersionCache(tokenRow.user_id);
+        void revokeUserSessions(tokenRow.user_id).catch(() => {});
 
         await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [tokenRow.user_id]);
 
@@ -514,6 +515,7 @@ router.post(
         );
         if (adminRow?.id) {
           invalidateTokenVersionCache(adminRow.id as string);
+          void revokeUserSessions(adminRow.id as string).catch(() => {});
         }
 
         res.json({ success: true, message: 'Senha atualizada com sucesso.' });
@@ -553,6 +555,7 @@ router.post(
           [studentRow.id],
         ).catch(() => {});
         invalidateTokenVersionCache(studentRow.id);
+        void revokeUserSessions(studentRow.id).catch(() => {});
       }
 
       res.json({ success: true, message: 'Senha atualizada com sucesso.' });
