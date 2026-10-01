@@ -18,9 +18,43 @@ atrás de um Nginx com SSL. O Redis roda como serviço próprio no docker-compos
 
 - VPS com **Docker** e **Docker Compose** instalados
 - Domínio apontado (registro A) para o IP da VPS
-- Projeto Supabase já configurado (banco + Auth + Storage B2)
 
-### 1. Subir o projeto
+### ⚡ Início rápido (automatizado)
+
+O script `deploy.sh` (ou os atalhos de `make`) automatiza todo o fluxo:
+
+```bash
+# 1. Setup: cria o .env a partir do .env.example e pergunta o domínio
+./deploy.sh setup
+
+# 2. Emitir o certificado SSL (primeira vez; requer domínio já apontando p/ a VPS)
+./deploy.sh ssl
+
+# 3. Build e subir todo o stack (nginx + api + redis + cron)
+./deploy.sh up
+
+# 4. Conferir saúde da aplicação
+./deploy.sh health
+```
+
+No dia-a-dia:
+
+```bash
+./deploy.sh update    # git pull + rebuild + restart (novo deploy)
+./deploy.sh logs      # logs da API em tempo real
+./deploy.sh backup    # backup manual do banco no Backblaze B2
+./deploy.sh status    # status dos containers
+./deploy.sh renew     # renovação manual do SSL
+./deploy.sh down      # para tudo
+```
+
+> Os mesmos comandos funcionam com `make` (`make setup`, `make up`, ...).
+> Para escalar a API (múltiplas réplicas atrás do Nginx): `docker compose up -d --build --scale api=3`
+
+### 🔧 Fluxo manual (referência)
+
+<details>
+<summary>Expandir passos manuais</summary>
 
 ```bash
 # 1. Clonar/atualizar o projeto na VPS
@@ -44,7 +78,7 @@ docker compose ps
 docker compose logs -f api
 ```
 
-> Para escalar a API (múltiplas réplicas atrás do Nginx): `docker compose up -d --build --scale api=3`
+</details>
 
 ### 2. Variáveis obrigatórias no `.env`
 
