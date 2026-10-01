@@ -27,7 +27,7 @@ class AuthService
             if (! $admin->active) {
                 return ['error' => 'Conta administrativa desativada.'];
             }
-            if (Hash::check($password, $admin->password_hash)) {
+            if (self::verifyPassword($password, $admin->password_hash)) {
                 return ['user' => $admin, 'type' => 'admin'];
             }
 
@@ -35,7 +35,7 @@ class AuthService
         }
 
         $student = StudentUser::where('email', $email)->first();
-        if ($student && Hash::check($password, $student->password_hash)) {
+        if ($student && self::verifyPassword($password, $student->password_hash)) {
             return ['user' => $student, 'type' => 'student'];
         }
 
@@ -88,5 +88,25 @@ class AuthService
     public function normalizeEmail(string $email): string
     {
         return strtolower(trim($email));
+    }
+
+    /**
+     * Verifica a senha aceitando hashes bcrypt gerados fora do Laravel
+     * (ex.: bcrypt do Node usa prefixo $2b$, que o Hash::check rejeita
+     * com exceção em vez de retornar false).
+     */
+    public static function verifyPassword(string $password, ?string $hash): bool
+    {
+        if (! $hash) {
+            return false;
+        }
+
+        // Hash já no formato aceito pelo Laravel ($2y$/$2a$)
+        if (! str_starts_with($hash, '$2b$')) {
+            return Hash::check($password, $hash);
+        }
+
+        // $2b$ → $2y$: mesmo algoritmo bcrypt, apenas prefixo de origem diferente
+        return password_verify($password, '$2y$'.substr($hash, 4));
     }
 }
