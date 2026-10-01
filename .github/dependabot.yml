@@ -1,0 +1,41 @@
+# Bumps automáticos das imagens base do Dockerfile (patches de segurança).
+# Escaneia semanalmente e abre PR quando sai versão nova de cada tag.
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Agrupa todos os bumps de imagens base num único PR
+    groups:
+      docker-base-images:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "docker"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+  - package-ecosystem: "composer"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      composer-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
