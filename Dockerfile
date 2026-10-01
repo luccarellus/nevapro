@@ -23,7 +23,7 @@ WORKDIR /app
 COPY backend/ ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-FROM php:8.3-fpm-alpine AS api
+FROM php:8.4-fpm-alpine AS api
 
 RUN apk add --no-cache curl libpq libzip oniguruma postgresql-client \
     && apk add --no-cache --virtual .build-dependencies $PHPIZE_DEPS curl-dev libzip-dev oniguruma-dev postgresql-dev \

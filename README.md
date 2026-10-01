@@ -64,7 +64,7 @@ nevapro/
 
 **Backend**
 
-- **Laravel 13** com PHP 8.3 para produção
+- **Laravel 13** com PHP 8.4.1+ para produção
 - **Express.js** com TypeScript para desenvolvimento e compatibilidade
 - **PostgreSQL** como banco de dados principal
 - **bcryptjs** para hash de senhas
@@ -136,7 +136,7 @@ O schema PostgreSQL contém **24 tabelas** (incluindo Multi-Tenancy & RBAC):
 
 ### Pré-requisitos
 
-- [PHP 8.3+](https://www.php.net/) com suporte a PostgreSQL/SQLite
+- [PHP 8.4.1+](https://www.php.net/) com suporte a PostgreSQL/SQLite
 - [Composer](https://getcomposer.org/)
 - [Node.js 20+](https://nodejs.org) e npm
 - PostgreSQL ou SQLite para desenvolvimento local

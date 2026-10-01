@@ -10,7 +10,7 @@
 
 ## 📦 Estratégia de Deploy (VPS)
 
-A aplicação usa Laravel/PHP-FPM para a API, Nginx para TLS e frontend estático,
+A aplicação usa Laravel/PHP-FPM (PHP 8.4.1+) para a API, Nginx para TLS e frontend estático,
 com containers Laravel separados para filas e agendamentos no deploy Compose.
 No EasyPanel também é possível usar o target padrão do Dockerfile: ele reúne
 frontend, Nginx, PHP-FPM, worker e scheduler em um único container. Cache, filas
