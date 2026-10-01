@@ -202,8 +202,8 @@ export default function App() {
     }
 
     const bgColors: Record<string, string> = {
-      'dark': '#191a32',
-      'light': '#f4f6ff',
+      'dark': '#060a12',
+      'light': '#f8fafc',
       'cyberpunk': isDarkMode ? '#08070d' : '#faf8fc',
       'eighties': isDarkMode ? '#080313' : '#fff3fb',
       'forest': isDarkMode ? '#050806' : '#f4f9f6',
