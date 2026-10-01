@@ -13,8 +13,9 @@
 A aplicação usa Laravel/PHP-FPM (PHP 8.4.1+) para a API, Nginx para TLS e frontend estático,
 com containers Laravel separados para filas e agendamentos no deploy Compose.
 No EasyPanel também é possível usar o target padrão do Dockerfile: ele reúne
-frontend, Nginx, PHP-FPM, worker e scheduler em um único container. Cache, filas
-e rate limit usam o PostgreSQL; não é necessário um serviço Redis.
+frontend, Nginx, PHP-FPM, worker e scheduler em um único container. O cache Laravel
+usa PostgreSQL por padrão; Redis é opcional e pode ser habilitado pelas variáveis
+de ambiente do serviço.
 
 ### Pré-requisitos
 
@@ -221,7 +222,12 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 
 ## 🧠 Cache, filas e agendamentos
 
-- O cache e as filas Laravel usam tabelas PostgreSQL.
+- O cache Laravel usa PostgreSQL por padrão. Para usar Redis, configure no serviço
+  da VPS/EasyPanel `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e `REDIS_URL` (ou
+  `REDIS_HOST`, `REDIS_PORT` e as credenciais correspondentes). O projeto usa
+  Predis, incluído nas dependências PHP, sem exigir a extensão `phpredis`.
+- O Compose respeita `CACHE_STORE` definido no ambiente ou no `.env`; sem essa
+  variável, Laravel mantém o cache PostgreSQL.
 - O serviço `worker` processa e-mails, notificações e backups.
 - O serviço `scheduler` executa a limpeza diária às 03:00 UTC e o backup às 04:00 UTC.
 - As migrations são executadas pelo `./deploy.sh up`; tabelas existentes são preservadas.

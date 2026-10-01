@@ -260,7 +260,10 @@ class AuthController extends Controller
     private function storeTokenVersion($user, string $plainToken, string $type): void
     {
         try {
-            $tokenId = (int) explode(':', $plainToken)[0];
+            $tokenId = strstr($plainToken, '|', true);
+            if ($tokenId === false || $tokenId === '') {
+                return;
+            }
             $model = PersonalAccessToken::find($tokenId);
             $model?->update(['name' => "auth:{$type}:tv".($user->token_version ?? 0)]);
         } catch (\Throwable $e) {

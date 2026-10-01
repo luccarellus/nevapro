@@ -8,7 +8,6 @@ x-laravel-environment: &laravel-environment
   DB_CONNECTION: pgsql
   DB_URL: ${DATABASE_URL:?DATABASE_URL obrigatoria}
   DB_SSLMODE: ${DB_SSLMODE:-disable}
-  CACHE_STORE: database
   SESSION_DRIVER: array
   QUEUE_CONNECTION: database
   DB_QUEUE_RETRY_AFTER: "3600"

@@ -14,7 +14,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! Schema::hasTable('personal_access_tokens')) {
+        if (! Schema::hasTable('personal_access_tokens') || DB::connection()->getDriverName() === 'sqlite') {
             return;
         }
 
@@ -22,7 +22,7 @@ return new class extends Migration
         Schema::table('personal_access_tokens', function (Blueprint $table) {
             try {
                 $table->dropIndex(['tokenable_type', 'tokenable_id']);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // índice pode não existir com esse nome em bases antigas
             }
         });
@@ -38,14 +38,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (! Schema::hasTable('personal_access_tokens')) {
+        if (! Schema::hasTable('personal_access_tokens') || DB::connection()->getDriverName() === 'sqlite') {
             return;
         }
 
         Schema::table('personal_access_tokens', function (Blueprint $table) {
             try {
                 $table->dropIndex(['tokenable_type', 'tokenable_id']);
-            } catch (\Throwable) {
+            } catch (Throwable) {
             }
         });
 

@@ -54,12 +54,6 @@ class AuthService
     /** Resolve o usuário a partir de um personal access token Sanctum. */
     public function resolveFromToken(string $token): ?array
     {
-        $parts = explode(':', $token);
-        if (count($parts) !== 2) {
-            return null;
-        }
-        [$tokenId, $tokenHash] = $parts;
-
         $accessToken = PersonalAccessToken::findToken($token);
         if (! $accessToken || $accessToken->expires_at?->isPast()) {
             return null;
@@ -77,7 +71,9 @@ class AuthService
 
         // Revogação por versão (senha trocada → todas as sessões anteriores caem)
         $tokenVersion = (int) ($user->token_version ?? 0);
-        $tokenTv = (int) ($accessToken->name_data['tv'] ?? 0);
+        $tokenTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $accessToken->name, $matches)
+            ? (int) $matches[1]
+            : 0;
         if ($tokenVersion > $tokenTv) {
             return null;
         }

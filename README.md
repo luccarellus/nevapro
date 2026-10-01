@@ -268,7 +268,9 @@ SUPABASE_SERVICE_ROLE_KEY="[service role key]"
 JWT_SECRET="[seu-secret]"
 ```
 
-> O deploy Docker usa tabelas PostgreSQL para cache e filas; Redis não é obrigatório.
+> O deploy Docker usa tabelas PostgreSQL para cache por padrão. Redis é opcional:
+> configure `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e a conexão Redis no ambiente
+> da VPS. O backend inclui Predis e não depende da extensão PHP `phpredis`.
 
 ### 4. Configure o banco de dados
 
