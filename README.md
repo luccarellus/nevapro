@@ -208,6 +208,29 @@ Inicie a API Laravel em `http://127.0.0.1:8000` e o frontend com
 `npm run dev:frontend` em dois terminais. O Vite encaminha `/api` para Laravel;
 `npm run dev` permanece apenas para desenvolvimento/compatibilidade Express.
 
+### Deploy no EasyPanel com Dockerfile (Laravel)
+
+O Dockerfile da raiz gera uma imagem única com frontend, Nginx e Laravel/PHP-FPM.
+Ele também inicia o worker e o scheduler Laravel via Supervisor, para poder ser
+implantado como um serviço Dockerfile no EasyPanel sem Docker Compose.
+
+1. Configure o serviço para construir usando o `Dockerfile` da raiz e publicar a
+   porta **80**. Não sobrescreva o comando de inicialização.
+2. Cadastre no painel as variáveis de produção do `.env.example`, incluindo
+   `APP_KEY`, `APP_URL`, `DATABASE_URL`, `DB_SSLMODE` e as configurações de B2,
+   e-mail e integrações usadas pela aplicação. O container converte
+   `DATABASE_URL` para `DB_URL` automaticamente.
+3. Defina `VITE_RECAPTCHA_SITE_KEY`, `VITE_SENTRY_DSN` e
+   `VITE_MAINTENANCE_MODE` como build arguments caso sejam usados; esses valores
+   são compilados no frontend durante o build.
+4. Faça backup e valide o schema do banco antes de executar
+   `php artisan migrate --force` pelo terminal do serviço. Migrations não são
+   executadas automaticamente na inicialização.
+
+O mesmo Dockerfile mantém os targets `api` e `web` usados pelo deploy em Compose.
+No EasyPanel, mantenha uma única instância desse serviço para evitar executar
+mais de um scheduler simultaneamente.
+
 ### Deploy na VPS (Docker Compose + Laravel)
 
 1. Copie e preencha o `.env` (veja o `.env.example`):

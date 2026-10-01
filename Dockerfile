@@ -49,3 +49,34 @@ FROM nginx:stable-alpine AS web
 RUN apk add --no-cache curl
 
 COPY --from=frontend /app/dist/ /usr/share/nginx/html/
+
+# EasyPanel Dockerfile deployment: Nginx and PHP-FPM share one container.
+# The Compose deployment continues to use the separate "web" and "api" targets.
+FROM api AS app
+
+RUN apk add --no-cache nginx supervisor
+
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    DB_CONNECTION=pgsql \
+    DB_SSLMODE=require \
+    CACHE_STORE=database \
+    SESSION_DRIVER=array \
+    SESSION_SECURE_COOKIE=true \
+    QUEUE_CONNECTION=database \
+    DB_QUEUE_RETRY_AFTER=3600 \
+    LOG_CHANNEL=stderr
+
+COPY --from=frontend /app/dist/ /usr/share/nginx/html/
+COPY nginx/standalone-nginx.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/neva-entrypoint
+
+RUN chmod +x /usr/local/bin/neva-entrypoint \
+    && mkdir -p /run/nginx /var/log/supervisor \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+EXPOSE 80
+
+ENTRYPOINT ["/usr/local/bin/neva-entrypoint"]
+CMD ["supervisord", "-n", "-c", "/etc/supervisord.conf"]

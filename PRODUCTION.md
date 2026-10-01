@@ -11,13 +11,29 @@
 ## 📦 Estratégia de Deploy (VPS)
 
 A aplicação usa Laravel/PHP-FPM para a API, Nginx para TLS e frontend estático,
-e containers Laravel separados para filas e agendamentos. Cache, filas e rate
-limit usam o PostgreSQL; não é necessário um serviço Redis.
+com containers Laravel separados para filas e agendamentos no deploy Compose.
+No EasyPanel também é possível usar o target padrão do Dockerfile: ele reúne
+frontend, Nginx, PHP-FPM, worker e scheduler em um único container. Cache, filas
+e rate limit usam o PostgreSQL; não é necessário um serviço Redis.
 
 ### Pré-requisitos
 
 - VPS com **Docker** e **Docker Compose** instalados
 - Domínio apontado (registro A) para o IP da VPS
+
+### EasyPanel usando somente o Dockerfile
+
+Configure o serviço para construir o `Dockerfile` da raiz e encaminhar o domínio
+à porta **80** do container. Não defina um comando de inicialização customizado:
+o Supervisor inicia Nginx, PHP-FPM, worker e scheduler.
+
+Configure as variáveis de produção do `.env.example` no painel, em especial
+`APP_KEY`, `APP_URL`, `DATABASE_URL` e `DB_SSLMODE`. O entrypoint mapeia
+`DATABASE_URL` para `DB_URL`, como faz o Compose. Defina também os build args
+`VITE_*` que forem usados pelo frontend. Migrations não são executadas ao iniciar;
+faça backup e confira o schema antes de rodar `php artisan migrate --force` pelo
+terminal do container. Mantenha uma única instância do serviço para evitar
+executar o scheduler em duplicidade.
 
 ### ⚡ Início rápido (automatizado)
 
