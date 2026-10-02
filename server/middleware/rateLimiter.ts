@@ -50,15 +50,20 @@ interface RateLimiterOptions {
   keyBy?: (req: Request) => string | null | undefined;
   /** Mensagem customizada do 429. */
   message?: string;
+  /**
+   * Força limite DISTRIBUÍDO via Redis mesmo quando remoto (1 RTT extra).
+   * Use em rotas sensíveis a brute force: login, registro, reset, upload.
+   */
+  distributed?: boolean;
 }
 
 /**
  * Rate Limiter — híbrido Redis ultra-rápido (Lua atômico) + fallback em memória local.
  *
  * Redis local (docker/VPS na mesma rede): <1ms via script Lua de ida e volta única.
- * Redis remoto (via internet, ~30ms de RTT): usar Redis aqui adicionaria 1 RTT
- * BLOQUEANTE a TODA requisição /api — por isso, nesse modo, o rate-limit roda
- * 100% em memória local (por instância), que é o trade-off correto de performance.
+ * Redis remoto (via internet): usado também para limites SENSÍVEIS (auth, upload),
+ * onde a segurança distribuída importa mais que 1 RTT — brute force multi-instância
+ * é mitigado. Endpoints de alta frequência continuam com limite local por instância.
  */
 export const rateLimiter = (limit: number, windowMs: number, options?: RateLimiterOptions) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -74,8 +79,11 @@ export const rateLimiter = (limit: number, windowMs: number, options?: RateLimit
     const now = Date.now();
     const windowKey = Math.floor(now / windowMs);
 
-    // Redis só entra no hot path se estiver no modo local (baixa latência)
-    if (isRedisConfigured() && !isRemoteRedis()) {
+    // Redis só entra no hot path se estiver no modo local (baixa latência).
+    // Com Redis remoto, o limite distribuído é usado quando marcado como
+    // sensível à segurança (distributed) — ex.: login, registro, upload.
+    const useRedis = isRedisConfigured() && (!isRemoteRedis() || options?.distributed === true);
+    if (useRedis) {
       const client = getRedisClient();
       if (client) {
         if (client.status !== 'ready') {

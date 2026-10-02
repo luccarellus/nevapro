@@ -1,3 +1,5 @@
+import { sanitizeRichText } from './sanitizeHtml';
+
 type Result<T> = { data: T } | { error: string };
 type Row = Record<string, unknown>;
 
@@ -67,6 +69,11 @@ export function validateMuralInput(body: unknown, partial = false): Result<Row> 
     ['category', 50, false], ['tag', 100, false], ['sender', 255, false],
   ]);
   if ('error' in result) return result;
+  // Stored XSS: o mural é renderizado como rich text (rehype-raw) no frontend.
+  // Sanitizar no servidor antes de persistir, igual às questões.
+  if (typeof result.data.content === 'string') {
+    result.data.content = sanitizeRichText(result.data.content);
+  }
   if (partial && Object.keys(result.data).length === 0) return { error: 'Nenhum campo válido foi informado.' };
   return result;
 }

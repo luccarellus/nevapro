@@ -277,14 +277,27 @@ router.post(
     if (!email || !role) {
       res.status(400).json({ error: 'E-mail e papel são obrigatórios.' });
       return;
-    }
-    if (!ROLE_CODES.includes(role)) {
+    }    if (!ROLE_CODES.includes(role)) {
       res.status(400).json({ error: `Papel inválido. Válidos: ${ROLE_CODES.join(', ')}.` });
       return;
     }
 
     const ctx = (req as any).rbacContext;
     const targetRole = role as RoleCode;
+
+    // Isolamento cross-tenant: a permissão foi validada contra req.tenantId
+    // (header), mas o vínculo é criado no tenant do path. Exigir que coincidam.
+    if (req.tenantId !== tenantId) {
+      res.status(403).json({ error: 'Acesso negado a este tenant.' });
+      return;
+    }
+
+    // super_admin é papel GLOBAL: apenas super admin pode atribuí-lo.
+    if (targetRole === 'super_admin' && !ctx?.isSuperAdmin) {
+      res.status(403).json({ error: 'Somente super admin pode atribuir este papel.' });
+      return;
+    }
+
     const permissionMap: Record<RoleCode, PermissionCode> = {
       super_admin: PERMISSIONS.USERS_MANAGE_ADMINS,
       tenant_admin: PERMISSIONS.USERS_MANAGE_ADMINS,
@@ -369,6 +382,14 @@ router.delete(
   ),
   async (req: AuthenticatedRequest, res: Response) => {
     const { id: tenantId, userId } = req.params;
+
+    // Isolamento cross-tenant: a permissão foi validada contra req.tenantId
+    // (header), mas o DELETE atua no tenant do path. Exigir que sejam o mesmo.
+    if (req.tenantId !== tenantId) {
+      res.status(403).json({ error: 'Acesso negado a este tenant.' });
+      return;
+    }
+
     try {
       const { rows } = await query(
         `DELETE FROM public.user_tenant_roles

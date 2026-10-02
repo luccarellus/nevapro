@@ -5,7 +5,7 @@ import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { resolveStoredFileUrl } from '../utils/storageUrl';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
+import { deleteUserCache, getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 import { getUserRbacContext } from '../services/rbacService';
 import { ADMIN_ROLE_CODES } from '../lib/permissions';
 
@@ -170,7 +170,21 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
   try {
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const cachedUser = await getUserCache<AuthenticatedUser>(userCacheKeys.auth(tokenHash));
-    if (cachedUser) return cachedUser;
+    if (cachedUser) {
+      // Revogação deve ser validada TAMBÉM no cache hit: sem isso, um token
+      // roubado continua válido por até TTL da sessão após troca de senha.
+      const tv = (cachedUser as { tokenVersion?: number }).tokenVersion;
+      if (isSessionRevoked(cachedUser.userId, tv)) {
+        await deleteUserCache(userCacheKeys.auth(tokenHash));
+        return null;
+      }
+      const currentVersion = await getTokenVersion(cachedUser.userId);
+      if (tv !== undefined && tv !== currentVersion) {
+        await deleteUserCache(userCacheKeys.auth(tokenHash));
+        return null;
+      }
+      return cachedUser;
+    }
 
     const user = verifySessionToken(token);
     if (!user) return null;
@@ -387,8 +401,12 @@ export const authenticateUser = async (email: string, password: string) => {
       tenantId: rbacContext.defaultTenantId || undefined,
       isAdmin: rbacContext.isAdmin,
     },
+    // Token de sessão NÃO é retornado no corpo: vai exclusivamente no cookie
+    // httpOnly (evita exfiltração via XSS). Rotas usam session.access_token
+    // apenas para setar o cookie.
     session: {
       access_token: sessionToken,
+      // Campo de marcação para transporte interno; não serializar ao cliente.
     },
   };
 };

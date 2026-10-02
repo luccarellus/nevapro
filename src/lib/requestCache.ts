@@ -1,3 +1,5 @@
+import { setCsrfToken } from './apiService';
+
 type CacheEntry = { expiresAt: number; value?: unknown; promise?: Promise<unknown>; staleAt?: number };
 
 const cache = new Map<string, CacheEntry>();
@@ -69,6 +71,10 @@ async function fetchAndCache<T>(url: string, cacheKey: string, ttlMs?: number): 
       throw error;
     }
     const value = await response.json() as T;
+    // Captura o token anti-CSRF emitido pelo bootstrap, se presente.
+    if (url.split('?')[0] === '/api/bootstrap' && (value as any)?.csrfToken) {
+      setCsrfToken((value as any).csrfToken);
+    }
     // Set expiry and stale time (stale = 80% of TTL, allows stale-while-revalidate)
     const staleAt = Date.now() + effectiveTtl * 0.8;
     cache.set(cacheKey, { value, expiresAt: Date.now() + effectiveTtl, staleAt });

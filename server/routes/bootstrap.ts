@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { query } from '../../src/lib/db';
 import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
+import { issueCsrfToken } from '../middleware/csrf';
 import { AuthenticatedRequest } from '../types';
 import { getUserCache, setUserCache, userCacheKeys } from '../services/userCache';
 import { log } from '../utils/logger';
@@ -9,14 +10,16 @@ import { resolveStoredFileUrl } from '../utils/storageUrl';
 
 const router = Router();
 
-router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest & { cookies?: Record<string, string> }, res: Response) => {
   const email = req.user?.email || '';
   const tenantId = req.tenantId;
   const cacheKey = tenantId ? `${userCacheKeys.bootstrap(email)}:${tenantId}` : userCacheKeys.bootstrap(email);
   try {
+    // Token anti-CSRF nunca deve vir de cache (depende do cookie corrente).
+    const csrfToken = issueCsrfToken(req as any);
     const cached = await getUserCache<Record<string, unknown>>(cacheKey);
     if (cached) {
-      res.json(cached);
+      res.json({ ...cached, csrfToken });
       return;
     }
     // Run 3 queries in parallel instead of a single heavy CTE
@@ -80,7 +83,7 @@ router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, re
       },
     };
     await setUserCache(cacheKey, payload, 60);
-    res.json(payload);
+    res.json({ ...payload, csrfToken });
   } catch (error) {
     log.error('[Bootstrap] Error:', error);
     res.status(500).json({ error: 'Erro ao carregar dados iniciais.' });

@@ -26,6 +26,11 @@ function cacheKeysForTenant(tenantId: string | null): string[] {
 router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tenantId = req.tenantId;
+    // Fail-closed: sem tenant resolvido, NUNCA listar de todos os tenants.
+    if (!tenantId) {
+      res.status(403).json({ error: 'Tenant não resolvido para o usuário.' });
+      return;
+    }
     const pageRaw = parseInt(String(req.query.page || '1'), 10);
     const page = Number.isInteger(pageRaw) && pageRaw > 0 ? Math.min(pageRaw, 1000) : 1;
     const pageSize = TENANT_QUESTIONS_PAGE_SIZE;
@@ -41,10 +46,10 @@ router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedReque
       `SELECT q.id, q.subject, q.text, q.image_url, q.correct_option_index,
               q.explanation, q.difficulty, q.xp_reward, q.year, q.tenant_id, q.created_at
        FROM public.questions q
-       WHERE ($1::uuid IS NULL OR q.tenant_id = $1)
+       WHERE q.tenant_id = $1
        ORDER BY q.created_at DESC
        LIMIT $2 OFFSET $3`,
-      [tenantId || null, pageSize + 1, (page - 1) * pageSize],
+      [tenantId, pageSize + 1, (page - 1) * pageSize],
     );
 
     // Um item extra indica que há próxima página (paginação sem COUNT(*)).
@@ -240,19 +245,32 @@ router.delete(
 router.get('/', requireAuth, async (req, res: Response) => {
   const { year, limit, offset } = req.query;
 
-  if (!year) {
-    res.status(400).json({ error: 'Year parameter is required' });
+  // Validação estrita: os valores são interpolados na URL upstream e na chave
+  // de cache — sem isso, path manipulation e poluição de cache são possíveis.
+  const yr = parseInt(String(year), 10);
+  const lim = parseInt(String(limit ?? '50'), 10);
+  const off = parseInt(String(offset ?? '0'), 10);
+  if (!Number.isInteger(yr) || yr < 2009 || yr > 2100) {
+    res.status(400).json({ error: 'Year parameter must be a valid exam year' });
+    return;
+  }
+  if (!Number.isInteger(lim) || lim < 1 || lim > 200) {
+    res.status(400).json({ error: 'Limit parameter must be between 1 and 200' });
+    return;
+  }
+  if (!Number.isInteger(off) || off < 0 || off > 100000) {
+    res.status(400).json({ error: 'Offset parameter must be a non-negative integer' });
     return;
   }
 
   try {
-    const cacheKey = `cache:questions:${year}:${limit || 50}:${offset || 0}`;
+    const cacheKey = `cache:questions:${yr}:${lim}:${off}`;
     const cached = await cacheGet<unknown>(cacheKey);
     if (cached) {
       res.json(cached);
       return;
     }
-    const apiUrl = `${BASE_URL}/exams/${year}/questions?limit=${limit || 50}&offset=${offset || 0}`;
+    const apiUrl = `${BASE_URL}/exams/${yr}/questions?limit=${lim}&offset=${off}`;
     const response = await fetch(apiUrl, {
       headers: { 'Content-Type': 'application/json' },
     });

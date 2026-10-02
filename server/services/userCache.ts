@@ -11,6 +11,8 @@ export const userCacheKeys = {
 
 export const getUserCache = cacheGet;
 export const setUserCache = cacheSet;
+/** Remove uma entrada pontual do cache (ex.: sessão revogada). */
+export const deleteUserCache = cacheInvalidate;
 
 export async function invalidateUserCache(email: string, userId?: string): Promise<void> {
   await cacheInvalidate(

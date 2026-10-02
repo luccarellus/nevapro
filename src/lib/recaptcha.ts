@@ -65,7 +65,12 @@ export function preloadRecaptcha(): Promise<void> {
  */
 export async function executeRecaptcha(action: string): Promise<string> {
   if (!isRecaptchaEnabled()) {
-    console.warn('[reCAPTCHA] Site key not configured. Skipping verification.');
+    // Fail-closed em produção: sem site key o servidor (com secret key)
+    // rejeitará a requisição — o erro precisa ser visível, não silenciado.
+    if (import.meta.env.PROD) {
+      throw new Error('Verificação de segurança não configurada. Contate o suporte.');
+    }
+    console.warn('[reCAPTCHA] Site key not configured. Skipping verification (dev only).');
     return '';
   }
 

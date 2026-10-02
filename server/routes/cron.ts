@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { runDatabaseBackup } from '../services/b2BackupStorage';
@@ -13,12 +14,21 @@ function verifyCronSecret(req: Request, res: Response, next: () => void) {
   if (cronSecret) {
     const authHeader = req.headers.authorization;
     const customHeader = req.headers['x-cron-secret'];
-    const querySecret = req.query.secret;
 
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-    const providedSecret = bearerToken || customHeader || querySecret;
+    const providedSecret = bearerToken || (Array.isArray(customHeader) ? customHeader[0] : customHeader) || null;
 
-    if (providedSecret !== cronSecret) {
+    // Segredo NÃO é aceito via query string: URLs vazam em access logs e proxies.
+    // Comparação em tempo constante evita vazamento por timing.
+    if (!providedSecret) {
+      log.warn('[Cron] Requisição sem segredo (envie via Authorization Bearer ou X-Cron-Secret).');
+      res.status(401).json({ error: 'Não autorizado. Segredo de Cron ausente.' });
+      return;
+    }
+    const a = Buffer.from(providedSecret);
+    const b = Buffer.from(cronSecret);
+    const secretOk = a.length === b.length && timingSafeEqual(a, b);
+    if (!secretOk) {
       log.warn('[Cron] Tentativa de execução não autorizada.');
       res.status(401).json({ error: 'Não autorizado. Segredo de Cron inválido.' });
       return;

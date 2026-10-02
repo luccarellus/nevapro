@@ -1,5 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { log } from '../utils/logger';
+
+/**
+ * Token anti-CSRF assinado (double-submit com HMAC): emitido no bootstrap e
+ * devolvido pelo cliente no header X-CSRF-Token em requisições mutantes.
+ * A assinatura cobre o valor do cookie de sessão, atrelando token à sessão.
+ */
+export const issueCsrfToken = (req: Request): string => {
+  const secret = process.env.JWT_SECRET || '';
+  const sid = (req as any).cookies?.session_token || '';
+  return createHmac('sha256', secret).update(`csrf:${sid}`).digest('hex');
+};
+
+const verifyCsrfToken = (req: Request): boolean => {
+  const header = req.headers['x-csrf-token'];
+  const token = Array.isArray(header) ? header[0] : header;
+  if (!token) return false;
+  const expected = issueCsrfToken(req);
+  if (expected.length !== token.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(token));
+};
 
 const normalizeOrigin = (value: string): string => {
   try {
@@ -76,6 +97,15 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction):
   // Skip idempotent methods
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
+  }
+
+  // Verificação de token anti-CSRF assinado (além da checagem de Origin).
+  // Cookie de sessão precisa existir: sem sessão não há CSRF a proteger.
+  const hasSession = Boolean((req as any).cookies?.session_token);
+  if (hasSession && !verifyCsrfToken(req)) {
+    log.warn('[CSRF] Token anti-CSRF ausente ou inválido');
+    res.status(403).json({ error: 'Acesso negado: token CSRF inválido.' });
+    return;
   }
 
   // 1. Origin header validation

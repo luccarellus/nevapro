@@ -105,17 +105,20 @@ app.use((req, res, next) => {
 // ===== CORS =====
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
-  const defaultOrigin = process.env.FRONTEND_URL?.split(',')[0] || 'https://neva.pro';
-  let allowedOrigin = defaultOrigin;
 
   if (requestOrigin && isAllowedOrigin(req, requestOrigin)) {
-    allowedOrigin = requestOrigin;
+    // Reflete a origem APENAS quando explicitamente permitida. Sem Origin
+    // permitido, nenhum header CORS é emitido (falha fechada, sem fallback).
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-Tenant-ID');
+  } else if (!requestOrigin) {
+    // Same-origin / curl / server-to-server: sem Origin não há risco CORS.
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-Tenant-ID');
   }
-
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, X-Tenant-ID');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });

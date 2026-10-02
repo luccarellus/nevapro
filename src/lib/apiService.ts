@@ -19,10 +19,16 @@ interface RequestConfig {
   body?: unknown;
 }
 
+// Token anti-CSRF emitido pelo bootstrap e anexado às requisições mutantes.
+let csrfToken: string | null = null;
+export function setCsrfToken(token: string | null | undefined): void {
+  csrfToken = token && typeof token === 'string' ? token : null;
+}
+
 async function request<T>(endpoint: string, config: RequestConfig = { method: 'GET' }): Promise<T> {
   const { method, body } = config;
   if (method === 'GET') return cachedFetchJson<T>(endpoint);
-  
+
   const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('neva_active_tenant') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -31,6 +37,9 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   };
   if (activeTenant) {
     headers['X-Tenant-ID'] = activeTenant;
+  }
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
   }
 
   const options: RequestInit = {

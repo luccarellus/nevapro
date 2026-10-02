@@ -26,23 +26,28 @@ const router = Router();
 // Dupla camada: por IP (atacante com 1 IP) + por CONTA (atacante com botnet de
 // proxies — a chave é o e-mail alvo, imune a rotação de IP).
 // Janelas longas: login 10/5min, recuperação 3/15min (quebra email bombing).
-const loginIpLimiter = rateLimiter(10, 5 * 60_000);
+// distributed: usa Redis mesmo remoto — brute force não pode ser por instância.
+const loginIpLimiter = rateLimiter(10, 5 * 60_000, { distributed: true });
 const loginAccountLimiter = rateLimiter(10, 5 * 60_000, {
+  distributed: true,
   keyBy: (req) => normalizeEmail(req.body?.email || ''),
   message: 'Muitas tentativas de login para esta conta. Tente novamente em alguns minutos.',
 });
-const forgotIpLimiter = rateLimiter(3, 15 * 60_000);
+const forgotIpLimiter = rateLimiter(3, 15 * 60_000, { distributed: true });
 const forgotAccountLimiter = rateLimiter(2, 15 * 60_000, {
+  distributed: true,
   keyBy: (req) => normalizeEmail(req.body?.email || ''),
   message: 'Limite de solicitações de recuperação atingido para este e-mail. Tente novamente em 15 minutos.',
 });
-const resetIpLimiter = rateLimiter(3, 15 * 60_000);
+const resetIpLimiter = rateLimiter(3, 15 * 60_000, { distributed: true });
 const resetAccountLimiter = rateLimiter(5, 15 * 60_000, {
+  distributed: true,
   keyBy: (req) => normalizeEmail(req.body?.email || ''),
   message: 'Muitas tentativas de redefinição para esta conta. Tente novamente mais tarde.',
 });
-const changePwIpLimiter = rateLimiter(3, 15 * 60_000);
+const changePwIpLimiter = rateLimiter(3, 15 * 60_000, { distributed: true });
 const changePwAccountLimiter = rateLimiter(3, 15 * 60_000, {
+  distributed: true,
   keyBy: (req) => normalizeEmail(req.body?.email || ''),
   message: 'Muitas tentativas de alteração de senha para esta conta. Tente novamente mais tarde.',
 });
@@ -87,18 +92,22 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       authenticateUser(cleanEmail, password),
     ]);
 
-    // Check reCAPTCHA result (non-blocking on failure — only blocks on explicit low score)
+    // Check reCAPTCHA result — em produção, falha ou score baixo BLOQUEIA o login.
     if (recaptchaResult.status === 'fulfilled' && recaptchaResult.value) {
       const recaptchaData = recaptchaResult.value;
       if (recaptchaData.success === false) {
         const errorCodes = recaptchaData['error-codes'] || [];
-        if (!errorCodes.includes('invalid-input-secret') && !errorCodes.includes('bad-request')) {
-          log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
-          // Don't block login on reCAPTCHA failure — rate limiter is the real protection
+        log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
+        if (process.env.NODE_ENV === 'production') {
+          res.status(403).json({ error: 'Verificação de segurança falhou. Tente novamente.' });
+          return;
         }
       } else if (typeof recaptchaData.score === 'number' && recaptchaData.score < 0.5) {
         log.warn(`[Auth] reCAPTCHA score baixo no login: ${recaptchaData.score}`);
-        // Don't block — rate limiter provides brute force protection
+        if (process.env.NODE_ENV === 'production') {
+          res.status(403).json({ error: 'Atividade suspeita identificada. Tente novamente mais tarde.' });
+          return;
+        }
       }
     }
 
