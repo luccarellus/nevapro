@@ -27,19 +27,10 @@ const L1_CACHE_MAX_ITEMS = isRemoteRedis() ? 20_000 : 2_000;
 const L1_DEFAULT_TTL_MS = isRemoteRedis() ? 60_000 : 5_000; // 60s remoto | 5s local
 const l1Cache = new Map<string, MemoryCacheEntry>();
 
-function getL1<T>(key: string): T | null {
-  const entry = l1Cache.get(key);
-  if (!entry) return null;
-  if (entry.expiresAt < Date.now()) {
-    l1Cache.delete(key);
-    return null;
-  }
-  return entry.data as T;
-}
-
 function setL1(key: string, data: unknown, ttlMs = L1_DEFAULT_TTL_MS): void {
   if (l1Cache.size >= L1_CACHE_MAX_ITEMS) {
-    // Evicção LRU simples: remove 10% dos itens mais antigos
+    // Evicção LRU real: getL1 reposiciona a chave para o fim do Map a cada
+    // acesso, então o início do Map são as chaves menos recentemente usadas.
     const keysToDelete = Array.from(l1Cache.keys()).slice(0, Math.floor(L1_CACHE_MAX_ITEMS * 0.1));
     for (const k of keysToDelete) {
       l1Cache.delete(k);
@@ -49,6 +40,19 @@ function setL1(key: string, data: unknown, ttlMs = L1_DEFAULT_TTL_MS): void {
     data,
     expiresAt: Date.now() + ttlMs,
   });
+}
+
+function getL1<T>(key: string): T | null {
+  const entry = l1Cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    l1Cache.delete(key);
+    return null;
+  }
+  // LRU: re-insere no fim do Map para marcar uso recente.
+  l1Cache.delete(key);
+  l1Cache.set(key, entry);
+  return entry.data as T;
 }
 
 function deleteL1(...keys: string[]): void {
@@ -194,19 +198,35 @@ export const cacheGet = async <T>(key: string): Promise<T | null> => {
 /**
  * TTL estendido no L1 para chaves de sessão/auth (`cache:auth:*`).
  * Sessões válidas têm TTL de 24h no Redis; estender o L1 para 5 min evita
- * pagar 1 RTT remoto (~31ms) por minuto de tráfego do usuário. Invalidação
+ * pagar 1 RTT remoto (~33ms) por minuto de tráfego do usuário. Invalidação
  * de sessão continua funcionando: logout/bump de versão chamam cacheInvalidate,
  * que remove do L1 e do Redis neste processo.
  */
 const AUTH_L1_TTL_MS = 5 * 60_000;
+
+/**
+ * TTL estendido no L1 para dados por usuário que mudam apenas por ação
+ * explícita do próprio usuário (perfil, bootstrap, notificações, caderno de
+ * erros). 60s de retenção local elimina 1 RTT remoto (~33ms) na maioria das
+ * requisições autenticadas; mutações chamam cacheInvalidate, que limpa o L1
+ * imediatamente (e publica no pub/sub para as outras instâncias).
+ */
+const USER_DATA_L1_TTL_MS = 60_000;
 
 export const cacheSet = async (key: string, data: unknown, ttlSeconds?: number): Promise<void> => {
   const ttl = ttlSeconds || CACHE_TTL[key] || 300;
 
   // No modo remoto o L1 retém por mais tempo (capa 60s): cada hit evita um RTT.
   const l1CapMs = isRemoteRedis() ? 60_000 : 15_000;
-  // Sessões de auth retêm 5 min no L1 (seguro: invalidação explícita limpa o L1)
-  const effectiveL1TtlMs = key.startsWith('cache:auth:') ? AUTH_L1_TTL_MS : Math.min(ttl * 1000, l1CapMs);
+  // Sessões de auth retêm 5 min no L1 (seguro: invalidação explícita limpa o L1);
+  // dados por usuário retêm 60s no L1 no modo remoto (idem: mutação invalida).
+  const isAuthKey = key.startsWith('cache:auth:');
+  const isUserDataKey = isRemoteRedis() && key.startsWith('cache:user:');
+  const effectiveL1TtlMs = isAuthKey
+    ? AUTH_L1_TTL_MS
+    : isUserDataKey
+      ? USER_DATA_L1_TTL_MS
+      : Math.min(ttl * 1000, l1CapMs);
 
   // Popula L1 em memória
   setL1(key, data, effectiveL1TtlMs);
@@ -319,6 +339,22 @@ export function startCacheInvalidationSubscriber(): void {
 
   subscriber.on('error', (err: Error) => {
     log.warn('[Cache] Subscriber de invalidação:', err?.message);
+  });
+
+  // Se a conexão do subscriber cair, mensagens publicadas no intervalo são
+  // PERDIDAS (pub/sub Redis não retém). Ao reconectar, o L1 local pode conter
+  // entradas cuja invalidação foi perdida — limpa tudo para garantir coerência.
+  // Custo: alguns cache misses extras (1 RTT remoto cada), sem risco de dado defasado.
+  subscriber.on('reconnecting', () => {
+    l1Cache.clear();
+    log.info('[Cache] Subscriber reconectando: L1 local limpo por segurança');
+  });
+  subscriber.on('connect', () => {
+    // Reassina automaticamente: o ioredis não recupera o modo subscribe sozinho
+    // em todas as falhas; re-subscribir é idempotente.
+    subscriber.subscribe(CACHE_INVALIDATION_CHANNEL).catch((err: unknown) => {
+      log.warn('[Cache] Falha ao reassinar canal de invalidação:', err instanceof Error ? err.message : err);
+    });
   });
 
   subscriber.subscribe(CACHE_INVALIDATION_CHANNEL).catch((err: unknown) => {

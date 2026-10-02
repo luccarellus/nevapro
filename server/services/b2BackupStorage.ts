@@ -4,15 +4,13 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import zlib from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
-import zlib from 'node:zlib';
 import { query } from '../../src/lib/db';
 import { log } from '../utils/logger';
 import { getB2Client, getB2Config } from './b2Client';
-
-const execAsync = promisify(exec);
 
 function getConfig() {
   const config = getB2Config();
@@ -68,11 +66,16 @@ async function generateSqlDump(): Promise<{ sql: string; tableCount: number; met
 
   // 1. Tenta usar o pg_dump nativo se disponível no sistema
   try {
-    const { stdout } = await execAsync(`pg_dump "${dbUrl}" --clean --if-exists --no-owner --no-privileges`, {
-      maxBuffer: 50 * 1024 * 1024, // 50 MB max
-      timeout: 120_000,
-    });
-
+    // execFile (sem shell): a connection string nunca é interpretada por um
+    // shell — elimina injeção de comando via metacaracteres em DATABASE_URL.
+    const { stdout } = await promisify(execFile)(
+      'pg_dump',
+      [dbUrl, '--clean', '--if-exists', '--no-owner', '--no-privileges'],
+      {
+        maxBuffer: 50 * 1024 * 1024, // 50 MB max
+        timeout: 120_000,
+      },
+    ) as unknown as { stdout: string };
     if (stdout && stdout.trim().length > 0) {
       return { sql: stdout, tableCount: -1, method: 'pg_dump' };
     }
@@ -214,6 +217,8 @@ export async function runDatabaseBackup(): Promise<{
       Body: compressedBuffer,
       ContentType: 'application/gzip',
       CacheControl: 'no-store',
+      // Dump contém password_hash e PII: criptografia obrigatória at rest.
+      ServerSideEncryption: 'AES256',
       Metadata: {
         source: 'nevapro',
         type: 'database-backup',
@@ -270,6 +275,7 @@ export async function verifyB2BackupStorage(): Promise<{ bucket: string; testKey
       Body: 'Neva Pro Backblaze Backup Test Probe',
       ContentType: 'text/plain',
       Metadata: { source: 'nevapro', type: 'test-probe' },
+      ServerSideEncryption: 'AES256',
     }),
   );
 

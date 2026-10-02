@@ -46,6 +46,7 @@ import uploadRoutes from './routes/uploads';
 import errorsBookRoutes from './routes/errorsBook';
 import sisuCutoffsRoutes from './routes/sisuCutoffs';
 import { closeCacheInvalidationSubscriber, startCacheInvalidationSubscriber } from './services/cache';
+import { startTokenVersionInvalidationSubscriber } from './middleware/auth';
 
 
 // Validate critical environment variables before starting
@@ -274,6 +275,8 @@ export const startServer = () => {
 
   // Ativa o subscriber pub/sub que propaga invalidações de L1 entre instâncias
   startCacheInvalidationSubscriber();
+  // Propaga bumps de token_version (revogação de sessão) entre instâncias
+  startTokenVersionInvalidationSubscriber();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     log.info(`[Server] Running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);

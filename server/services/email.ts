@@ -194,7 +194,7 @@ export async function sendWelcomeEmail(
                   <strong>E-mail:</strong> ${to}
                 </p>
                 <p style="margin:0;font-size:14px;color:#475569;">
-                  <strong>Senha padrão:</strong> <code style="background:#e2e8f0;padding:2px 8px;border-radius:6px;color:#6C5CE7;font-weight:bold;">nevapro123</code>
+                  <strong>Senha:</strong> Defina sua senha pelo link enviado em um e-mail separado. Se ainda não recebeu, use a opção <em>"Esqueci minha senha"</em> na tela de login.
                 </p>
               </div>
 

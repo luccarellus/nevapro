@@ -23,8 +23,7 @@ router.get('/', requireAuth, resolveTenant, async (req, res: Response) => {
     let builder = dbAdmin
       .from('users')
       .select('name, city, xp, level, avatar_url')
-      .not('role', 'is', null)
-      .neq('role', 'admin')
+      .eq('role', 'student')
       .eq('show_in_leaderboard', true);
 
     if (tenantId) {
@@ -43,7 +42,8 @@ router.get('/', requireAuth, resolveTenant, async (req, res: Response) => {
       avatarUrl: resolveStoredFileUrl((u as any).avatar_url),
     }));
 
-    await cacheSet(cacheKey, filteredLeaderboard);
+    // TTL curto: XP muda a cada resposta; ranking nunca deve ficar stale horas.
+    await cacheSet(cacheKey, filteredLeaderboard, 30);
     res.json(filteredLeaderboard);
   } catch (err) {
     log.error('[Leaderboard] Error:', err);

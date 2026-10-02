@@ -11,8 +11,10 @@
  */
 import * as dotenv from 'dotenv';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import { Pool, PoolClient } from 'pg';
 import Redis from 'ioredis';
+import { resolveRedisConnectionConfig } from '../services/redisConnectionConfig';
 
 // Mesma estratégia do app (server/instrument.ts): .env.local tem prioridade sobre .env.
 // Sem isso, o script pode validar credenciais diferentes das que o app realmente usa.
@@ -112,31 +114,26 @@ async function checkPostgres(label: string, connectionString: string): Promise<b
 
 async function checkRedis(): Promise<boolean> {
   banner('Redis');
-  const url = process.env.REDIS_URL;
-  const host = process.env.REDIS_HOST;
-  if (!url && !host) {
+  const connection = resolveRedisConnectionConfig(process.env);
+  if (!connection) {
     console.log('Aviso: Redis não configurado no .env — o app usará fallback em memória (cache/rate-limit local).');
     return true;
   }
 
-  const password = process.env.REDIS_PASSWORD;
-  const username = process.env.REDIS_USERNAME || 'default';
-  const target = url || `redis://${host}:${process.env.REDIS_PORT || 6379}`;
-  console.log(`Fonte: ${url ? 'REDIS_URL' : 'REDIS_HOST/PORT'} → ${maskUrl(target)}`);
+  const target = connection.url || `redis://${connection.host}:${connection.port}`;
+  console.log(`Fonte: ${connection.url ? 'REDIS_URL' : 'REDIS_HOST/PORT'} → ${maskUrl(target)}`);
 
-  // Mesma ordem de prioridade do app (server/services/redisClient.ts)
-  const client: Redis = url
-    ? new Redis(url, { lazyConnect: true, connectTimeout: 5_000, maxRetriesPerRequest: 0, enableOfflineQueue: false })
-    : new Redis({
-        host,
-        port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
-        password: password || undefined,
-        username,
-        lazyConnect: true,
-        connectTimeout: 5_000,
-        maxRetriesPerRequest: 0,
-        enableOfflineQueue: false,
-      });
+  const redisOptions = {
+    lazyConnect: true,
+    connectTimeout: 5_000,
+    maxRetriesPerRequest: 0,
+    enableOfflineQueue: false,
+    username: connection.username,
+    password: connection.password,
+  };
+  const client: Redis = connection.url
+    ? new Redis(connection.url, redisOptions)
+    : new Redis({ ...redisOptions, host: connection.host, port: connection.port });
   client.on('error', () => {});
 
   try {
@@ -145,6 +142,18 @@ async function checkRedis(): Promise<boolean> {
     const info = await client.info('server');
     const versionLine = info.split('\n').find((l) => l.startsWith('redis_version:'));
     console.log(`OK PING → ${pong} | ${versionLine?.replace('redis_version:', 'versão ') ?? 'versão desconhecida'}`);
+
+    const pingTimes: number[] = [];
+    for (let index = 0; index < 10; index++) {
+      const startedAt = performance.now();
+      await client.ping();
+      pingTimes.push(performance.now() - startedAt);
+    }
+    pingTimes.sort((a, b) => a - b);
+    console.log(
+      `   Latência PING: mediana ${pingTimes[5].toFixed(1)}ms, p95 ${pingTimes[9].toFixed(1)}ms ` +
+      `(${connection.url ? 'REDIS_URL' : 'REDIS_HOST/PORT'})`,
+    );
 
     // Sonda real de escrita/leitura (chave com TTL de 30s: expira sozinha)
     try {
@@ -162,9 +171,8 @@ async function checkRedis(): Promise<boolean> {
     console.error(`FALHOU ${maskUrl(target)}`);
     console.error(`   ${message}`);
     if (/NOAUTH|WRONGPASS|ERR Invalid password|ERR Client sent AUTH/i.test(message)) {
-      if (url && !url.includes('@')) {
-        console.error('   Dica: REDIS_URL não tem credenciais, mas REDIS_PASSWORD está definido.');
-        console.error(`   Use: redis://${username}:${password ? '***' : ''}@host:porta (o app ignora REDIS_PASSWORD quando REDIS_URL existe)`);
+      if (connection.url && !connection.password) {
+        console.error('   Dica: defina REDIS_PASSWORD ou inclua as credenciais em REDIS_URL.');
       }
     }
     return false;

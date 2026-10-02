@@ -211,8 +211,12 @@ export function hasPermission(context: RbacContext, permission: PermissionCode, 
   if (context.isSuperAdmin) return true;
   if (!context.permissions.includes(permission)) return false;
 
-  // Sem tenant ativo definido: papel global aplica-se por padrão.
-  if (!tenantId) return true;
+  // Fail-closed: sem tenant ativo, a permissão só é válida se o usuário
+  // tiver um único tenant padrão inequívoco. Antes, qualquer permissão era
+  // concedida sem contexto de tenant (postura fail-open).
+  if (!tenantId) {
+    return Boolean(context.defaultTenantId) || context.tenants.length === 1;
+  }
 
   // Com tenant ativo: exige vínculo real do usuário com o tenant.
   const belongsToTenant =

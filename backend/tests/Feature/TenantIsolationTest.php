@@ -8,6 +8,7 @@ use App\Models\Material;
 use App\Models\StudentUser;
 use App\Services\ApiCache;
 use App\Services\NotificationService;
+use App\Services\TenantAccess;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -68,6 +69,45 @@ class TenantIsolationTest extends TestCase
 
         self::assertSame($tenantId, $request->attributes->get('tenant_id'));
         self::assertSame(204, $response->getStatusCode());
+    }
+
+    public function test_users_cannot_select_an_inactive_tenant_even_with_membership(): void
+    {
+        $this->seed();
+        $tenantId = $this->createTenant('tenant-inactive');
+        $userId = (string) Str::uuid();
+        $roleId = DB::table('roles')
+            ->where('code', 'teacher')
+            ->whereNull('tenant_id')
+            ->value('id');
+
+        DB::table('user_tenant_roles')->insert([
+            'user_id' => $userId,
+            'tenant_id' => $tenantId,
+            'role_id' => $roleId,
+        ]);
+        DB::table('tenants')->where('id', $tenantId)->update(['active' => false]);
+
+        $user = new StudentUser;
+        $user->id = $userId;
+        $user->tenant_id = '00000000-0000-0000-0000-000000000001';
+        $request = Request::create('/api/materials', 'GET', [], [], [], [
+            'HTTP_X_TENANT_ID' => $tenantId,
+        ]);
+        $request->attributes->set('auth_user', $user);
+        $request->attributes->set('auth_type', 'student');
+
+        $response = (new ResolveTenant)->handle($request, fn () => response()->noContent());
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    public function test_legacy_admin_role_is_not_a_global_super_admin_role(): void
+    {
+        $admin = new \App\Models\AdminUser;
+        $admin->role = 'admin';
+
+        self::assertFalse(TenantAccess::isSuperAdmin($admin, 'admin'));
     }
 
     public function test_material_updates_and_deletes_are_scoped_to_the_active_tenant(): void

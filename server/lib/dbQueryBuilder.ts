@@ -34,6 +34,7 @@ class PostgresQueryBuilder {
   private insertData: any = null;
   private updateData: any = null;
   private limitVal: number | null = null;
+  private offsetVal: number | null = null;
   private orderCol: string | null = null;
   private orderAsc: boolean = true;
   private orConditions: { col: string; val: any }[] = [];
@@ -55,7 +56,16 @@ class PostgresQueryBuilder {
 
   insert(data: any) {
     this.action = 'insert';
-    this.insertData = Array.isArray(data) ? data[0] : data;
+    // Bulk insert era truncado silenciosamente (só a 1ª linha persistia).
+    // Agora falha alto — o chamador corrige ou usa múltiplos inserts.
+    if (Array.isArray(data)) {
+      if (data.length > 1) {
+        throw new Error('Bulk insert não suportado pelo query builder: passe um único objeto ou insira linha a linha.');
+      }
+      this.insertData = data[0] ?? null;
+    } else {
+      this.insertData = data;
+    }
     return this;
   }
 
@@ -88,7 +98,9 @@ class PostgresQueryBuilder {
   }
 
   range(start: number, end: number) {
-    this.limitVal = end - start + 1;
+    // Paginação estilo Supabase: start..end inclusive, com OFFSET real.
+    this.limitVal = Math.max(end - start + 1, 0);
+    this.offsetVal = Math.max(start, 0);
     return this;
   }
 
@@ -130,6 +142,10 @@ class PostgresQueryBuilder {
         } else if (op === 'eq') {
           this.orConditions.push({ col, val });
         }
+      } else {
+        // Fail-closed: condição malformada era descartada em silêncio — se ela
+        // carregava um filtro de segurança (ex.: tenant_id.eq.x), ele sumia.
+        throw new Error(`Condição .or() malformada (filtro não aplicado): "${part.trim()}"`);
       }
     }
     return this;
@@ -193,7 +209,10 @@ class PostgresQueryBuilder {
         sql += ` ORDER BY ${safeOrderCol} ${this.orderAsc ? 'ASC' : 'DESC'}`;
       }
       if (this.limitVal) {
-        sql += ` LIMIT ${this.limitVal}`;
+        sql += ` LIMIT ${Math.floor(this.limitVal)}`;
+      }
+      if (this.offsetVal) {
+        sql += ` OFFSET ${Math.floor(this.offsetVal)}`;
       }
     } else if (this.action === 'insert') {
       const keys = Object.keys(this.insertData);
@@ -203,37 +222,41 @@ class PostgresQueryBuilder {
       sql = `INSERT INTO ${safeTable} (${safeKeys.join(', ')}) VALUES (${placeholders}) RETURNING ${safeSelectCols}`;
       params.push(...vals);
     } else if (this.action === 'update') {
+      // Fail-closed: UPDATE sem WHERE afetaria a tabela inteira.
+      if (this.whereCols.length === 0) {
+        return { data: null, error: new Error('UPDATE sem filtro (WHERE) bloqueado: escopo obrigatório.') };
+      }
       const keys = Object.keys(this.updateData);
       const vals = Object.values(this.updateData);
       const safeKeys = keys.map(k => sanitizeIdentifier(k));
       const setClause = safeKeys.map((k, i) => `${k} = $${i+1}`).join(', ');
       sql = `UPDATE ${safeTable} SET ${setClause}`;
       params.push(...vals);
-      
-      if (this.whereCols.length > 0) {
-        const offset = keys.length;
-        const whereClause = this.whereCols.map((c, i) => {
-           const cleanCol = c.replace('__gte', '').replace('__lte', '');
-           const safeCol = sanitizeIdentifier(cleanCol);
-           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
-           return `${safeCol} ${op} $${offset + i + 1}`;
-        }).join(' AND ');
-        sql += ` WHERE ${whereClause}`;
-        params.push(...this.whereVals);
-      }
+
+      const offset = keys.length;
+      const whereClause = this.whereCols.map((c, i) => {
+         const cleanCol = c.replace('__gte', '').replace('__lte', '');
+         const safeCol = sanitizeIdentifier(cleanCol);
+         const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+         return `${safeCol} ${op} $${offset + i + 1}`;
+      }).join(' AND ');
+      sql += ` WHERE ${whereClause}`;
+      params.push(...this.whereVals);
       sql += ` RETURNING ${safeSelectCols}`;
     } else if (this.action === 'delete') {
-      sql = `DELETE FROM ${safeTable}`;
-      if (this.whereCols.length > 0) {
-        const whereClause = this.whereCols.map((c, i) => {
-           const cleanCol = c.replace('__gte', '').replace('__lte', '');
-           const safeCol = sanitizeIdentifier(cleanCol);
-           const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
-           return `${safeCol} ${op} $${i+1}`;
-        }).join(' AND ');
-        sql += ` WHERE ${whereClause}`;
-        params.push(...this.whereVals);
+      // Fail-closed: DELETE sem WHERE destruiria a tabela inteira.
+      if (this.whereCols.length === 0) {
+        return { data: null, error: new Error('DELETE sem filtro (WHERE) bloqueado: escopo obrigatório.') };
       }
+      sql = `DELETE FROM ${safeTable}`;
+      const whereClause = this.whereCols.map((c, i) => {
+         const cleanCol = c.replace('__gte', '').replace('__lte', '');
+         const safeCol = sanitizeIdentifier(cleanCol);
+         const op = c.endsWith('__gte') ? '>=' : (c.endsWith('__lte') ? '<=' : '=');
+         return `${safeCol} ${op} $${i+1}`;
+      }).join(' AND ');
+      sql += ` WHERE ${whereClause}`;
+      params.push(...this.whereVals);
     }
 
     try {

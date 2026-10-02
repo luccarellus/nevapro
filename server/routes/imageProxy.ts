@@ -27,24 +27,25 @@ const isAllowedImageHost = (hostname: string): boolean => {
   return extraHosts.includes(h);
 };
 
-const fetchImageWithRedirects = async (rawUrl: string) => {
+const fetchImageWithRedirects = async (rawUrl: string, signal: AbortSignal) => {
   let currentUrl = rawUrl.trim();
   for (let hop = 0; hop <= IMAGE_PROXY_MAX_REDIRECTS; hop++) {
     const parsed = new URL(currentUrl);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      throw new Error('protocolo nao permitido');
-    }
-    if (!isAllowedImageHost(parsed.hostname)) {
+    if ((parsed.protocol !== 'https:' && parsed.protocol !== 'http:') ||
+        !isAllowedImageHost(parsed.hostname) ||
+        (parsed.port !== '' && parsed.port !== '80' && parsed.port !== '443') ||
+        parsed.username !== '' || parsed.password !== '') {
       throw new Error('Acesso negado: dominio nao permitido.');
     }
     const response = await fetch(parsed.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NevaApp/1.0)', Referer: 'https://enem.dev/' },
       redirect: 'manual',
-      signal: AbortSignal.timeout(IMAGE_PROXY_TIMEOUT_MS),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(IMAGE_PROXY_TIMEOUT_MS)]),
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (!location) throw new Error('redirect sem location');
+      await response.body?.cancel();
       // Header pode conter espacos e URLs relativas — resolve antes da proxima iteracao
       currentUrl = new URL(location.trim(), parsed).toString();
       continue;
@@ -61,30 +62,51 @@ router.get('/', rateLimiter(120, 60_000), async (req, res: Response) => {
     return;
   }
   try {
-    const response = await fetchImageWithRedirects(imageUrl);
+    const controller = new AbortController();
+    const response = await fetchImageWithRedirects(imageUrl, controller.signal);
     if (!response.ok) {
+      await response.body?.cancel();
       res.status(response.status).send('Fetch error');
       return;
     }
     // Só serve conteúdo de imagem de verdade
     const contentType = response.headers.get('content-type') || '';
-    if (!contentType.startsWith('image/')) {
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      await response.body?.cancel();
       res.status(415).send('Unsupported media type');
       return;
     }
-    // Cap de tamanho: rejeita cedo via Content-Length e valida de novo no buffer
-    const declaredLength = Number(response.headers.get('content-length') || 0);
-    if (declaredLength > IMAGE_PROXY_MAX_BYTES) {
+    const declaredLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > IMAGE_PROXY_MAX_BYTES) {
+      controller.abort();
+      await response.body?.cancel();
       res.status(413).send('Image too large');
       return;
     }
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > IMAGE_PROXY_MAX_BYTES) {
-      res.status(413).send('Image too large');
+    if (!response.body) {
+      res.status(502).send('Empty image response');
       return;
     }
-    res.setHeader('Content-Type', contentType || 'image/jpeg');
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > IMAGE_PROXY_MAX_BYTES) {
+        controller.abort();
+        await reader.cancel();
+        res.status(413).send('Image too large');
+        return;
+      }
+      chunks.push(Buffer.from(value));
+    }
+    const buffer = Buffer.concat(chunks, received);
+    res.setHeader('Content-Length', String(received));
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.send(buffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : '';

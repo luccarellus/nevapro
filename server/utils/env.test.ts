@@ -19,6 +19,8 @@ import { log } from './logger';
 const resetEnv = () => {
   process.env.DATABASE_URL = 'postgresql://user:pass@localhost:5432/test';
   process.env.JWT_SECRET = 'seguro_seguro_seguro_seguro_32chars!';
+  delete process.env.REDIS_URL;
+  delete process.env.REDIS_HOST;
 };
 
 beforeEach(() => {
@@ -56,8 +58,16 @@ describe('validateEnv', () => {
 
   it('avisa sobre serviços opcionais não configurados (não lança)', () => {
     delete process.env.REDIS_URL;
+    delete process.env.REDIS_HOST;
     delete process.env.SENTRY_DSN;
     validateEnv();
     expect(log.warn).toHaveBeenCalled();
+  });
+
+  it('accepts REDIS_HOST as an alternative Redis configuration', () => {
+    delete process.env.REDIS_URL;
+    process.env.REDIS_HOST = 'redis';
+    validateEnv();
+    expect(log.warn).not.toHaveBeenCalledWith(expect.stringContaining('Redis caching'));
   });
 });

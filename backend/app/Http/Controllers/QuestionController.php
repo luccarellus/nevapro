@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Questões — espelha routes/questions.ts da API Express:
@@ -18,6 +19,10 @@ use Illuminate\Support\Str;
 class QuestionController extends Controller
 {
     private const PAGE_SIZE = 50;
+
+    private const ENEM_MAX_LIMIT = 200;
+
+    private const ENEM_MAX_OFFSET = 100000;
 
     public function __construct(private readonly ApiCache $cache) {}
 
@@ -49,8 +54,6 @@ class QuestionController extends Controller
                 'subject' => $q->subject,
                 'text' => $q->text,
                 'imageUrl' => $q->image_url,
-                'correctOptionIndex' => $q->correct_option_index,
-                'explanation' => $q->explanation,
                 'difficulty' => $q->difficulty,
                 'xpReward' => $q->xp_reward,
                 'year' => $q->year,
@@ -66,16 +69,17 @@ class QuestionController extends Controller
     public function enem(Request $request): JsonResponse
     {
         $year = filter_var($request->query('year'), FILTER_VALIDATE_INT);
-        if ($year === false || $year < 1) {
+        if ($year === false || $year < 2009 || $year > 2100) {
             return response()->json(['error' => 'Year parameter is required'], 400);
         }
 
         $limit = filter_var($request->query('limit', 50), FILTER_VALIDATE_INT);
         $offset = filter_var($request->query('offset', 0), FILTER_VALIDATE_INT);
-        if ($limit === false || $limit < 1 || $offset === false || $offset < 0) {
+        if ($limit === false || $limit < 1 || $limit > self::ENEM_MAX_LIMIT
+            || $offset === false || $offset < 0 || $offset > self::ENEM_MAX_OFFSET) {
             return response()->json(['error' => 'Parâmetros limit ou offset inválidos.'], 400);
         }
-        $cacheKey = "questions:{$year}:{$limit}:{$offset}";
+        $cacheKey = "questions:v2:{$year}:{$limit}:{$offset}";
         $payload = $this->cache->remember($cacheKey, 600, function () use ($year, $limit, $offset) {
             $response = Http::timeout(15)->get(
                 "https://api.enem.dev/v1/exams/{$year}/questions",
@@ -99,7 +103,22 @@ class QuestionController extends Controller
             return response()->json($payload, $status);
         }
 
-        return response()->json($payload);
+        $questions = $payload['questions'] ?? null;
+        if (! is_array($questions) || ! array_is_list($questions)) {
+            return response()->json(['error' => 'Resposta inválida da API ENEM.'], 502);
+        }
+
+        try {
+            $this->persistExternalQuestions($questions, 'enem', $year);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json(['error' => 'Não foi possível validar o gabarito das questões ENEM.'], 502);
+        }
+
+        return response()->json([
+            'questions' => array_map(fn (array $question) => $this->hideAnswerKey($question), $questions),
+        ]);
     }
 
     public function enemHubSubjects(): JsonResponse
@@ -144,9 +163,13 @@ class QuestionController extends Controller
             return response()->json(['error' => 'EnemHub não configurada (ENEMHUB_API_KEY ausente).'], 503);
         }
 
-        $limit = min(max((int) $request->query('limit', 50), 1), 200);
-        $page = max((int) $request->query('page', 1), 1);
-        $cacheKey = "enemhub:questions:{$year}:{$limit}:{$page}";
+        $limit = filter_var($request->query('limit', 50), FILTER_VALIDATE_INT);
+        $page = filter_var($request->query('page', 1), FILTER_VALIDATE_INT);
+        if ($limit === false || $limit < 1 || $limit > self::ENEM_MAX_LIMIT
+            || $page === false || $page < 1 || $page > intdiv(self::ENEM_MAX_OFFSET, self::ENEM_MAX_LIMIT)) {
+            return response()->json(['error' => 'Parâmetros limit ou page inválidos.'], 400);
+        }
+        $cacheKey = "enemhub:questions:v2:{$year}:{$limit}:{$page}";
         $payload = $this->cache->remember($cacheKey, 600, function () use ($key, $year, $limit, $page) {
             $url = 'https://api.enemhub.com.br/v1/enem/questions';
             $response = Http::withHeaders(['X-API-Key' => $key])
@@ -178,7 +201,23 @@ class QuestionController extends Controller
             return response()->json($payload, $status);
         }
 
-        return response()->json($payload);
+        $questions = $payload['questions'] ?? null;
+        if (! is_array($questions) || ! array_is_list($questions)) {
+            return response()->json(['error' => 'Resposta inválida da EnemHub.'], 502);
+        }
+
+        try {
+            $this->persistExternalQuestions($questions, 'enemhub', $year);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json(['error' => 'Não foi possível validar o gabarito da EnemHub.'], 502);
+        }
+
+        return response()->json([
+            'questions' => array_map(fn (array $question) => $this->hideAnswerKey($question), $questions),
+            'meta' => $payload['meta'] ?? null,
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -251,5 +290,141 @@ class QuestionController extends Controller
         $html = preg_replace('/javascript\s*:/i', '', $html) ?? '';
 
         return trim($html);
+    }
+
+    /**
+     * Persists the provider's answer key before removing it from client output.
+     * IDs intentionally match the React ENEM and EnemHub question IDs.
+     */
+    private function persistExternalQuestions(array $questions, string $source, int $year): void
+    {
+        DB::transaction(function () use ($questions, $source, $year): void {
+            foreach ($questions as $raw) {
+                if (! is_array($raw)) {
+                    throw new RuntimeException('External question payload must be an object.');
+                }
+
+                $alternatives = $raw['alternatives'] ?? null;
+                if (! is_array($alternatives) || count($alternatives) < 2 || count($alternatives) > 10) {
+                    throw new RuntimeException('External question has an invalid alternatives list.');
+                }
+
+                $questionIndex = null;
+                if ($source === 'enem') {
+                    $discipline = is_string($raw['discipline'] ?? null) ? $raw['discipline'] : 'geral';
+                    $index = filter_var($raw['index'] ?? null, FILTER_VALIDATE_INT);
+                    if ($index === false || $index < 0) {
+                        throw new RuntimeException('External ENEM question has an invalid index.');
+                    }
+                    $questionIndex = $index;
+                    $normalizedDiscipline = strtolower(Str::ascii($discipline));
+                    $id = "{$year}-{$index}-{$normalizedDiscipline}";
+                    $subject = $discipline;
+                    $context = is_string($raw['context'] ?? null) ? $raw['context'] : '';
+                    $introduction = is_string($raw['alternativesIntroduction'] ?? null)
+                        ? $raw['alternativesIntroduction'] : '';
+                    $text = trim($context."\n\n".$introduction);
+                    $files = is_array($raw['files'] ?? null) ? $raw['files'] : [];
+                    $imageUrl = is_string($files[0] ?? null) ? $files[0] : null;
+                    $difficulty = 'médio';
+                    $xpReward = 15;
+                } else {
+                    $externalId = $raw['externalId'] ?? null;
+                    $providerId = $raw['id'] ?? null;
+                    $suffix = is_string($externalId) && $externalId !== ''
+                        ? $externalId
+                        : (is_string($providerId) ? substr($providerId, 0, 8) : '');
+                    $subjectName = $raw['subject']['name'] ?? null;
+                    $subject = is_string($subjectName) ? $subjectName : 'Geral';
+                    $id = "ehub-{$year}-{$suffix}";
+                    $text = is_string($raw['statement'] ?? null) ? $raw['statement'] : '';
+                    $imageUrl = null;
+                    $difficulty = in_array($raw['difficulty'] ?? null, ['fácil', 'médio', 'difícil'], true)
+                        ? $raw['difficulty'] : 'médio';
+                    $xpReward = 15;
+                }
+
+                if ($id === '' || strlen($id) > 64 || ! is_string($text) || trim($text) === '') {
+                    throw new RuntimeException('External question has invalid identifying or text fields.');
+                }
+
+                $correctIndex = null;
+                foreach (array_values($alternatives) as $index => $alternative) {
+                    if (! is_array($alternative)) {
+                        continue;
+                    }
+                    $isCorrect = $source === 'enem'
+                        ? (($alternative['isCorrect'] ?? false) === true
+                            || (($alternative['letter'] ?? null) === ($raw['correctAlternative'] ?? null)))
+                        : (($alternative['isCorrect'] ?? false) === true
+                            || (($alternative['letter'] ?? null) === ($raw['correctAlternative'] ?? null)));
+                    if ($isCorrect) {
+                        if ($correctIndex !== null) {
+                            throw new RuntimeException('External question has multiple correct alternatives.');
+                        }
+                        $correctIndex = $index;
+                    }
+                }
+                if ($correctIndex === null) {
+                    throw new RuntimeException('External question has no verifiable correct alternative.');
+                }
+
+                $inserted = DB::table('questions')->insertOrIgnore([
+                    'id' => $id,
+                    'subject' => mb_substr(strip_tags((string) $subject), 0, 255),
+                    'text' => $text,
+                    'image_url' => $imageUrl,
+                    'correct_option_index' => $correctIndex,
+                    'explanation' => is_string($raw['explanation'] ?? null) ? $raw['explanation'] : '',
+                    'difficulty' => $difficulty,
+                    'xp_reward' => $xpReward,
+                    'year' => $year,
+                    'index' => $questionIndex,
+                    'tenant_id' => null,
+                    'created_at' => now(),
+                ]);
+                if ($inserted === 0) {
+                    continue;
+                }
+
+                foreach (array_values($alternatives) as $optionIndex => $alternative) {
+                    if (! is_array($alternative) || ! is_string($alternative['text'] ?? null)) {
+                        throw new RuntimeException('External question has an invalid alternative.');
+                    }
+                    $optionImage = $source === 'enem'
+                        ? ($alternative['file'] ?? null)
+                        : ($alternative['image'] ?? null);
+                    DB::table('question_options')->insert([
+                        'id' => (string) Str::uuid(),
+                        'question_id' => $id,
+                        'text' => $alternative['text'],
+                        'image_url' => is_string($optionImage) ? $optionImage : null,
+                        'letter' => chr(65 + $optionIndex),
+                        'is_correct' => $optionIndex === $correctIndex,
+                    ]);
+                }
+            }
+        });
+    }
+
+    private function hideAnswerKey(array $question): array
+    {
+        foreach (['correctAlternative', 'correctOptionIndex', 'correct_option_index', 'answer', 'gabarito', 'explanation'] as $key) {
+            unset($question[$key]);
+        }
+        if (is_array($question['alternatives'] ?? null)) {
+            $question['alternatives'] = array_map(function ($alternative) {
+                if (! is_array($alternative)) {
+                    return $alternative;
+                }
+                foreach (['isCorrect', 'is_correct', 'correct'] as $key) {
+                    unset($alternative[$key]);
+                }
+
+                return $alternative;
+            }, $question['alternatives']);
+        }
+
+        return $question;
     }
 }

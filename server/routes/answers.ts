@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { getClient, query } from '../../src/lib/db';
+import { getClient } from '../../src/lib/db';
 import { requireAuth } from '../middleware/auth';
 import { resolveTenant } from '../middleware/tenant';
 import { requirePermission } from '../middleware/rbac';
@@ -8,116 +8,102 @@ import { AuthenticatedRequest } from '../types';
 import { log } from '../utils/logger';
 import { invalidateUserCache } from '../services/userCache';
 import { PERMISSIONS } from '../lib/permissions';
-import { sanitizeRichText, sanitizePlainText } from '../utils/sanitizeHtml';
 
 const MAX_OPTIONS = 10;
-
-/** Normaliza uma string de imagem para URL absoluta válida ou null. */
-function normalizeImageUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.length > 2048) return null;
-  return trimmed;
-}
-
-/**
- * Sanitiza o questionData enviado pelo cliente antes de persistir.
- *
- * O cliente controla esse payload e ele é renderizado com react-markdown +
- * rehype-raw (sem sanitização) — sem esta camada, qualquer usuário autenticado
- * consegue persistir HTML/JS malicioso executado no navegador de outros alunos.
- */
-function sanitizeQuestionData(raw: Record<string, any> | undefined): Record<string, any> | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-
-  const text = sanitizeRichText(raw.text);
-  if (!text) return null; // sem enunciado válido, não persistimos a questão
-
-  const correctIndexRaw = raw.correctOptionIndex;
-  const correctOptionIndex =
-    typeof correctIndexRaw === 'number' && Number.isInteger(correctIndexRaw) && correctIndexRaw >= 0
-      ? Math.min(correctIndexRaw, MAX_OPTIONS - 1)
-      : null;
-
-  const options = Array.isArray(raw.options)
-    ? raw.options.slice(0, MAX_OPTIONS).map((opt: unknown) => sanitizeRichText(opt, 2_000))
-    : [];
-
-  const optionImages = Array.isArray(raw.optionImages)
-    ? raw.optionImages.slice(0, MAX_OPTIONS).map(normalizeImageUrl)
-    : [];
-
-  return {
-    subject: sanitizePlainText(raw.subject, 120) || 'Geral',
-    text,
-    imageUrl: normalizeImageUrl(raw.imageUrl),
-    correctOptionIndex,
-    explanation: sanitizeRichText(raw.explanation, 10_000),
-    difficulty: ['fácil', 'médio', 'difícil'].includes(String(raw.difficulty || '').toLowerCase())
-      ? String(raw.difficulty).toLowerCase()
-      : 'médio',
-    xpReward: typeof raw.xpReward === 'number' && raw.xpReward >= 0 && raw.xpReward <= 1000 ? Math.round(raw.xpReward) : 50,
-    year:
-      typeof raw.year === 'number' && raw.year >= 1990 && raw.year <= 2100
-        ? Math.round(raw.year)
-        : new Date().getFullYear(),
-    index: typeof raw.index === 'number' && Number.isInteger(raw.index) && raw.index >= 0 ? Math.min(raw.index, 1_000_000) : 0,
-    options,
-    optionImages,
-  };
-}
 
 type AnswerInput = {
   userId: string;
   questionId: string;
-  selectedOption: number | null;
-  isCorrect: boolean;
-  questionData?: Record<string, any>;
+  selectedOption: number;
 };
+
+function isAnswerInput(value: unknown): value is AnswerInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const answer = value as Record<string, unknown>;
+  return typeof answer.userId === 'string' &&
+    typeof answer.questionId === 'string' &&
+    answer.questionId.trim().length > 0 &&
+    answer.questionId.length <= 64 &&
+    normalizeSelectedOption(answer.selectedOption) !== null;
+}
+
+/** Valida selectedOption como índice inteiro dentro dos limites. */
+function normalizeSelectedOption(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= MAX_OPTIONS) {
+    return null;
+  }
+  return value;
+}
 
 const router = Router();
 
 router.post('/', rateLimiter(30, 60_000), requireAuth, resolveTenant, requirePermission(PERMISSIONS.QUESTIONS_ANSWER), async (req: AuthenticatedRequest, res: Response) => {
-  const { userId, questionId, isCorrect, selectedOption, questionData } = req.body;
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'Corpo da requisição inválido.' });
+    return;
+  }
+  const { userId, selectedOption } = req.body;
+  const questionId = typeof req.body.questionId === 'string' ? req.body.questionId.trim() : '';
+  if (!questionId || questionId.length > 64) {
+    res.status(400).json({ error: 'questionId inválido.' });
+    return;
+  }
+  if (typeof userId !== 'string') {
+    res.status(400).json({ error: 'userId inválido.' });
+    return;
+  }
   // Política: respostas registradas apenas para a própria conta.
   if (req.user?.userId !== userId) {
     res.status(403).json({ error: 'Acesso negado.' });
     return;
   }
+  const safeSelected = normalizeSelectedOption(selectedOption);
+  if (safeSelected === null) {
+    res.status(400).json({ error: 'selectedOption inválido.' });
+    return;
+  }
+  let gradedAnswer: { is_correct: boolean; correct_option_index: number | null; explanation: string | null } | null = null;
   try {
     const tenantId = req.tenantId || null;
-    const safeQuestion = sanitizeQuestionData(questionData);
-    const insertOptionPromises: Promise<unknown>[] = [];
-    const qCheck = await query('SELECT 1 FROM public.questions WHERE id = $1 LIMIT 1', [questionId]);
-    if (qCheck.rows.length === 0 && safeQuestion) {
-      await query(
-        `INSERT INTO public.questions (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         ON CONFLICT (id) DO NOTHING`,
-        [questionId, safeQuestion.subject, safeQuestion.text, safeQuestion.imageUrl,
-         safeQuestion.correctOptionIndex, safeQuestion.explanation, safeQuestion.difficulty,
-         safeQuestion.xpReward, safeQuestion.year, safeQuestion.index],
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+      const graded = await client.query(
+        `SELECT qo.is_correct, q.correct_option_index, q.explanation
+         FROM public.questions q
+         LEFT JOIN public.question_options qo
+           ON qo.question_id = q.id AND qo.letter = $2
+         WHERE q.id = $1
+         LIMIT 1`,
+        [questionId, String.fromCharCode(65 + safeSelected)],
       );
-      safeQuestion.options.forEach((opt: string, idx: number) => {
-        insertOptionPromises.push(
-          query(
-            `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
-             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
-            [questionId, opt, safeQuestion.optionImages[idx] || null, String.fromCharCode(65 + idx), idx === safeQuestion.correctOptionIndex],
-          ),
-        );
-      });
-      if (insertOptionPromises.length > 0) {
-        await Promise.all(insertOptionPromises);
+      if (graded.rows.length === 0 || graded.rows[0].is_correct === null) {
+        await client.query('ROLLBACK');
+        res.status(422).json({ error: 'Questão indisponível para correção.' });
+        return;
       }
+      gradedAnswer = graded.rows[0];
+      const isCorrect = Boolean(graded.rows[0].is_correct);
+      await client.query(
+        `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, tenant_id, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())`,
+        [userId, questionId, safeSelected, isCorrect, tenantId],
+      );
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw txErr;
+    } finally {
+      client.release();
     }
-    await query(
-      `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, tenant_id, created_at)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())`,
-      [userId, questionId, selectedOption !== undefined ? selectedOption : null, isCorrect, tenantId],
-    );
     await invalidateUserCache(req.user?.email || '', userId);
-    res.json({ success: true });
+    if (!gradedAnswer) throw new Error('Missing grading result after answer transaction.');
+    res.json({
+      success: true,
+      isCorrect: gradedAnswer.is_correct,
+      correctOptionIndex: gradedAnswer.correct_option_index,
+      explanation: gradedAnswer.explanation,
+    });
   } catch (err) {
     log.error('[POST /api/answers] Error:', err);
     res.status(500).json({ error: 'Erro ao registrar resposta.' });
@@ -125,13 +111,18 @@ router.post('/', rateLimiter(30, 60_000), requireAuth, resolveTenant, requirePer
 });
 
 router.post('/batch', rateLimiter(10, 60_000), requireAuth, resolveTenant, requirePermission(PERMISSIONS.QUESTIONS_ANSWER), async (req: AuthenticatedRequest, res: Response) => {
-  const answers = req.body?.answers as AnswerInput[];
-  if (!Array.isArray(answers) || answers.length === 0 || answers.length > 200) {
+  const rawAnswers: unknown = req.body?.answers;
+  if (!Array.isArray(rawAnswers) || rawAnswers.length === 0 || rawAnswers.length > 200) {
     res.status(400).json({ error: 'Envie entre 1 e 200 respostas.' });
     return;
   }
+  if (rawAnswers.some((answer) => !isAnswerInput(answer))) {
+    res.status(400).json({ error: 'Lote de respostas inválido.' });
+    return;
+  }
+  const answers = rawAnswers as AnswerInput[];
   const userId = answers[0]?.userId;
-  if (!userId || answers.some((answer) => answer.userId !== userId || !answer.questionId)) {
+  if (!userId || answers.some((answer) => answer.userId !== userId)) {
     res.status(400).json({ error: 'Lote de respostas inválido.' });
     return;
   }
@@ -141,71 +132,60 @@ router.post('/batch', rateLimiter(10, 60_000), requireAuth, resolveTenant, requi
     return;
   }
 
-  type SafeEntry = { answer: AnswerInput; safe: NonNullable<ReturnType<typeof sanitizeQuestionData>> };
-  const questions = answers
-    .map((answer) => ({ answer, safe: sanitizeQuestionData(answer.questionData) }))
-    .filter((entry): entry is SafeEntry => entry.safe !== null)
-    .map(({ answer, safe }) => ({
-      id: answer.questionId,
-      subject: safe.subject,
-      text: safe.text,
-      image_url: safe.imageUrl,
-      correct_option_index: safe.correctOptionIndex,
-      explanation: safe.explanation,
-      difficulty: safe.difficulty,
-      xp_reward: safe.xpReward,
-      year: safe.year,
-      question_index: safe.index,
-    }));
-  const options = answers
-    .map((answer) => ({ answer, safe: sanitizeQuestionData(answer.questionData) }))
-    .filter((entry): entry is SafeEntry => entry.safe !== null)
-    .flatMap(({ answer, safe }) =>
-      safe.options.map((text: string, index: number) => ({
-        question_id: answer.questionId,
-        text,
-        image_url: safe.optionImages[index] || null,
-        letter: String.fromCharCode(65 + index),
-        is_correct: index === safe.correctOptionIndex,
-      })),
-    );
-  const answerRows = answers.map((answer) => ({
-    user_id: answer.userId,
-    question_id: answer.questionId,
-    selected_option_index: answer.selectedOption ?? null,
-    is_correct: Boolean(answer.isCorrect),
-    tenant_id: req.tenantId || null,
-  }));
-
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    if (questions.length > 0) {
-      await client.query(
-        `INSERT INTO public.questions
-          (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index)
-         SELECT id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, question_index
-         FROM jsonb_to_recordset($1::jsonb) AS q(
-           id varchar, subject varchar, text text, image_url text, correct_option_index integer,
-           explanation text, difficulty varchar, xp_reward integer, year integer, question_index integer
-         ) ON CONFLICT (id) DO NOTHING`,
-        [JSON.stringify(questions)],
-      );
+    const questionIds = [...new Set(answers.map((answer) => answer.questionId))];
+    const known = await client.query(
+      'SELECT id, correct_option_index, explanation FROM public.questions WHERE id = ANY($1::varchar[])',
+      [questionIds],
+    );
+    if (known.rows.length !== questionIds.length) {
+      await client.query('ROLLBACK');
+      res.status(422).json({ error: 'Uma ou mais questões estão indisponíveis para correção.' });
+      return;
     }
-    if (options.length > 0) {
-      await client.query(
-        `INSERT INTO public.question_options (id, question_id, text, image_url, letter, is_correct)
-         SELECT gen_random_uuid(), o.question_id, o.text, o.image_url, o.letter, o.is_correct
-         FROM jsonb_to_recordset($1::jsonb) AS o(
-           question_id varchar, text text, image_url text, letter varchar, is_correct boolean
-         )
-         WHERE NOT EXISTS (
-           SELECT 1 FROM public.question_options existing
-           WHERE existing.question_id = o.question_id AND existing.letter = o.letter
-         )`,
-        [JSON.stringify(options)],
-      );
+    const correctIndexes = new Map<string, number | null>(
+      known.rows.map((row) => [row.id, row.correct_option_index]),
+    );
+
+    const optionRows = await client.query(
+      `SELECT question_id, letter, is_correct
+       FROM public.question_options
+       WHERE question_id = ANY($1::varchar[])`,
+      [questionIds],
+    );
+    const correctness = new Map<string, Map<string, boolean>>();
+    for (const row of optionRows.rows) {
+      if (!correctness.has(row.question_id)) correctness.set(row.question_id, new Map());
+      correctness.get(row.question_id)!.set(row.letter, Boolean(row.is_correct));
     }
+    const hasUnknownOption = answers.some((answer) => {
+      const letter = String.fromCharCode(65 + answer.selectedOption);
+      return !correctness.get(answer.questionId)?.has(letter);
+    });
+    if (hasUnknownOption) {
+      await client.query('ROLLBACK');
+      res.status(422).json({ error: 'Uma ou mais alternativas não existem para as questões informadas.' });
+      return;
+    }
+    const answerRows = answers.map((answer) => {
+      const letter = String.fromCharCode(65 + answer.selectedOption);
+      return {
+        user_id: answer.userId,
+        question_id: answer.questionId,
+        selected_option_index: answer.selectedOption,
+        is_correct: correctness.get(answer.questionId)?.get(letter) === true,
+        tenant_id: req.tenantId || null,
+      };
+    });
+    const results = answerRows.map((answer) => ({
+      questionId: answer.question_id,
+      selectedOption: answer.selected_option_index,
+      isCorrect: answer.is_correct,
+      correctOptionIndex: correctIndexes.get(answer.question_id) ?? null,
+      explanation: known.rows.find((question) => question.id === answer.question_id)?.explanation ?? null,
+    }));
     await client.query(
       `INSERT INTO public.answers (id, user_id, question_id, selected_option_index, is_correct, tenant_id, created_at)
        SELECT gen_random_uuid(), user_id, question_id, selected_option_index, is_correct, tenant_id, NOW()
@@ -216,7 +196,7 @@ router.post('/batch', rateLimiter(10, 60_000), requireAuth, resolveTenant, requi
     );
     await client.query('COMMIT');
     await invalidateUserCache(req.user?.email || '', userId);
-    res.json({ success: true, count: answers.length });
+    res.json({ success: true, count: answers.length, results });
   } catch (error) {
     await client.query('ROLLBACK');
     log.error('[POST /api/answers/batch] Error:', error);

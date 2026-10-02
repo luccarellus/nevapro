@@ -122,7 +122,14 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes('abort') || errorMessage.includes('Timeout')) {
-        log.warn('[reCAPTCHA] Timeout na verificação — permitindo requisição para não bloquear usuário');
+        // Fail-closed em produção: timeout da API do Google não pode abrir
+        // janela de bypass da anti-automation (era fail-open antes).
+        if (process.env.NODE_ENV === 'production') {
+          log.warn('[reCAPTCHA] Timeout na verificação — bloqueando requisição (fail-closed em produção)');
+          res.status(503).json({ error: 'Verificação de segurança indisponível. Tente novamente em instantes.' });
+          return;
+        }
+        log.warn('[reCAPTCHA] Timeout na verificação — permitindo requisição (dev)');
         return next();
       }
       log.error('[reCAPTCHA] Erro na verificação:', errorMessage);

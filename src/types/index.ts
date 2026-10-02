@@ -5,8 +5,8 @@ export interface Question {
   options: string[];
   optionImages?: (string | null)[];
   imageUrl?: string;
-  correctOptionIndex: number;
-  explanation: string;
+  correctOptionIndex?: number;
+  explanation?: string;
   difficulty: 'fácil' | 'médio' | 'difícil';
   xpReward: number;
 }

@@ -11,6 +11,7 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import https from 'node:https';
+import { log } from '../utils/logger';
 
 interface B2Config {
   endpoint: string;
@@ -68,14 +69,19 @@ export function getB2Client(): S3Client {
     );
   }
 
-  const rejectUnauthorized =
-    process.env.B2_SSL_REJECT_UNAUTHORIZED === 'false' ||
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0'
-      ? false
-      : true;
+  // TLS validation sempre ligada em produção. O toggle só existe em dev
+  // (certificados autoassinados locais) e é explicitamente proibido em prod —
+  // backups trafegam credenciais e dump completo do banco.
+  const allowInsecureTls =
+    process.env.B2_SSL_REJECT_UNAUTHORIZED === 'false' &&
+    process.env.NODE_ENV !== 'production';
+
+  if (process.env.NODE_ENV === 'production' && process.env.B2_SSL_REJECT_UNAUTHORIZED === 'false') {
+    log.warn('[B2] B2_SSL_REJECT_UNAUTHORIZED=false ignorado em produção: validação TLS obrigatória.');
+  }
 
   const agent = new https.Agent({
-    rejectUnauthorized,
+    rejectUnauthorized: !allowInsecureTls,
   });
 
   client = new S3Client({

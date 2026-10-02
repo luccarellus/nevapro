@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { requireAuth, authenticateUser, invalidateTokenVersionCache, revokeUserSessions } from '../middleware/auth';
-import { query } from '../../src/lib/db';
+import { getClient, query } from '../../src/lib/db';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { sanitizeInput, normalizeEmail } from '../utils/sanitize';
 import { PLATFORM_TENANT_ID } from '../services/rbacService';
@@ -54,8 +54,12 @@ const changePwAccountLimiter = rateLimiter(3, 15 * 60_000, {
 
 // ============= LOGIN =============
 router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    res.status(400).json({ error: 'Corpo da requisição inválido.' });
+    return;
+  }
   const { email, password } = req.body;
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
     return;
   }
@@ -133,27 +137,29 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       : { error: 'Falha na autenticação.' };
     
     if (result.error) {
-      // Increment failed attempts
+      // Increment failed attempts — atomicamente, para evitar TOCTOU que zera
+      // o contador sob requisições paralelas (brute force distribuído).
       try {
-        const { rows: currentAttemptRows } = await query(
-          'SELECT attempts FROM public.login_attempts WHERE email = $1',
-          [cleanEmail],
+        const { rows: upsertRows } = await query(
+          `INSERT INTO public.login_attempts (email, attempts, lock_until)
+           VALUES ($1, 1, NULL)
+           ON CONFLICT (email) DO UPDATE
+             SET attempts = login_attempts.attempts + 1,
+                 lock_until = CASE
+                   WHEN login_attempts.attempts + 1 >= $2
+                   THEN NOW() + ($3::bigint || ' milliseconds')::interval
+                   ELSE NULL
+                 END,
+                 updated_at = NOW()
+           RETURNING attempts, lock_until`,
+          [cleanEmail, MAX_LOGIN_ATTEMPTS, String(LOCKOUT_DURATION_MS)],
         );
-        if (currentAttemptRows.length > 0) {
-          const newAttempts = currentAttemptRows[0].attempts + 1;
-          const lockUntil =
-            newAttempts >= MAX_LOGIN_ATTEMPTS
-              ? new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString()
-              : null;
-          await query(
-            'UPDATE public.login_attempts SET attempts = $1, lock_until = $2, updated_at = NOW() WHERE email = $3',
-            [newAttempts, lockUntil, cleanEmail],
-          );
-        } else {
-          await query(
-            'INSERT INTO public.login_attempts (email, attempts, lock_until) VALUES ($1, 1, NULL)',
-            [cleanEmail],
-          );
+        if (upsertRows.length > 0 && upsertRows[0].lock_until) {
+          // Alcançou o lockout com este incremento: bloqueia já nesta resposta.
+          res.status(429).json({
+            error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${Math.ceil(LOCKOUT_DURATION_MS / 60000)} minutos.`,
+          });
+          return;
         }
       } catch (dbErr) {
         log.error('[Auth] Erro ao registrar tentativa falha:', dbErr);
@@ -210,12 +216,10 @@ router.post('/register', rateLimiter(5, 15 * 60_000), async (req: AuthenticatedR
       dbAdmin.from('users').select('email').eq('email', cleanEmail).maybeSingle(),
     ]);
 
-    if (adminCheck.rows.length > 0) {
-      res.status(403).json({ error: 'E-mails administrativos devem ser gerenciados pelo banco de dados.' });
-      return;
-    }
-    if (existingCheck.data) {
-      res.status(400).json({ error: 'E-mail já cadastrado.' });
+    // Resposta uniforme para qualquer conflito de e-mail: evita enumeração
+    // de contas existentes (inclusive quais são administrativas).
+    if (adminCheck.rows.length > 0 || existingCheck.data) {
+      res.status(409).json({ error: 'Não foi possível concluir o cadastro com este e-mail. Se for você, tente entrar ou recuperar a senha.' });
       return;
     }
 
@@ -427,20 +431,44 @@ router.post(
         const newHash = await bcrypt.hash(password, 10);
         const targetTable = tokenRow.user_type === 'admin' ? 'admin_users' : 'users';
 
-        await query(
-          `UPDATE public.${targetTable} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
-          [newHash, tokenRow.user_id],
-        );
-
-        // Revoga todas as sessões ativas do usuário (senhas comprometidas etc.)
-        await query(
-          `UPDATE public.${targetTable} SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`,
-          [tokenRow.user_id],
-        ).catch(() => {}); // coluna opcional até a migração rodar
+        // Transação única: senha + token_version + DELETE do token. Sem isso,
+        // um crash entre statements deixa o token reutilizável (replay).
+        const client = await getClient();
+        try {
+          await client.query('BEGIN');
+          // DELETE primeiro e de forma condicional: garante uso único do token
+          // mesmo sob requisições paralelas (só uma consegue deletar).
+          const del = await client.query(
+            'DELETE FROM public.password_reset_tokens WHERE token = $1',
+            [hashResetToken(token)],
+          );
+          if (del.rowCount === 0) {
+            await client.query('ROLLBACK');
+            res.status(401).json({ error: 'Link de recuperação inválido ou expirado. Solicite um novo.' });
+            return;
+          }
+          await client.query(
+            `UPDATE public.${targetTable} SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+            [newHash, tokenRow.user_id],
+          );
+          // Revoga todas as sessões ativas do usuário (senhas comprometidas etc.)
+          try {
+            await client.query(
+              `UPDATE public.${targetTable} SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`,
+              [tokenRow.user_id],
+            );
+          } catch {
+            // coluna opcional até a migração rodar — não aborta a troca de senha
+          }
+          await client.query('COMMIT');
+        } catch (txErr) {
+          await client.query('ROLLBACK').catch(() => {});
+          throw txErr;
+        } finally {
+          client.release();
+        }
         invalidateTokenVersionCache(tokenRow.user_id);
         void revokeUserSessions(tokenRow.user_id).catch(() => {});
-
-        await query('DELETE FROM public.password_reset_tokens WHERE user_id = $1', [tokenRow.user_id]);
 
         res.json({ success: true, message: 'Senha redefinida com sucesso.' });
         return;
@@ -456,7 +484,34 @@ router.post(
 );
 
 // ============= LOGOUT =============
-router.post('/logout', async (_req: AuthenticatedRequest, res: Response) => {
+router.post('/logout', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  // Revogação server-side: bump de token_version invalida o token HMAC mesmo
+  // que o cookie tenha sido capturado (logout apenas no cookie não revoga).
+  const user = req.user;
+  if (!user) {
+    res.status(401).json({ error: 'Sessão inválida ou expirada.' });
+    return;
+  }
+  try {
+    const targetTable = user.role === 'admin' ? 'admin_users' : 'users';
+    const { rows } = await query(
+      `UPDATE public.${targetTable}
+       SET token_version = COALESCE(token_version, 0) + 1
+       WHERE id = $1
+       RETURNING token_version`,
+      [user.userId],
+    );
+    if (rows.length === 0) {
+      res.status(401).json({ error: 'Sessão inválida ou expirada.' });
+      return;
+    }
+    invalidateTokenVersionCache(user.userId);
+    await revokeUserSessions(user.userId);
+  } catch (err) {
+    log.error('[Logout] Falha ao revogar sessão:', err);
+    res.status(500).json({ error: 'Não foi possível encerrar a sessão.' });
+    return;
+  }
   // Clear session cookie
   res.clearCookie('session_token', {
     httpOnly: true,

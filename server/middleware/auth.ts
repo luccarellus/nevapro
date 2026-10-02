@@ -10,12 +10,52 @@ import { getUserRbacContext } from '../services/rbacService';
 import { ADMIN_ROLE_CODES } from '../lib/permissions';
 
 import bcrypt from 'bcryptjs';
+import { getRedisClient } from '../services/redisClient';
 
 const STUDENT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const ADMIN_SESSION_TTL_SECONDS = 24 * 60 * 60;
 
 const getSessionSecret = (): string | null =>
   process.env.JWT_SECRET || null;
+
+/**
+ * Pub/sub multi-instância: quando uma instância bumpa token_version (troca de
+ * senha/reset), as demais limpam seu cache local de token_version imediatamente.
+ * Sem isso, outras instâncias continuam aceitando tokens revogados por até
+ * TOKEN_VERSION_CACHE_TTL_MS.
+ */
+const TOKEN_VERSION_PUBSUB_CHANNEL = 'auth:token-version-bump';
+
+let tokenVersionSubscriberStarted = false;
+
+export function startTokenVersionInvalidationSubscriber(): void {
+  if (tokenVersionSubscriberStarted) return;
+  const client = getRedisClient();
+  if (!client) return;
+  tokenVersionSubscriberStarted = true;
+
+  const subscriber = client.duplicate();
+  subscriber.on('error', (err: Error) => {
+    log.warn('[Auth] Subscriber token_version:', err?.message);
+  });
+  subscriber.subscribe(TOKEN_VERSION_PUBSUB_CHANNEL).catch((err: unknown) => {
+    log.warn('[Auth] Falha ao assinar canal token_version:', err instanceof Error ? err.message : err);
+  });
+  subscriber.on('message', (_channel: string, message: string) => {
+    if (message) tokenVersionCache.delete(message);
+  });
+  log.info('[Auth] Subscriber multi-instância de token_version ativo');
+}
+
+function publishTokenVersionBump(userId: string): void {
+  try {
+    const client = getRedisClient();
+    if (!client || client.status !== 'ready') return;
+    void client.publish(TOKEN_VERSION_PUBSUB_CHANNEL, userId).catch(() => {});
+  } catch {
+    // best-effort: revogação local já executou
+  }
+}
 
 /**
  * Versão do token por usuário: incrementada quando a senha muda, o que
@@ -64,11 +104,13 @@ export function invalidateTokenVersionCache(userId: string): void {
  */
 const revokedUsers = new Map<string, { version: number; expiresAt: number }>();
 
-/** Chama após bump de token_version: grava a nova versão e revoga caches de sessão. */
+/** Chama após bump de token_version: grava a nova versão e revoga caches de sessão em TODAS as instâncias. */
 export async function revokeUserSessions(userId: string): Promise<void> {
   invalidateTokenVersionCache(userId);
   const version = await getTokenVersion(userId);
   revokedUsers.set(userId, { version, expiresAt: Date.now() + TOKEN_VERSION_CACHE_TTL_MS });
+  // Propaga a limpeza do cache local de token_version para as outras instâncias.
+  publishTokenVersionBump(userId);
 }
 
 /**
@@ -231,6 +273,7 @@ const verifySession = async (token: string): Promise<AuthenticatedUser | null> =
         userId: adminRow.id,
         email: user.email,
         role: 'admin',
+        tokenVersion: user.tokenVersion,
         roles: rbacContext.roles,
         permissions: rbacContext.permissions,
         tenants: rbacContext.tenants,

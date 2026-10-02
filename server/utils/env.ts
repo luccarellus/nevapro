@@ -11,7 +11,6 @@ const REQUIRED_VARS: string[] = [
 
 const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
   { vars: ['B2_ENDPOINT', 'B2_KEY_ID', 'B2_APPLICATION_KEY', 'B2_BUCKET_NAME'], purpose: 'Backblaze B2 file storage' },
-  { vars: ['REDIS_URL'], purpose: 'Redis caching (self-hosted — VPS via docker-compose)' },
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },
   { vars: ['GEMINI_API_KEY'], purpose: 'Gemini AI API' },
   { vars: ['RESEND_API_KEY', 'RESEND_FROM_EMAIL'], purpose: 'Resend (envio de e‑mails de redefinição de senha)' },
@@ -50,6 +49,10 @@ export function validateEnv(): void {
     } else if (someMissing) {
       log.warn(`[ENV] Aviso: Configuração incompleta para ${group.purpose}. Alguns recursos podem falhar.`);
     }
+  }
+
+  if (!process.env.REDIS_URL?.trim() && !process.env.REDIS_HOST?.trim()) {
+    log.warn('[ENV] Aviso: Redis caching não configurado. O app usará fallback em memória.');
   }
 }
 import { log } from './logger';

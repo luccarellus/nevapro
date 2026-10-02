@@ -44,8 +44,8 @@ interface CrudRouterOptions {
   fieldMap?: Record<string, string>;
   /** Optional: default values for DB fields when not provided in request. */
   defaults?: Record<string, unknown>;
-  /** Optional: async callback executed BEFORE deleting a row. */
-  onBeforeDelete?: (id: string) => Promise<void>;
+  /** Optional: async callback executed BEFORE deleting a row (recebe o tenant resolvido). */
+  onBeforeDelete?: (id: string, tenantId?: string) => Promise<void>;
 }
 
 function mapFieldNames(data: Row, fieldMap?: Record<string, string>): Row {
@@ -104,7 +104,13 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       }
 
       let builder = dbAdmin.from(options.table).select('*');
-      if (tenantScoped && tenantId) {
+      // Fail-closed: tabela tenant-scoped sem tenant resolvido não lista nada
+      // (antes retornava linhas de todos os tenants).
+      if (tenantScoped) {
+        if (!tenantId) {
+          res.json([]);
+          return;
+        }
         builder = builder.eq('tenant_id', tenantId);
       }
       const { data, error } = await builder.order(orderColumn, { ascending: orderAsc });
@@ -171,7 +177,8 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       res.status(201).json(mapRow(result));
     } catch (err: any) {
       log.error(`[${options.table} Create] Error:`, err);
-      res.status(500).json({ error: err?.message || 'Failed to create' });
+      // Mensagem genérica: err.message do driver/DB não deve vazar ao cliente.
+      res.status(500).json({ error: 'Erro interno ao criar.' });
     }
   });
 
@@ -190,19 +197,33 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
         updated_at: new Date().toISOString(),
       };
 
+      // Fail-closed: tabela tenant-scoped exige tenant resolvido no update.
+      if (options.tenantScoped !== false && !req.tenantId) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       let builder = dbAdmin.from(options.table).update(updates);
-      if (options.tenantScoped !== false && req.tenantId) {
+      if (options.tenantScoped !== false) {
         builder = builder.eq('tenant_id', req.tenantId);
       }
       const { data, error } = await builder.eq('id', id).select('*').single();
 
       if (error) throw error;
+      if (!data) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       const invalidateKeys = [options.cacheKey];
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
       res.json(mapRow(data));
     } catch (err: any) {
       log.error(`[${options.table} Update] Error:`, err);
+      // PFX (no rows) do PostgREST-like builder indica id inexistente/fora do tenant.
+      if (err?.code === 'PGRST116' || /no rows/i.test(String(err?.message || ''))) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
       res.status(500).json({ error: 'Erro interno ao atualizar.' });
     }
   });
@@ -212,12 +233,18 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
     try {
       const { id } = req.params;
 
+      // Fail-closed: tabela tenant-scoped exige tenant resolvido no delete.
+      if (options.tenantScoped !== false && !req.tenantId) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+
       if (options.onBeforeDelete) {
-        await options.onBeforeDelete(id);
+        await options.onBeforeDelete(id, req.tenantId);
       }
 
       let builder = dbAdmin.from(options.table).delete();
-      if (options.tenantScoped !== false && req.tenantId) {
+      if (options.tenantScoped !== false) {
         builder = builder.eq('tenant_id', req.tenantId);
       }
       const { error } = await builder.eq('id', id);
@@ -226,10 +253,11 @@ export function createCrudRouter(options: CrudRouterOptions): Router {
       const invalidateKeys = [options.cacheKey];
       if (req.tenantId) invalidateKeys.push(`${options.cacheKey}:${req.tenantId}`);
       await cacheInvalidate(...invalidateKeys);
-      res.json({ success: true });
+      res.status(204).end();
     } catch (err: any) {
       log.error(`[${options.table} Delete] Error:`, err);
-      res.status(500).json({ error: err?.message || 'Failed to delete' });
+      // Mensagem genérica: err.message do driver/DB não deve vazar ao cliente.
+      res.status(500).json({ error: 'Erro interno ao excluir.' });
     }
   });
 

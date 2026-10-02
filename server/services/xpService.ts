@@ -64,24 +64,26 @@ export async function awardXp(
   if (amount === 0) return null;
 
   try {
+    // UPDATE único e atômico: o nível é recalculado dentro do próprio UPDATE
+    // (subquery com a curva de níveis acumulados), eliminando a janela de
+    // corrida do UPDATE em duas passadas (nível divergente / level=1 transitório).
     const { rows } = await query(
-      `UPDATE public.users
-         SET xp = COALESCE(xp, 0) + $1,
-             level = $2,
+      `UPDATE public.users u
+         SET xp = COALESCE(u.xp, 0) + $1,
+             level = (
+               SELECT COUNT(*) + 1
+               FROM unnest($2::int[]) AS thresholds
+               WHERE COALESCE(u.xp, 0) + $1 >= thresholds
+             ),
              updated_at = NOW()
        WHERE id = $3
        RETURNING xp, level`,
-      [amount, 1, userId],
+      [amount, levelThresholds(), userId],
     );
     if (rows.length === 0) return null;
 
-    // Recalcula o nível com o XP atualizado (segunda passada simples: evita
-    // duplicar a curva em SQL e mantém o cálculo em um só lugar).
     const newXp = Number(rows[0].xp) || 0;
-    const newLevel = levelFromXp(newXp);
-    if (newLevel !== Number(rows[0].level)) {
-      await query('UPDATE public.users SET level = $1 WHERE id = $2', [newLevel, userId]);
-    }
+    const newLevel = Number(rows[0].level) || levelFromXp(newXp);
 
     await dbAdmin.from('xp_logs').insert({
       user_id: userId,
@@ -96,6 +98,23 @@ export async function awardXp(
     log.error('[XP Service] Erro ao conceder XP:', err);
     return null;
   }
+}
+
+/**
+ * Limiar acumulado de XP por nível (1-based). Espelha levelFromXp:
+ * thresholds[i] = XP mínimo para alcançar o nível i+2.
+ */
+function levelThresholds(): number[] {
+  const thresholds: number[] = [];
+  let xpNeededForNext = 300;
+  let accumulated = 300;
+  // Curva 1.35: nível 60 já ultrapassa qualquer XP inteiro relevante.
+  for (let i = 0; i < 60; i++) {
+    thresholds.push(accumulated);
+    xpNeededForNext = Math.floor(xpNeededForNext * 1.35);
+    accumulated += xpNeededForNext;
+  }
+  return thresholds;
 }
 
 /**

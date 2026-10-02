@@ -6,7 +6,6 @@ use App\Models\AdminUser;
 use App\Models\StudentUser;
 use App\Services\ApiCache;
 use App\Services\B2StorageService;
-use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -155,27 +154,4 @@ class UserController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function awardXp(Request $request): JsonResponse
-    {
-        $authUser = $request->attributes->get('auth_user');
-        $type = $request->attributes->get('auth_type');
-
-        if ($type !== 'student') {
-            return response()->json(['error' => 'Acesso negado.'], 403);
-        }
-
-        $data = $request->validate([
-            'amount' => ['required', 'integer', 'min:0', 'max:100'],
-            'reason' => ['required', 'string', 'max:255'],
-        ]);
-
-        app(XpService::class)->award(
-            $authUser->id,
-            $request->attributes->get('tenant_id'),
-            $data['amount'],
-            $data['reason'],
-        );
-
-        return response()->json(['success' => true]);
-    }
 }

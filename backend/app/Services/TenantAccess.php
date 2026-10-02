@@ -11,12 +11,19 @@ class TenantAccess
     public static function isSuperAdmin(object $user, string $authType): bool
     {
         return $authType === 'admin'
-            && in_array($user->role ?? null, ['admin', 'super', 'super_admin'], true);
+            && in_array($user->role ?? null, ['super', 'super_admin'], true);
     }
 
     public static function canAccess(object $user, string $authType, string $tenantId): bool
     {
-        if (self::isSuperAdmin($user, $authType) || (string) ($user->tenant_id ?? '') === $tenantId) {
+        if (self::isSuperAdmin($user, $authType)) {
+            return true;
+        }
+
+        if (! Tenant::query()->whereKey($tenantId)->where('active', true)->exists()) {
+            return false;
+        }
+        if ((string) ($user->tenant_id ?? '') === $tenantId) {
             return true;
         }
 

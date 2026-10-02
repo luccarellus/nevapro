@@ -45,12 +45,13 @@ function extractTenantFromHost(host: string | undefined): string | null {
 
 /**
  * Middleware: resolve e anexa o tenant ativo da requisição.
- * Nunca bloqueia a requisição — se nenhum tenant for resolvido,
- * `req.tenantId` permanece indefinido (comportamento legado).
+ * Fail-closed: se nenhum tenant for resolvido (resolução falhou e não há
+ * fallback), a requisição é bloqueada com 500 — queries sem escopo de tenant
+ * expõem dados de todos os tenants.
  */
 export const resolveTenant = async (
   req: AuthenticatedRequest,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
@@ -63,12 +64,15 @@ export const resolveTenant = async (
     if (tenant) {
       req.tenantId = tenant.id;
       req.tenant = tenant;
+      next();
+      return;
     }
+    log.warn('[Tenant] Requisição bloqueada: nenhum tenant resolvido.');
+    res.status(500).json({ error: 'Não foi possível determinar o contexto de dados (tenant).' });
   } catch (err) {
-    // Não bloqueia: o escopo de tenant é um aprimoramento de isolamento.
     log.warn('[Tenant] Falha ao resolver tenant da requisição:', err);
+    res.status(500).json({ error: 'Não foi possível determinar o contexto de dados (tenant).' });
   }
-  next();
 };
 
 /**

@@ -209,20 +209,46 @@ router.put(
       }
 
       const updates: Record<string, unknown> = {};
-      if (req.body.done !== undefined) updates.done = req.body.done;
-      if (req.body.title !== undefined) updates.title = req.body.title;
-      if (req.body.estimated_time !== undefined) updates.estimated_time = req.body.estimated_time;
-      if (req.body.target_tab !== undefined) updates.target_tab = req.body.target_tab;
+      if (req.body.done !== undefined) {
+        if (typeof req.body.done !== 'boolean') {
+          res.status(400).json({ error: 'Campo "done" deve ser booleano.' });
+          return;
+        }
+        updates.done = req.body.done;
+      }
+      if (req.body.title !== undefined) {
+        if (typeof req.body.title !== 'string' || req.body.title.trim().length === 0 || req.body.title.length > 200) {
+          res.status(400).json({ error: 'Campo "title" deve ser texto de 1 a 200 caracteres.' });
+          return;
+        }
+        updates.title = req.body.title.trim();
+      }
+      if (req.body.estimated_time !== undefined) {
+        if (typeof req.body.estimated_time !== 'number' || !Number.isFinite(req.body.estimated_time) || req.body.estimated_time < 0 || req.body.estimated_time > 1440) {
+          res.status(400).json({ error: 'Campo "estimated_time" deve ser minutos entre 0 e 1440.' });
+          return;
+        }
+        updates.estimated_time = req.body.estimated_time;
+      }
+      if (req.body.target_tab !== undefined) {
+        if (typeof req.body.target_tab !== 'string' || req.body.target_tab.length > 50) {
+          res.status(400).json({ error: 'Campo "target_tab" inválido.' });
+          return;
+        }
+        updates.target_tab = req.body.target_tab;
+      }
 
       if (Object.keys(updates).length === 0) {
         res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
         return;
       }
 
+      // Ownership no próprio statement (sem TOCTOU entre SELECT e UPDATE).
       const { data, error } = await dbAdmin
         .from('user_study_tasks')
         .update(updates)
         .eq('id', id)
+        .eq('user_id', user.id)
         .select('*')
         .single();
 
@@ -258,21 +284,13 @@ router.delete(
         return;
       }
 
-      const { data: existing } = await dbAdmin
-        .from('user_study_tasks')
-        .select('user_id')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (existing && existing.user_id !== user.id) {
-        res.status(403).json({ error: 'Acesso negado.' });
-        return;
-      }
-
+      // Ownership escopado no próprio DELETE: nunca remove tarefa de outro
+      // usuário, elimina TOCTOU do check-then-delete e não vaza existência de IDs.
       const { error } = await dbAdmin
         .from('user_study_tasks')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
       res.json({ success: true });

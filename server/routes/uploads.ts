@@ -137,7 +137,8 @@ router.get('/storage/object', requireAuth, async (req: any, res: any) => {
   }
   // Anti-IDOR: a URL precisa de assinatura HMAC válida (emitida no upload /
   // resolveStoredFileUrl). Impede enumerar objetos de outros usuários.
-  if (process.env.NODE_ENV === 'production' && !verifyObjectSignature(filePath, req.query.s as string | undefined)) {
+  // Exigida em TODOS os ambientes: staging/dev costuma ter dados reais.
+  if (!verifyObjectSignature(filePath, req.query.s as string | undefined)) {
     res.status(403).json({ error: 'Assinatura de arquivo inválida.' });
     return;
   }

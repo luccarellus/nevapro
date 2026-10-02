@@ -42,7 +42,7 @@ Route::get('/health/details', [HealthController::class, 'details'])
 Route::get('imagem', [ImageProxyController::class, 'show'])
     ->middleware(['auth.custom', 'throttle.custom:120,60']);
 Route::get('storage/object', [StorageObjectController::class, 'show'])
-    ->middleware(['auth.custom', 'throttle.custom:120,60']);
+    ->middleware(['auth.custom', 'tenant', 'throttle.custom:120,60']);
 
 // ===== Auth (público + rate limit) =====
 Route::prefix('auth')->group(function () {
@@ -70,9 +70,6 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
         ->middleware(['throttle.custom:10,60', 'recaptcha']);
     Route::delete('user/profile', [UserController::class, 'deleteProfile'])
         ->middleware(['throttle.custom:3,60', 'recaptcha']);
-
-    // XP / gamificação
-    Route::post('user/award-xp', [UserController::class, 'awardXp']);
 
     // Erros book
     Route::post('user/errors-book', [ErrorsBookController::class, 'store']);

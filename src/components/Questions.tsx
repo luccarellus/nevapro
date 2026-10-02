@@ -24,6 +24,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
@@ -80,43 +81,61 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
   };
 
   const handleFinish = async () => {
-    let correctOnes = 0;
-    let totalXp = 0;
-
-    const answerBatch = questions.map((q, idx) => {
-      const isCorrect = userAnswers[idx] === q.correctOptionIndex;
-      if (isCorrect) {
-        correctOnes++;
-        totalXp += q.xpReward;
-      }
+    const answerBatch = questions.flatMap((q, idx) => {
+      const selectedOption = userAnswers[idx];
+      if (selectedOption === undefined) return [];
       return {
-          userId: user.id,
-          questionId: q.id,
-          selectedOption: userAnswers[idx] ?? null,
-          isCorrect,
-          questionData: {
-            subject: q.subject,
-            text: q.text,
-            options: q.options,
-            optionImages: q.optionImages || [],
-            imageUrl: q.imageUrl || null,
-            correctOptionIndex: q.correctOptionIndex,
-            explanation: q.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
-            difficulty: q.difficulty || 'médio', xpReward: q.xpReward,
-            year: Number(selectedYear || q.id.split('-')[0] || 2023),
-            index: Number(q.id.split('-')[1] || idx + 1)
-          },
-        };
+        userId: user.id,
+        questionId: q.id,
+        selectedOption,
+      };
     });
-    fetch('/api/answers/batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({ answers: answerBatch }),
-    }).catch(err => console.error('Failed to log answers:', err));
 
-    setScore(correctOnes);
-    onEarnXp(totalXp, correctOnes, questions.length, false, 'Treinamento de Questões');
-    setShowResult(true);
+    setSubmitting(true);
+    setError(null);
+    try {
+      let results: Array<{
+        questionId: string;
+        isCorrect: boolean;
+        correctOptionIndex: number | null;
+        explanation: string | null;
+      }> = [];
+      if (answerBatch.length > 0) {
+        const response = await fetch('/api/answers/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ answers: answerBatch }),
+        });
+        if (!response.ok) throw new Error('A API não validou as respostas.');
+        const body = await response.json();
+        if (!Array.isArray(body.results) || body.results.length !== answerBatch.length) {
+          throw new Error('Resposta de correção inválida.');
+        }
+        results = body.results;
+      }
+
+      const resultsByQuestion = new Map(results.map((result) => [result.questionId, result]));
+      const gradedQuestions = questions.map((question) => {
+        const result = resultsByQuestion.get(question.id);
+        return result ? {
+          ...question,
+          correctOptionIndex: result.correctOptionIndex ?? undefined,
+          explanation: result.explanation ?? undefined,
+        } : question;
+      });
+      const correctOnes = results.filter((result) => result.isCorrect).length;
+      setQuestions(gradedQuestions);
+      setScore(correctOnes);
+      if (answerBatch.length > 0) {
+        onEarnXp(correctOnes * 10, correctOnes, answerBatch.length, false, 'Treinamento de Questões');
+      }
+      setShowResult(true);
+    } catch (err) {
+      console.error('Failed to validate answers:', err);
+      setError('Não foi possível validar suas respostas. Tente finalizar novamente.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -337,13 +356,19 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
             ) : (
               <button
                 onClick={handleFinish}
+                disabled={submitting}
                 className="flex-1 py-4 md:py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl md:rounded-[28px] font-bold text-xs transition-all flex items-center justify-center gap-4 shadow-2xl shadow-brand-primary/20 active:scale-[0.98] cursor-pointer"
               >
-                Finalizar desafio
+                {submitting ? 'Validando respostas...' : 'Finalizar desafio'}
                 <Award size={20} />
               </button>
             )}
           </div>
+          {error && (
+            <div className="mt-4 p-4 bg-red-500/10 text-red-500 rounded-2xl text-center font-bold text-xs">
+              {error}
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>

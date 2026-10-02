@@ -79,12 +79,14 @@ export const isAllowedOrigin = (req: Request, value?: string | string[]): boolea
 
 /**
  * CSRF Protection Middleware
- * 
+ *
  * Strategy:
- * 1. Validates Origin header dynamically against Same-Origin host and allowed domains
- * 2. Falls back to Referer header
- * 3. Requires X-Requested-With if neither Origin nor Referer is present
- * 
+ * 1. Token anti-CSRF assinado é OBRIGATÓRIO para toda requisição mutante com
+ *    cookie de sessão (double-submit HMAC) — não basta Origin/Referer.
+ * 2. Valida Origin header dinamicamente; fallback para Referer.
+ * 3. Sem Origin/Referer (server-to-server): exige token CSRF válido quando há
+ *    sessão — o antigo bypass por X-Requested-With foi removido (era forjável).
+ *
  * Skipped in development mode to avoid breaking Vite HMR.
  * Skipped for idempotent methods (GET, HEAD, OPTIONS).
  */
@@ -136,14 +138,9 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction):
     }
   }
 
-  // 3. X-Requested-With check (no Origin/Referer available)
-  const requestedWith = req.headers['x-requested-with'];
-  if (!requestedWith || requestedWith !== 'XMLHttpRequest') {
-    log.warn('[CSRF] Requisição sem Origin/Referer nem X-Requested-With');
-    res.status(403).json({ error: 'Acesso negado: cabeçalho de segurança ausente.' });
-    return;
-  }
-
+  // 3. Sem Origin/Referer: o token CSRF (validado acima quando há sessão) é a
+  // única garantia. Requisições com sessão já passaram por verifyCsrfToken;
+  // requisições sem sessão (ex.: webhooks têm rota própria) seguem adiante.
   next();
 };
 

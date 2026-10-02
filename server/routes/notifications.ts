@@ -75,7 +75,7 @@ router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest, re
     res.json(rows);
   } catch (err) {
     log.error('[Notifications] Error:', err);
-    res.json([]);
+    res.status(500).json({ error: 'Erro ao buscar notificações.' });
   }
 });
 
@@ -113,11 +113,11 @@ router.post('/read-all', requireAuth, async (req: AuthenticatedRequest, res: Res
          )`,
       [userId],
     );
-    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
+    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId), `${userCacheKeys.notifications(userId)}:${req.tenantId || ''}`);
     res.json({ success: true });
   } catch (err) {
     log.error('[Notifications ReadAll] Error:', err);
-    res.json({ success: false });
+    res.status(500).json({ error: 'Erro ao marcar notificações como lidas.' });
   }
 });
 
@@ -139,26 +139,33 @@ router.post('/:id/read', requireAuth, async (req: AuthenticatedRequest, res: Res
 
     const userId = await getRequestUserId(req, req.user?.email || '');
 
+    // Fail-closed: sem userId resolvido, nenhuma escrita é permitida.
+    if (!userId) {
+      res.status(401).json({ error: 'Usuário não identificado.' });
+      return;
+    }
+
     // Política: só o dono da notificação (ou o próprio usuário em notificação global)
     // pode marcá-la como lida.
-    if (userId && notif.user_id && notif.user_id !== userId) {
+    if (notif.user_id && notif.user_id !== userId) {
       res.status(403).json({ error: 'Acesso negado' });
       return;
     }
 
-    if (notif.user_id === null && userId) {
+    if (notif.user_id === null) {
       // Notificação global — usa notification_reads
       await markGlobalNotificationAsRead(id, userId);
     } else {
-      // Notificação do usuário — usa is_read diretamente
+      // Notificação do usuário — SEMPRE escopada ao dono
       const { error } = await dbAdmin
         .from('notifications')
         .update({ is_read: true })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', userId);
       if (error) throw error;
     }
 
-    if (userId) await cacheInvalidate(userCacheKeys.notifications(userId));
+    await cacheInvalidate(userCacheKeys.notifications(userId), `${userCacheKeys.notifications(userId)}:${req.tenantId || ''}`);
     res.json({ success: true });
   } catch (err) {
     log.error('[Notification Read] Error:', err);

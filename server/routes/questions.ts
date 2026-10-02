@@ -14,6 +14,115 @@ const router = Router();
 
 const BASE_URL = 'https://api.enem.dev/v1';
 const TENANT_QUESTIONS_PAGE_SIZE = 50;
+const MAX_OPTIONS = 10;
+const ENEM_MAX_LIMIT = 200;
+const ENEM_MAX_OFFSET = 100_000;
+
+type ExternalAlternative = Record<string, unknown> & { text?: string; letter?: string };
+type ExternalQuestion = Record<string, unknown> & {
+  alternatives?: ExternalAlternative[];
+  correctAlternative?: string;
+};
+
+function hideAnswerKey(question: ExternalQuestion): ExternalQuestion {
+  const { correctAlternative: _correctAlternative, correctOptionIndex: _correctIndex,
+    correct_option_index: _correctOptionIndex, answer: _answer, gabarito: _gabarito,
+    explanation: _explanation, ...safeQuestion } = question;
+  return {
+    ...safeQuestion,
+    alternatives: question.alternatives?.map(({ isCorrect: _isCorrect, is_correct: _is_correct,
+      correct: _correct, ...alternative }) => alternative),
+  };
+}
+
+function externalQuestionId(question: ExternalQuestion, source: 'enem' | 'enemhub', year: number): string {
+  if (source === 'enemhub') {
+    const suffix = typeof question.externalId === 'string' && question.externalId
+      ? question.externalId
+      : typeof question.id === 'string' ? question.id.slice(0, 8) : '';
+    return `ehub-${year}-${suffix}`;
+  }
+  const discipline = typeof question.discipline === 'string' ? question.discipline : 'geral';
+  const normalized = discipline.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return `${year}-${question.index}-${normalized}`;
+}
+
+async function persistExternalQuestions(
+  questions: ExternalQuestion[],
+  source: 'enem' | 'enemhub',
+  year: number,
+): Promise<void> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    for (const question of questions) {
+      const alternatives = question.alternatives;
+      if (!Array.isArray(alternatives) || alternatives.length < 2 || alternatives.length > MAX_OPTIONS) {
+        throw new Error('External question has an invalid alternatives list.');
+      }
+      const id = externalQuestionId(question, source, year);
+      const subject = source === 'enem'
+        ? (typeof question.discipline === 'string' ? question.discipline : 'Geral')
+        : (typeof question.subject === 'object' && question.subject !== null &&
+            typeof (question.subject as Record<string, unknown>).name === 'string'
+            ? (question.subject as Record<string, string>).name : 'Geral');
+      const text = source === 'enem'
+        ? `${typeof question.context === 'string' ? question.context : ''}\n\n${typeof question.alternativesIntroduction === 'string' ? question.alternativesIntroduction : ''}`.trim()
+        : typeof question.statement === 'string' ? question.statement : '';
+      if (!id || id.length > 64 || !text) {
+        throw new Error('External question has invalid identifying or text fields.');
+      }
+
+      const correctIndexes = alternatives.flatMap((alternative, index) => {
+        const isCorrect = alternative.isCorrect === true || alternative.letter === question.correctAlternative;
+        return isCorrect ? [index] : [];
+      });
+      if (correctIndexes.length !== 1) {
+        throw new Error('External question has no unique, verifiable correct alternative.');
+      }
+      const correctIndex = correctIndexes[0];
+      const inserted = await client.query(
+        `INSERT INTO public.questions
+          (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index, tenant_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, '', $6, 15, $7, $8, NULL, NOW())
+         ON CONFLICT (id) DO NOTHING
+         RETURNING id`,
+        [
+          id,
+          subject.slice(0, 255),
+          text,
+          source === 'enem' && Array.isArray(question.files) && typeof question.files[0] === 'string'
+            ? question.files[0] : null,
+          correctIndex,
+          source === 'enemhub' && ['fácil', 'médio', 'difícil'].includes(String(question.difficulty))
+            ? question.difficulty : 'médio',
+          year,
+          source === 'enem' && Number.isInteger(question.index) ? question.index : null,
+        ],
+      );
+      if (inserted.rowCount === 0) continue;
+
+      for (const [index, alternative] of alternatives.entries()) {
+        if (typeof alternative.text !== 'string') {
+          throw new Error('External question has an invalid alternative text.');
+        }
+        const image = source === 'enem' ? alternative.file : alternative.image;
+        await client.query(
+          `INSERT INTO public.question_options
+            (id, question_id, text, image_url, letter, is_correct)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+          [id, alternative.text, typeof image === 'string' ? image : null, String.fromCharCode(65 + index), index === correctIndex],
+        );
+      }
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 /** Chaves de cache da listagem paginada de questões do tenant. */
 function cacheKeysForTenant(tenantId: string | null): string[] {
@@ -87,8 +196,8 @@ router.get('/tenant', requireAuth, resolveTenant, async (req: AuthenticatedReque
         subject: q.subject,
         text: q.text,
         imageUrl: q.image_url,
-        correctOptionIndex: q.correct_option_index,
-        explanation: q.explanation,
+        // Gabarito não é exposto em listagem: aluno poderia memorizar as
+        // respostas via API antes de responder. A correção é feita no servidor.
         difficulty: q.difficulty,
         xpReward: q.xp_reward,
         year: q.year,
@@ -258,13 +367,13 @@ router.get('/', requireAuth, async (req, res: Response) => {
     res.status(400).json({ error: 'Limit parameter must be between 1 and 200' });
     return;
   }
-  if (!Number.isInteger(off) || off < 0 || off > 100000) {
-    res.status(400).json({ error: 'Offset parameter must be a non-negative integer' });
+  if (!Number.isInteger(off) || off < 0 || off > ENEM_MAX_OFFSET) {
+    res.status(400).json({ error: `Offset parameter must be between 0 and ${ENEM_MAX_OFFSET}` });
     return;
   }
 
   try {
-    const cacheKey = `cache:questions:${yr}:${lim}:${off}`;
+    const cacheKey = `cache:questions:v2:${yr}:${lim}:${off}`;
     const cached = await cacheGet<unknown>(cacheKey);
     if (cached) {
       res.json(cached);
@@ -280,8 +389,15 @@ router.get('/', requireAuth, async (req, res: Response) => {
       return;
     }
 
-    const data = await response.json();
-    const payload = { questions: data.questions || data };
+    const data = await response.json() as { questions?: unknown };
+    const questions = Array.isArray(data.questions) ? data.questions : null;
+    if (!questions || questions.some((question) => !question || typeof question !== 'object' || Array.isArray(question))) {
+      res.status(502).json({ error: 'Invalid response from ENEM API' });
+      return;
+    }
+    const externalQuestions = questions as ExternalQuestion[];
+    await persistExternalQuestions(externalQuestions, 'enem', yr);
+    const payload = { questions: externalQuestions.map(hideAnswerKey) };
     await cacheSet(cacheKey, payload, 600);
     res.json(payload);
   } catch (err) {
@@ -347,8 +463,13 @@ router.get('/enemhub', requireAuth, async (req, res: Response) => {
     res.status(400).json({ error: 'Parâmetro year inválido (2009-2025).' });
     return;
   }
-  const limitNum = Math.min(Math.max(parseInt(String(limit || '50'), 10) || 50, 1), 200);
-  const pageNum = Math.max(parseInt(String(page || '1'), 10) || 1, 1);
+  const limitNum = Number(limit ?? 50);
+  const pageNum = Number(page ?? 1);
+  if (!Number.isInteger(limitNum) || limitNum < 1 || limitNum > ENEM_MAX_LIMIT ||
+      !Number.isInteger(pageNum) || pageNum < 1 || pageNum > Math.floor(ENEM_MAX_OFFSET / ENEM_MAX_LIMIT)) {
+    res.status(400).json({ error: 'Limit or page parameter is invalid' });
+    return;
+  }
 
   const key = getEnemHubKey();
   if (!key) {
@@ -357,7 +478,7 @@ router.get('/enemhub', requireAuth, async (req, res: Response) => {
   }
 
   try {
-    const cacheKey = 'cache:enemhub:questions:' + yearNum + ':' + limitNum + ':' + pageNum;
+    const cacheKey = 'cache:enemhub:questions:v2:' + yearNum + ':' + limitNum + ':' + pageNum;
     const cached = await cacheGet<unknown>(cacheKey);
     if (cached) {
       res.json(cached);
@@ -374,8 +495,15 @@ router.get('/enemhub', requireAuth, async (req, res: Response) => {
       res.status(response.status).json({ error: 'EnemHub API error: ' + response.statusText });
       return;
     }
-    const body = await response.json();
-    const payload = { questions: body.data || [], meta: body.meta || null };
+    const body = await response.json() as { data?: unknown; meta?: unknown };
+    const questions = Array.isArray(body.data) ? body.data : null;
+    if (!questions || questions.some((question) => !question || typeof question !== 'object' || Array.isArray(question))) {
+      res.status(502).json({ error: 'Invalid response from EnemHub API' });
+      return;
+    }
+    const externalQuestions = questions as ExternalQuestion[];
+    await persistExternalQuestions(externalQuestions, 'enemhub', yearNum);
+    const payload = { questions: externalQuestions.map(hideAnswerKey), meta: body.meta || null };
     await cacheSet(cacheKey, payload, 600);
     res.json(payload);
   } catch (err) {

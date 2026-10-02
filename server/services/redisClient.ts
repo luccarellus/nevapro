@@ -1,5 +1,6 @@
 import Redis, { RedisOptions } from 'ioredis';
 import { log } from '../utils/logger';
+import { resolveRedisConnectionConfig } from './redisConnectionConfig';
 
 /**
  * Cliente Redis ultra-rápido (VPS / docker-compose).
@@ -22,8 +23,8 @@ export const isRemoteRedis = (): boolean => {
   const override = process.env.REDIS_REMOTE_MODE;
   if (override === 'true') return true;
   if (override === 'false') return false;
-  const url = process.env.REDIS_URL;
-  const host = url ? hostFromRedisUrl(url) : process.env.REDIS_HOST || '';
+  const connection = resolveRedisConnectionConfig(process.env);
+  const host = connection?.url ? hostFromRedisUrl(connection.url) : connection?.host || '';
   return !isPrivateHost(host);
 };
 
@@ -57,13 +58,8 @@ export function getRedisRttMs(): number {
 }
 
 export function getRedisClient(): Redis | null {
-  const url = process.env.REDIS_URL;
-  const host = process.env.REDIS_HOST;
-  const port = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379;
-  const password = process.env.REDIS_PASSWORD;
-  const username = process.env.REDIS_USERNAME || 'default';
-
-  if (!url && !host) return null;
+  const connection = resolveRedisConnectionConfig(process.env);
+  if (!connection) return null;
   if (client) return client;
 
   const redisOptions: RedisOptions = {
@@ -88,14 +84,18 @@ export function getRedisClient(): Redis | null {
     },
   };
 
-  if (url) {
-    client = new Redis(url, redisOptions);
+  if (connection.url) {
+    client = new Redis(connection.url, {
+      ...redisOptions,
+      username: connection.username,
+      password: connection.password,
+    });
   } else {
     client = new Redis({
-      host,
-      port,
-      password: password || undefined,
-      username: username || undefined,
+      host: connection.host,
+      port: connection.port,
+      password: connection.password,
+      username: connection.username,
       ...redisOptions,
     });
   }
@@ -189,7 +189,7 @@ export async function closeRedisClient(): Promise<void> {
 }
 
 // Inicializa a conexão de forma ansiosa no boot se o Redis estiver configurado
-if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+if (resolveRedisConnectionConfig(process.env)) {
   try {
     getRedisClient();
   } catch {

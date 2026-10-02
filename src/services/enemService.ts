@@ -13,9 +13,7 @@ export interface EnemQuestion {
     letter: string;
     text: string;
     file: string | null;
-    isCorrect: boolean;
   }[];
-  correctAlternative: string;
 }
 
 export interface EnemHubQuestion {
@@ -24,14 +22,12 @@ export interface EnemHubQuestion {
   year: number;
   difficulty: string;
   statement: string;
-  correctAlternative: string;
   exam: string;
   subject: { id: string; name: string; area: string };
   alternatives: {
     id: string;
     letter: string;
     text: string;
-    isCorrect: boolean;
     image?: string;
   }[];
 }
@@ -129,8 +125,6 @@ const enemhubService = {
           options: alts.map((a) => a.text || ''),
           optionImages: alts.map((a) => (a.image ? (proxyImageUrl(a.image) ?? null) : null)),
           imageUrl: undefined,
-          correctOptionIndex: alts.findIndex((a) => a.isCorrect),
-          explanation: 'Questão oficial do ENEM (EnemHub).',
           difficulty: difficulty === 'fácil' || difficulty === 'difícil' ? difficulty : 'médio',
           xpReward: 15,
         };
@@ -214,8 +208,6 @@ export const enemService = {
           options: (q.alternatives || []).map(opt => opt.text || ''),
           optionImages: (q.alternatives || []).map(opt => proxyImageUrl(opt.file) || null),
           imageUrl: mainImage && !alreadyInline ? mainImage : undefined,
-          correctOptionIndex: (q.alternatives || []).findIndex(opt => opt.letter === q.correctAlternative),
-          explanation: 'Resolução baseada nos critérios oficiais do ENEM.',
           difficulty: 'médio',
           xpReward: 15
         };
@@ -360,7 +352,7 @@ export const enemService = {
         for (const q of backup) {
           if (questions.length >= 90) break;
           // Use a new unique index to avoid UI collisions
-          questions.push({...q, id: `${q.id}-fallback-${questions.length}`});
+          questions.push(q);
         }
       }
     }

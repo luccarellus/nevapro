@@ -42,6 +42,11 @@ export function validateMaterialInput(body: unknown, partial = false): Result<Ro
     ['foco', 255, false], ['url', 2048, !partial], ['description', 5000, false],
   ]);
   if ('error' in result) return result;
+  // Stored XSS: URL do material é renderizada como link no frontend.
+  // Apenas http(s) é permitido — bloqueia javascript:, data:, vbscript: etc.
+  if (typeof result.data.url === 'string' && !/^https?:\/\//i.test(result.data.url)) {
+    return { error: 'O campo url deve ser uma URL http(s) válida.' };
+  }
   if (partial && Object.keys(result.data).length === 0) return { error: 'Nenhum campo válido foi informado.' };
   return result;
 }
@@ -73,6 +78,14 @@ export function validateMuralInput(body: unknown, partial = false): Result<Row> 
   // Sanitizar no servidor antes de persistir, igual às questões.
   if (typeof result.data.content === 'string') {
     result.data.content = sanitizeRichText(result.data.content);
+  }
+  // Campos de texto puro também são neutralizados (defesa em profundidade
+  // contra renderização com dangerouslySetInnerHTML em qualquer tela).
+  for (const field of ['title', 'tag', 'sender'] as const) {
+    if (typeof result.data[field] === 'string') {
+      result.data[field] = result.data[field]
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
   }
   if (partial && Object.keys(result.data).length === 0) return { error: 'Nenhum campo válido foi informado.' };
   return result;

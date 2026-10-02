@@ -33,6 +33,7 @@ export default function Simulados({
   const [view, setView] = useState<'selection' | 'simulation' | 'result'>('selection');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
@@ -42,6 +43,7 @@ export default function Simulados({
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [selectedReviewIndex, setSelectedReviewIndex] = useState<number | null>(0);
   const [resultsCache, setResultsCache] = useState<Record<string, any>>({});
+  const finishSubmittedRef = useRef(false);
 
   const [selectedYears, setSelectedYears] = useState<Record<string, number>>(() => {
     const years: Record<string, number> = {};
@@ -157,6 +159,7 @@ export default function Simulados({
       if (fetchedQuestions.length === 0) {
         setError('Nenhuma questão encontrada para este simulado.');
       } else {
+        finishSubmittedRef.current = false;
         setQuestions(fetchedQuestions);
         setCurrentIndex(0);
         setUserAnswers({});
@@ -178,60 +181,75 @@ export default function Simulados({
     }));
   };
 
-  const handleFinishSimulation = () => {
-    let correctOnes = 0;
-    questions.forEach((q, idx) => {
-      if (userAnswers[idx] === q.correctOptionIndex) {
-        correctOnes++;
-      }
+  const handleFinishSimulation = async (): Promise<boolean> => {
+    if (finishSubmittedRef.current) return false;
+    finishSubmittedRef.current = true;
+    setSubmitting(true);
+    setError(null);
+    const answerBatch = questions.flatMap((question, index) => {
+      const selectedOption = userAnswers[index];
+      return selectedOption === undefined ? [] : [{
+        userId: user.id,
+        questionId: question.id,
+        selectedOption,
+      }];
     });
 
-    setScore(correctOnes);
-    if (selectedSim) {
-      const totalQ = questions.length || selectedSim.totalQuestions || 90;
-      // Ganha XP proporcional aos acertos em relação ao total de questões do simulado.
-      const xpEarned = Math.round((correctOnes / totalQ) * selectedSim.xpReward);
+    try {
+      let results: Array<{
+        questionId: string;
+        isCorrect: boolean;
+        correctOptionIndex: number | null;
+        explanation: string | null;
+      }> = [];
+      if (answerBatch.length > 0) {
+        const response = await fetch('/api/answers/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ answers: answerBatch }),
+        });
+        if (!response.ok) throw new Error('A API não validou as respostas.');
+        const body = await response.json();
+        if (!Array.isArray(body.results) || body.results.length !== answerBatch.length) {
+          throw new Error('Resposta de correção inválida.');
+        }
+        results = body.results;
+      }
 
-      onEarnXp(xpEarned, correctOnes, totalQ, false, `Simulado: ${selectedSim.title}`);
-      const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;
-      localStorage.setItem(`neva_sim_result_${user.id}_${selectedSim.id}_${selectedYear}`, JSON.stringify({
-        questions,
-        userAnswers,
-        score: correctOnes,
-        timestamp: new Date().toISOString()
-      }));
-
-      const answerBatch = questions.map((q, idx) => {
-        const isCorrect = userAnswers[idx] === q.correctOptionIndex;
-        // Para o simulado, se o aluno não respondeu, conta como incorreto no caderno de erros
-        const selectedOption = userAnswers[idx];
-        return {
-            userId: user.id,
-            questionId: q.id,
-            selectedOption: selectedOption !== undefined ? selectedOption : null,
-            isCorrect: selectedOption !== undefined ? isCorrect : false,
-            questionData: {
-              subject: q.subject,
-              text: q.text,
-              options: q.options,
-              optionImages: q.optionImages || [],
-              imageUrl: q.imageUrl || null,
-              correctOptionIndex: q.correctOptionIndex,
-              explanation: q.explanation || 'Resolução baseada nos critérios oficiais do ENEM.',
-              difficulty: q.difficulty || 'médio',
-              xpReward: q.xpReward || 50,
-              year: Number(selectedYear),
-              index: Number(q.id.split('-')[1] || idx + 1)
-            },
-          };
+      const resultsByQuestion = new Map(results.map((result) => [result.questionId, result]));
+      const gradedQuestions = questions.map((question) => {
+        const result = resultsByQuestion.get(question.id);
+        return result ? {
+          ...question,
+          correctOptionIndex: result.correctOptionIndex ?? undefined,
+          explanation: result.explanation ?? undefined,
+        } : question;
       });
-      fetch('/api/answers/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ answers: answerBatch }),
-      }).catch(err => console.error('Failed to log simulated answers:', err));
+      const correctOnes = results.filter((result) => result.isCorrect).length;
+      setQuestions(gradedQuestions);
+      setScore(correctOnes);
+      if (answerBatch.length > 0 && selectedSim) {
+        onEarnXp(correctOnes * 10, correctOnes, answerBatch.length, false, `Simulado: ${selectedSim.title}`);
+      }
+      if (selectedSim) {
+        const selectedYear = selectedYears[selectedSim.id] || selectedSim.year || 2023;
+        localStorage.setItem(`neva_sim_result_${user.id}_${selectedSim.id}_${selectedYear}`, JSON.stringify({
+          questions: gradedQuestions,
+          userAnswers,
+          score: correctOnes,
+          timestamp: new Date().toISOString()
+        }));
+      }
+      setView('result');
+      return true;
+    } catch (err) {
+      console.error('Failed to validate simulated answers:', err);
+      setError('Não foi possível validar suas respostas. Tente finalizar novamente.');
+      finishSubmittedRef.current = false;
+      return false;
+    } finally {
+      setSubmitting(false);
     }
-    setView('result');
   };
 
   const renderExitConfirmModal = () => (
@@ -255,18 +273,21 @@ export default function Simulados({
             </p>
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => {
-                  handleFinishSimulation();
-                  setShowExitConfirm(false);
-                  if (pendingTab && onConfirmExit) {
-                    onConfirmExit();
-                  } else if (onCancelExit) {
-                    onCancelExit();
+                onClick={async () => {
+                  const finished = await handleFinishSimulation();
+                  if (finished) {
+                    setShowExitConfirm(false);
+                    if (pendingTab && onConfirmExit) {
+                      onConfirmExit();
+                    } else if (onCancelExit) {
+                      onCancelExit();
+                    }
                   }
                 }}
+                disabled={submitting}
                 className="w-full bg-brand-primary hover:bg-brand-secondary text-white py-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-[0.98]"
               >
-                Finalizar e ver resultados
+                {submitting ? 'Validando respostas...' : 'Finalizar e ver resultados'}
               </button>
               <button
                 onClick={() => {
@@ -607,12 +628,14 @@ export default function Simulados({
           ) : (
             <button
               onClick={handleFinishSimulation}
+              disabled={submitting}
               className="px-6 sm:px-10 py-4 sm:py-5 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] shadow-lg shadow-brand-primary/20 transition-all active:scale-95"
             >
-              Finalizar Simulado
+              {submitting ? 'Validando respostas...' : 'Finalizar Simulado'}
             </button>
           )}
         </div>
+        {error && <div className="mt-4 p-4 bg-red-500/10 text-red-500 rounded-2xl font-bold text-sm text-center">{error}</div>}
 
         {/* Progress Bar */}
         <div className="mt-12 h-1 bg-text-main/5 rounded-full overflow-hidden">

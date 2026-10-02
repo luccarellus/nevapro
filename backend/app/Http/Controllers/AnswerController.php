@@ -11,9 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Respostas — espelha routes/answers.ts da API Express:
- * registra a resposta do aluno, faz upsert da questão quando inédita
- * (fluxo ENEM externo) e suporta lote de até 200 respostas.
+ * Respostas — registra apenas respostas de questões e gabaritos já persistidos
+ * pelo servidor; suporta lotes de até 200 respostas.
  */
 class AnswerController extends Controller
 {
@@ -23,9 +22,7 @@ class AnswerController extends Controller
         $data = $request->validate([
             'userId' => ['required', 'string'],
             'questionId' => ['required', 'string', 'max:64'],
-            'selectedOption' => ['nullable', 'integer', 'min:0', 'max:9'],
-            'isCorrect' => ['required', 'boolean'],
-            'questionData' => ['nullable', 'array'],
+            'selectedOption' => ['required', 'integer', 'min:0', 'max:9'],
         ]);
 
         // Política: respostas registradas apenas para a própria conta
@@ -33,35 +30,52 @@ class AnswerController extends Controller
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
 
+        $question = Question::whereKey($data['questionId'])->first(['id', 'correct_option_index', 'explanation']);
+        if (! $question) {
+            return response()->json(['error' => 'Questão indisponível para correção.'], 422);
+        }
+
+        $letter = chr(65 + $data['selectedOption']);
+        $selectedAnswer = QuestionOption::where('question_id', $data['questionId'])
+            ->where('letter', $letter)
+            ->first(['is_correct']);
+        if (! $selectedAnswer) {
+            return response()->json(['error' => 'Alternativa indisponível para a questão informada.'], 422);
+        }
+        $isCorrect = (bool) $selectedAnswer->is_correct;
+
         $tenantId = $request->attributes->get('tenant_id');
-
-        DB::transaction(function () use ($data, $tenantId) {
-            $this->upsertQuestion($data['questionId'], $data['questionData'] ?? null);
-
+        DB::transaction(function () use ($data, $tenantId, $isCorrect) {
             Answer::create([
                 'id' => (string) Str::uuid(),
                 'user_id' => $data['userId'],
                 'question_id' => $data['questionId'],
-                'selected_option_index' => $data['selectedOption'] ?? null,
-                'is_correct' => $data['isCorrect'],
+                'selected_option_index' => $data['selectedOption'],
+                'is_correct' => $isCorrect,
                 'tenant_id' => $tenantId,
             ]);
         });
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'isCorrect' => $isCorrect,
+            'correctOptionIndex' => $question->correct_option_index,
+            'explanation' => $question->explanation,
+        ]);
     }
 
     public function batch(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
-        $answers = $request->input('answers');
-
-        if (! is_array($answers) || count($answers) === 0 || count($answers) > 200) {
-            return response()->json(['error' => 'Envie entre 1 e 200 respostas.'], 400);
-        }
-
-        $userId = $answers[0]['userId'] ?? null;
-        if (! $userId || collect($answers)->contains(fn ($a) => ($a['userId'] ?? null) !== $userId || empty($a['questionId']))) {
+        $data = $request->validate([
+            'answers' => ['required', 'array', 'min:1', 'max:200'],
+            'answers.*.userId' => ['required', 'string'],
+            'answers.*.questionId' => ['required', 'string', 'max:64'],
+            'answers.*.selectedOption' => ['required', 'integer', 'min:0', 'max:9'],
+        ]);
+        $answers = $data['answers'];
+        $userId = $answers[0]['userId'];
+        if (collect($answers)->contains(fn ($answer) => $answer['userId'] !== $userId)) {
             return response()->json(['error' => 'Lote de respostas inválido.'], 400);
         }
 
@@ -70,83 +84,58 @@ class AnswerController extends Controller
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
 
-        $tenantId = $request->attributes->get('tenant_id');
+        $questionIds = collect($answers)->pluck('questionId')->unique()->values();
+        $questionData = Question::whereIn('id', $questionIds)
+            ->get(['id', 'correct_option_index', 'explanation'])
+            ->keyBy('id');
+        $questionIndexes = $questionData->map(fn ($question) => $question->correct_option_index);
+        $knownQuestionIds = $questionIndexes->keys();
+        if ($knownQuestionIds->count() !== $questionIds->count()) {
+            return response()->json(['error' => 'Uma ou mais questões estão indisponíveis para correção.'], 422);
+        }
 
-        DB::transaction(function () use ($answers, $tenantId) {
+        $options = QuestionOption::whereIn('question_id', $questionIds)
+            ->get(['question_id', 'letter'])
+            ->groupBy('question_id')
+            ->map(fn ($options) => $options->pluck('letter')->all());
+        foreach ($answers as $answer) {
+            $letter = chr(65 + $answer['selectedOption']);
+            if (! in_array($letter, $options->get($answer['questionId'], []), true)) {
+                return response()->json(['error' => 'Uma ou mais alternativas não existem para as questões informadas.'], 422);
+            }
+        }
+        $correctOptions = QuestionOption::whereIn('question_id', $questionIds)
+            ->where('is_correct', true)
+            ->get(['question_id', 'letter'])
+            ->groupBy('question_id')
+            ->map(fn ($options) => $options->pluck('letter')->all());
+        $tenantId = $request->attributes->get('tenant_id');
+        $results = [];
+
+        DB::transaction(function () use ($answers, $tenantId, $correctOptions, $questionIndexes, &$results) {
             foreach ($answers as $answer) {
-                $this->upsertQuestion($answer['questionId'], $answer['questionData'] ?? null);
+                $letter = chr(65 + $answer['selectedOption']);
+                $isCorrect = in_array($letter, $correctOptions->get($answer['questionId'], []), true);
 
                 Answer::create([
                     'id' => (string) Str::uuid(),
                     'user_id' => $answer['userId'],
                     'question_id' => $answer['questionId'],
-                    'selected_option_index' => $answer['selectedOption'] ?? null,
-                    'is_correct' => (bool) ($answer['isCorrect'] ?? false),
+                    'selected_option_index' => $answer['selectedOption'],
+                    'is_correct' => $isCorrect,
                     'tenant_id' => $tenantId,
                 ]);
+                $results[] = [
+                    'questionId' => $answer['questionId'],
+                    'selectedOption' => $answer['selectedOption'],
+                    'isCorrect' => $isCorrect,
+                    'correctOptionIndex' => $questionIndexes->get($answer['questionId']),
+                    'explanation' => $questionData->get($answer['questionId'])?->explanation,
+                ];
             }
         });
 
-        return response()->json(['success' => true, 'count' => count($answers)]);
+        return response()->json(['success' => true, 'count' => count($answers), 'results' => $results]);
     }
 
-    /**
-     * Upsert da questão quando ela ainda não existe no banco
-     * (questões vindas de fontes externas — api.enem.dev — são persistidas
-     * no primeiro registro de resposta). Sanitização idêntica ao Express.
-     */
-    private function upsertQuestion(string $questionId, ?array $raw): void
-    {
-        if (Question::where('id', $questionId)->exists()) {
-            return;
-        }
-        if (! $raw || empty($raw['text'])) {
-            return;
-        }
-
-        $options = array_slice(array_values($raw['options'] ?? []), 0, 10);
-        $optionImages = array_slice(array_values($raw['optionImages'] ?? []), 0, 10);
-        $correctIndex = is_int($raw['correctOptionIndex'] ?? null) && ($raw['correctOptionIndex'] ?? -1) >= 0
-            ? min($raw['correctOptionIndex'], 9) : null;
-
-        Question::create([
-            'id' => $questionId,
-            'subject' => mb_substr(strip_tags($raw['subject'] ?? 'Geral'), 0, 120) ?: 'Geral',
-            'text' => $this->sanitizeRichText($raw['text']),
-            'image_url' => $raw['imageUrl'] ?? null,
-            'correct_option_index' => $correctIndex,
-            'explanation' => $this->sanitizeRichText(mb_substr($raw['explanation'] ?? '', 0, 10000)),
-            'difficulty' => in_array($raw['difficulty'] ?? '', ['fácil', 'médio', 'difícil']) ? $raw['difficulty'] : 'médio',
-            'xp_reward' => ($raw['xpReward'] ?? 50) >= 0 && ($raw['xpReward'] ?? 50) <= 1000 ? (int) ($raw['xpReward'] ?? 50) : 50,
-            'year' => ($raw['year'] ?? now()->year) >= 1990 && ($raw['year'] ?? 0) <= 2100 ? (int) $raw['year'] : now()->year,
-            'index' => (int) ($raw['index'] ?? 0),
-        ]);
-
-        foreach ($options as $i => $text) {
-            $clean = $this->sanitizeRichText(mb_substr((string) $text, 0, 2000));
-            if (! $clean) {
-                continue;
-            }
-            QuestionOption::create([
-                'id' => (string) Str::uuid(),
-                'question_id' => $questionId,
-                'text' => $clean,
-                'image_url' => $optionImages[$i] ?? null,
-                'letter' => chr(65 + $i),
-                'is_correct' => $i === $correctIndex,
-            ]);
-        }
-    }
-
-    private function sanitizeRichText(?string $html): string
-    {
-        if (! $html) {
-            return '';
-        }
-        $html = preg_replace('#<(script|style)[^>]*>.*?</\1>#is', '', $html) ?? '';
-        $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/javascript\s*:/i', '', $html) ?? '';
-
-        return trim($html);
-    }
 }

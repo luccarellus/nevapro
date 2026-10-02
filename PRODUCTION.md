@@ -225,10 +225,17 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
   dados no volume `redis_data`. API, worker e scheduler aguardam Redis saudável.
 - No Compose, Laravel usa Redis para cache, sessões e filas (`CACHE_STORE=redis`,
   `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis`). Predis já está incluído nas
-  dependências PHP, sem exigir a extensão `phpredis`.
+  dependências PHP, sem exigir a extensão `phpredis`. O hostname `redis` mantém o
+  tráfego na rede privada do Compose; não substitua por um IP público no deploy.
 - No EasyPanel ou em outro runtime fora do Compose, forneça um Redis externo e
   configure `REDIS_CLIENT=predis`, `REDIS_HOST`/`REDIS_PORT` (ou `REDIS_URL`),
   `CACHE_STORE=redis`, `SESSION_DRIVER=redis` e `QUEUE_CONNECTION=redis`.
+- Mantenha o Redis na mesma rede privada da aplicação sempre que possível: Redis
+  remoto adiciona a latência de rede a cada cache miss e operação de sessão/fila.
+  `REDIS_PASSWORD` e `REDIS_USERNAME` podem complementar uma `REDIS_URL` sem
+  credenciais na API Express legada; credenciais já embutidas na URL prevalecem.
+- Execute `npm run verify:connections` no ambiente da aplicação para verificar
+  autenticação, leitura/escrita e latência PING do Redis usado pela API Express.
 - A API Express legada usa o mesmo Redis para cache compartilhado e rate limit
   distribuído quando configurada; sem ele, mantém o fallback local.
 - O serviço `worker` processa e-mails, notificações e backups.

@@ -85,10 +85,10 @@ nevapro/
 
 A Neva Pro implementa um conjunto robusto de proteções de segurança:
 
-- **Autenticação por Cookie HttpOnly** — tokens de sessão assinados com HMAC-SHA256
+- **Autenticação por Cookie HttpOnly** — tokens de acesso Laravel Sanctum no runtime de produção; a API Express legada usa sessões HMAC-SHA256
 - **Proteção contra Força Bruta** — bloqueio de conta após 5 tentativas falhas (15 min)
-- **Rate Limiter** — limitação de requisições por IP em memória
-- **Tokens Revogados** — logout invalidando o token no banco de dados
+- **Rate Limiter** — limites por IP/conta usando o cache configurado (Redis no Docker Compose)
+- **Tokens Revogados** — logout revoga a sessão atual e alterações de senha invalidam tokens anteriores
 - **Hash de Senhas** — BCrypt com salt (10 rounds), com migração automática de senhas legadas
 - **Sanitização de Inputs** — proteção contra XSS em campos de texto
 - **Proteção Mass Assignment** — campo `role` não pode ser alterado por estudantes
@@ -269,9 +269,13 @@ SUPABASE_SERVICE_ROLE_KEY="[service role key]"
 JWT_SECRET="[seu-secret]"
 ```
 
-> O deploy Docker usa tabelas PostgreSQL para cache por padrão. Redis é opcional:
-> configure `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e a conexão Redis no ambiente
-> da VPS. O backend inclui Predis e não depende da extensão PHP `phpredis`.
+> O deploy Docker Compose conecta a API Laravel ao Redis pela rede privada do Compose
+> (`CACHE_STORE=redis`, `REDIS_HOST=redis`), compartilhando cache, sessões e filas sem
+> tráfego pela internet. O target standalone/EasyPanel usa PostgreSQL por padrão;
+> para habilitar Redis, forneça um Redis privado/acessível pelo serviço e configure
+> `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e `REDIS_HOST`/`REDIS_PORT` ou `REDIS_URL`.
+> A API Express legada também aceita `REDIS_PASSWORD`/`REDIS_USERNAME` junto com uma
+> `REDIS_URL` sem credenciais. O backend inclui Predis e não depende da extensão PHP `phpredis`.
 
 ### 4. Configure o banco de dados
 

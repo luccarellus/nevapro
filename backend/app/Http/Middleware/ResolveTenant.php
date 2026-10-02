@@ -20,13 +20,17 @@ class ResolveTenant
         $authType = (string) $request->attributes->get('auth_type', '');
         $requestedTenantId = $request->header('X-Tenant-ID');
 
-        if ($requestedTenantId && $user && ! TenantAccess::canAccess($user, $authType, $requestedTenantId)) {
-            return response()->json(['error' => 'Acesso negado ao tenant solicitado.'], 403);
-        }
-
         $tenantId = $requestedTenantId
             ?? $user?->tenant_id
             ?? Tenant::PLATFORM_ID;
+
+        $tenantIsActive = Tenant::query()
+            ->whereKey($tenantId)
+            ->where('active', true)
+            ->exists();
+        if (! $tenantIsActive || ! $user || ! TenantAccess::canAccess($user, $authType, (string) $tenantId)) {
+            return response()->json(['error' => 'Acesso negado ao tenant solicitado.'], 403);
+        }
 
         $request->attributes->set('tenant_id', $tenantId);
 
