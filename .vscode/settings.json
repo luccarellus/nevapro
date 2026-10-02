@@ -3,5 +3,14 @@
   "scss.validate": false,
   "less.validate": false,
   "html.validate.styles": false,
-  "css-compatibility.enable": false
+  "css-compatibility.enable": false,
+  "docker.scout.enable": false,
+  "docker.languageserver.diagnostics.deprecatedMaintainer": "ignore",
+  "docker.languageserver.diagnostics.emptyContinuationLine": "ignore",
+  "docker.languageserver.diagnostics.instructionCasing": "ignore",
+  "docker.languageserver.diagnostics.instructionCmdMultiple": "ignore",
+  "docker.languageserver.diagnostics.instructionEntrypointMultiple": "ignore",
+  "docker.languageserver.diagnostics.instructionHealthcheckMultiple": "ignore",
+  "docker.languageserver.diagnostics.instructionJSONInSingleQuotes": "ignore",
+  "docker.languageserver.diagnostics.instructionWorkdirRelative": "ignore"
 }

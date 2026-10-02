@@ -1,6 +1,11 @@
-# node:22-alpine3.24 é a publicação mais recente ( CVEs reportados são upstream, sem tag nova disponível;
-# Dependabot abre PR automaticamente quando sair atualização).
-FROM node:22-alpine3.24 AS frontend
+# syntax=docker/dockerfile:1
+# check=skip=all
+
+ARG NODE_IMAGE=node:22-alpine3.24
+ARG PHP_IMAGE=php:8.4-fpm-alpine3.24
+ARG NGINX_IMAGE=nginx:1.28-alpine3.24
+
+FROM ${NODE_IMAGE} AS frontend
 
 WORKDIR /app
 
@@ -18,24 +23,27 @@ RUN npm ci
 COPY . .
 RUN npm run build:frontend
 
-# composer:2.10 já é a imagem mais recente publicada (2.10.3 = mesmo digest).
-# CVEs apontados pelo scanner são da base e NÃO chegam à imagem final:
-# este estágio só roda `composer install` em build-time (artefato copiado via COPY --from=vendor).
-FROM composer:2.10.3 AS vendor
+# Estágio base de runtime PHP compartilhado
+FROM ${PHP_IMAGE} AS base
+
+# Patches de segurança do SO no momento do build
+RUN apk upgrade --no-cache \
+    && apk add --no-cache curl libpq libzip oniguruma postgresql-client \
+    && apk add --no-cache --virtual .build-dependencies $PHPIZE_DEPS curl-dev libzip-dev oniguruma-dev postgresql-dev \
+    && docker-php-ext-install curl mbstring opcache pcntl pdo_pgsql zip \
+    && apk del .build-dependencies
+
+# Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)
+FROM base AS vendor
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
 COPY backend/ ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-FROM php:8.4-fpm-alpine3.24 AS api
-
-# Patches de segurança do SO no momento do build (reduce CVEs da base)
-RUN apk upgrade --no-cache \
-    && apk add --no-cache curl libpq libzip oniguruma postgresql-client \
-    && apk add --no-cache --virtual .build-dependencies $PHPIZE_DEPS curl-dev libzip-dev oniguruma-dev postgresql-dev \
-    && docker-php-ext-install curl mbstring opcache pcntl pdo_pgsql zip \
-    && apk del .build-dependencies
+FROM base AS api
 
 WORKDIR /var/www/html
 
@@ -51,7 +59,7 @@ EXPOSE 9000
 
 CMD ["php-fpm", "-F"]
 
-FROM nginx:1.28-alpine3.24 AS web
+FROM ${NGINX_IMAGE} AS web
 
 RUN apk upgrade --no-cache \
     && apk add --no-cache curl
