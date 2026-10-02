@@ -44,6 +44,7 @@ import imageProxyRoutes from './routes/imageProxy';
 import lgpdRoutes from './routes/lgpd';
 import uploadRoutes from './routes/uploads';
 import errorsBookRoutes from './routes/errorsBook';
+import sisuCutoffsRoutes from './routes/sisuCutoffs';
 import { closeCacheInvalidationSubscriber, startCacheInvalidationSubscriber } from './services/cache';
 
 
@@ -194,6 +195,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/client-logs', rateLimiter(30, 60_000), clientLogRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/user', errorsBookRoutes);
+app.use('/api/sisu', sisuCutoffsRoutes);
 app.use('/api/imagem', imageProxyRoutes);
 app.use('/api/lgpd', lgpdRoutes);
 app.use('/api', uploadRoutes);

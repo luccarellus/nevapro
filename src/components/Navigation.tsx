@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon, Target, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon, Target, TrendingUp, Layers, Medal, GraduationCap } from 'lucide-react';
 import Logo from './Logo';
 
 import { UserProfile } from '../types';
@@ -28,6 +28,9 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
     { id: 'plano_estudos', label: 'Plano de Estudos', icon: Target, color: 'text-brand-primary', bgColor: 'bg-brand-primary/10', hex: 'var(--brand-primary)' },
     { id: 'desempenho', label: 'Desempenho', icon: TrendingUp, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96' },
     { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-400', bgColor: 'bg-amber-400/10', hex: '#d8b478' },
+    { id: 'flashcards', label: 'Flashcards', icon: Layers, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
+    { id: 'metas', label: 'Metas e Conquistas', icon: Medal, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
+    { id: 'simulador_sisu', label: 'Simulador SISU', icon: GraduationCap, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
     { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96' },
     { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-400', bgColor: 'bg-purple-400/10', hex: '#4aab96' },
     { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#4aab96' },
@@ -73,19 +76,29 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 onMouseEnter={() => onTabHover?.(tab.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative ${
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group relative ${
                   isActive 
                   ? `${tab.color} ${tab.bgColor}` 
                   : 'text-text-secondary hover:bg-text-main/5 hover:text-text-main'
                 }`}
               >
                 <Icon 
-                  size={20} 
+                  size={19} 
                   strokeWidth={isActive ? 2.5 : 2} 
                   className={isActive ? tab.color : 'text-text-secondary group-hover:text-text-main transition-colors'}
                 />
-                <span className={`text-sm font-bold tracking-tight ${isActive ? 'font-black' : ''}`}>{tab.label}</span>
+                <span className={`text-sm tracking-tight truncate ${isActive ? 'font-black' : 'font-bold'}`}>{tab.label}</span>
                 
+                {tab.badge && (
+                  <span className={`ml-auto text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                    isActive
+                      ? 'bg-emerald-500 text-black shadow-sm'
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+
                 {isActive && (
                   <motion.div
                     layoutId="activeSideTab"

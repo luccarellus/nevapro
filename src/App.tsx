@@ -32,6 +32,9 @@ const Settings = lazy(() => import('./components/Settings'));
 const ErrorsBook = lazy(() => import('./components/ErrorsBook'));
 const StudyPlan = lazy(() => import('./components/StudyPlan'));
 const Performance = lazy(() => import('./components/Performance'));
+const Flashcards = lazy(() => import('./components/Flashcards'));
+const Metas = lazy(() => import('./components/Metas'));
+const SimuladorSisu = lazy(() => import('./components/SimuladorSisu'));
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
 const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
 const ComingSoon = lazy(() => import('./components/ComingSoon'));
@@ -394,6 +397,12 @@ export default function App() {
         return <StudyPlan user={user} onTabChange={handleTabChange} onEarnXp={handleEarnXp} />;
       case 'desempenho':
         return <Performance user={user} onTabChange={handleTabChange} />;
+      case 'flashcards':
+        return <Flashcards user={user} onEarnXp={handleEarnXp} />;
+      case 'metas':
+        return <Metas user={user} onTabChange={handleTabChange} />;
+      case 'simulador_sisu':
+        return <SimuladorSisu user={user} />;
       case 'ranking':
         return <Leaderboard user={user} />;
       case 'materiais':
