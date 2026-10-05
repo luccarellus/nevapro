@@ -675,6 +675,44 @@ class SecurityFixesTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
     }
 
+    public function test_client_log_accepts_the_frontend_batch_format(): void
+    {
+        $logger = Mockery::mock();
+        $logger->shouldReceive('info')->once()->withArgs(function ($message, $context) {
+            return $message === '[Client] tela carregada'
+                && ($context['context']['page'] ?? null) === '/questoes';
+        });
+        $logger->shouldReceive('warning')->once()->withArgs(function ($message, $context) {
+            return $message === '[Client] alerta'
+                && ($context['context']['timestamp'] ?? null) === '2026-10-05T17:00:00.000Z';
+        });
+        $manager = Mockery::mock(\Illuminate\Log\LogManager::class);
+        $manager->shouldReceive('channel')->with('daily')->twice()->andReturn($logger);
+        Log::swap($manager);
+
+        $request = Request::create('/api/client-logs', 'POST', [
+            'entries' => [
+                [
+                    'level' => 'info',
+                    'message' => 'tela carregada',
+                    'page' => '/questoes',
+                    'timestamp' => '2026-10-05T17:00:00.000Z',
+                ],
+                [
+                    'level' => 'warn',
+                    'message' => 'alerta',
+                    'page' => '/dashboard',
+                    'timestamp' => '2026-10-05T17:00:00.000Z',
+                ],
+            ],
+        ]);
+
+        $response = (new ClientLogController)->store($request);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(2, $response->getData(true)['accepted']);
+    }
+
     // ===== Achado 11 (BAIXA): rate limit sem Retry-After =====
 
     public function test_rate_limit_returns_retry_after_header(): void
