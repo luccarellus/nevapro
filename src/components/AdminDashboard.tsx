@@ -173,13 +173,25 @@ export default function AdminDashboard({
   }, [filterCity]);
   const gremiosMA = useMemo(() => getUniqueNormalized(students.map(s => s.gremio)), [students]);
 
+  const refreshMaterials = async () => {
+    setMaterials(await materialService.getMaterials());
+  };
+
+  const refreshRecados = async () => {
+    setRecados(await muralService.getRecados());
+  };
+
+  const refreshEventos = async () => {
+    setEventos(await eventService.getEventos());
+  };
+
+  const refreshStudents = async () => {
+    setStudents(await adminService.getStudents());
+  };
+
   const fetchData = async () => {
     try {
-      const [mats, recal, evts, studs] = await Promise.all([
-        materialService.getMaterials(), muralService.getRecados(), eventService.getEventos(),
-        adminService.getStudents()
-      ]);
-      setMaterials(mats); setRecados(recal); setEventos(evts); setStudents(studs);
+      await Promise.all([refreshMaterials(), refreshRecados(), refreshEventos(), refreshStudents()]);
     } catch (error) { console.error('Failed to fetch data:', error); }
     finally { setIsLoading(false); }
   };
@@ -239,7 +251,8 @@ export default function AdminDashboard({
       } else {
         await muralService.addRecado({ title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content, sender: 'Administração', date: new Date().toISOString() });
       }
-      setIsSuccess(true); fetchData();
+      await refreshRecados();
+      setIsSuccess(true);
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
     } catch (error: any) {
       console.error('Failed to save notice:', error);
@@ -255,7 +268,8 @@ export default function AdminDashboard({
       const payload = { title: eventForm.title, date: parts[0], time: parts[1] || '00:00', type: 'evento' as const, category: eventForm.category, xpReward: parseInt(eventForm.xpReward), observation: eventForm.observation };
       if (editingId) { await eventService.updateEvento(editingId, payload); }
       else { await eventService.addEvento(payload); }
-      setIsSuccess(true); fetchData();
+      await refreshEventos();
+      setIsSuccess(true);
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
     } catch (error: any) {
       console.error('Failed to save event:', error);
@@ -274,7 +288,8 @@ export default function AdminDashboard({
       const payload = { title: materialForm.title, type: materialForm.type as any, foco: materialForm.foco, url: finalUrl, description: materialForm.description };
       if (editingId) { await materialService.updateMaterial(editingId, payload); }
       else { await materialService.addMaterial(payload); }
-      setIsSuccess(true); fetchData();
+      await refreshMaterials();
+      setIsSuccess(true);
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
     } catch (error: any) {
       console.error('Failed to save material:', error);
@@ -305,7 +320,10 @@ export default function AdminDashboard({
       if (type === 'evento') await eventService.deleteEvento(id);
       else if (type === 'material') await materialService.deleteMaterial(id);
       else if (type === 'recado') await muralService.deleteRecado(id);
-      setDeleteConfirm(null); await fetchData();
+      setDeleteConfirm(null);
+      if (type === 'evento') await refreshEventos();
+      else if (type === 'material') await refreshMaterials();
+      else await refreshRecados();
     } catch (error) { console.error('Failed to delete ' + type + ':', error); }
   };
 

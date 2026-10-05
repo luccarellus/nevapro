@@ -15,7 +15,6 @@ export const userService = {
       method: 'POST',
       body: { ...data, recaptcha_token },
     });
-    invalidateRequestCache();
     return result;
   },
 
@@ -24,7 +23,9 @@ export const userService = {
     const url = email 
       ? `/api/user/profile?email=${encodeURIComponent(email)}` 
       : '/api/user/profile';
-    return request(url, { method: 'DELETE', body: { recaptcha_token } });
+    const result = await request<{ success: boolean }>(url, { method: 'DELETE', body: { recaptcha_token } });
+    invalidateRequestCache();
+    return result;
   },
 
   async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {

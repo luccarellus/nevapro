@@ -27,21 +27,49 @@ class AdminController extends Controller
     public function users(Request $request): JsonResponse
     {
         $tenantId = $request->attributes->get('tenant_id');
+        $cacheKey = ApiCache::ADMIN_USERS.($tenantId ? ":{$tenantId}" : '');
 
-        $users = StudentUser::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->orderBy('created_at')
-            ->limit(500)
-            ->get();
+        $users = $this->cache->remember($cacheKey, 60, function () use ($tenantId): array {
+            return DB::table('users')
+                ->when($tenantId, fn ($query) => $query->where('tenant_id', $tenantId))
+                ->orderBy('created_at')
+                ->limit(500)
+                ->get([
+                    'id', 'email', 'name', 'avatar_url', 'role', 'tenant_id', 'city',
+                    'school', 'gremio', 'xp', 'level', 'streak', 'points', 'rank',
+                    'answered_questions', 'correct_answers', 'flash_quiz_completed',
+                    'show_in_leaderboard', 'language_preference', 'tri_target_score',
+                    'created_at', 'updated_at',
+                ])
+                ->map(fn ($user): array => [
+                    'id' => $user->id,
+                    'email' => $user->email,
+                    'name' => $user->name,
+                    'avatarUrl' => B2StorageService::resolveStoredUrl($user->avatar_url),
+                    'role' => $user->role ?: 'student',
+                    'isAdmin' => false,
+                    'tenantId' => $user->tenant_id,
+                    'city' => $user->city,
+                    'school' => $user->school,
+                    'gremio' => $user->gremio,
+                    'xp' => (int) $user->xp,
+                    'level' => (int) $user->level,
+                    'streak' => (int) $user->streak,
+                    'points' => (int) $user->points,
+                    'rank' => (int) $user->rank,
+                    'answeredQuestions' => (int) $user->answered_questions,
+                    'correctAnswers' => (int) $user->correct_answers,
+                    'flashQuizCompleted' => (bool) $user->flash_quiz_completed,
+                    'showInLeaderboard' => (bool) $user->show_in_leaderboard,
+                    'languagePreference' => $user->language_preference,
+                    'triTargetScore' => (int) $user->tri_target_score,
+                    'createdAt' => $user->created_at ? Carbon::parse($user->created_at)->toISOString() : null,
+                    'updatedAt' => $user->updated_at ? Carbon::parse($user->updated_at)->toISOString() : null,
+                ])
+                ->all();
+        });
 
-        return response()->json($users->map(fn ($u) => [
-            ...$u->toProfileArray(),
-            'tenantId' => $u->tenant_id,
-            'school' => $u->school,
-            'gremio' => $u->gremio,
-            'rank' => $u->rank,
-            'updatedAt' => $u->updated_at?->toISOString(),
-        ]));
+        return response()->json($users);
     }
 
     public function createUser(Request $request): JsonResponse
@@ -69,6 +97,11 @@ class AdminController extends Controller
             'city' => $data['city'] ?? null,
             'school' => $data['school'] ?? null,
         ]);
+
+        $this->cache->invalidate(
+            ApiCache::ADMIN_USERS,
+            ...($user->tenant_id ? [ApiCache::ADMIN_USERS.":{$user->tenant_id}"] : []),
+        );
 
         return response()->json(['id' => $user->id], 201);
     }
@@ -104,6 +137,10 @@ class AdminController extends Controller
             "profile:{$user->email}",
             ApiCache::LEADERBOARD,
             ApiCache::ADMIN_ACTIVITIES,
+        );
+        $this->cache->invalidate(
+            ApiCache::ADMIN_USERS,
+            ...($user->tenant_id ? [ApiCache::ADMIN_USERS.":{$user->tenant_id}"] : []),
         );
 
         return response()->json(['success' => true]);
@@ -142,6 +179,10 @@ class AdminController extends Controller
             "profile:{$user->email}",
             ApiCache::LEADERBOARD,
             ApiCache::ADMIN_ACTIVITIES,
+        );
+        $this->cache->invalidate(
+            ApiCache::ADMIN_USERS,
+            ...($user->tenant_id ? [ApiCache::ADMIN_USERS.":{$user->tenant_id}"] : []),
         );
 
         return response()->json(['success' => true]);

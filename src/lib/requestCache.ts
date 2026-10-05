@@ -6,14 +6,17 @@ const cache = new Map<string, CacheEntry>();
 
 // Endpoint-specific TTLs (in ms)
 const ENDPOINT_TTLS: Record<string, number> = {
-  '/api/bootstrap': 60_000,      // Bootstrap: 60s (heavy endpoint, cache aggressively)
-  '/api/leaderboard': 120_000,   // Leaderboard: 2min (stable data)
-  '/api/materials': 120_000,     // Materials: 2min (stable data)
-  '/api/questoes': 300_000,      // Questions: 5min (external API, cache long)
-  '/api/user/profile': 30_000,   // Profile: 30s (user-specific)
-  '/api/user/stats': 60_000,     // Stats: 60s
-  '/api/notifications': 45_000,  // Notifications: 45s
-  '/api/performance': 60_000,    // Performance: 60s
+  '/api/bootstrap': 60_000,       // Bootstrap: 60s (heavy endpoint, cache aggressively)
+  '/api/leaderboard': 120_000,    // Leaderboard: 2min (stable data)
+  '/api/materials': 120_000,      // Materials: 2min (stable data)
+  '/api/questoes': 300_000,       // Questions: 5min (external API, cache long)
+  '/api/user/profile': 30_000,    // Profile: 30s (user-specific)
+  '/api/user/stats': 60_000,      // Stats: 60s
+  '/api/notifications': 45_000,   // Notifications: 45s
+  '/api/performance': 60_000,     // Performance: 60s
+  '/api/admin/users': 30_000,     // Admin user list: 30s (changes on writes)
+  '/api/eventos': 60_000,         // Events: 60s
+  '/api/recados': 60_000,         // Mural notices: 60s
 };
 
 function getEndpointTtl(url: string): number {
@@ -89,8 +92,8 @@ async function fetchAndCache<T>(url: string, cacheKey: string, ttlMs?: number): 
 }
 
 /**
- * Invalida cache de forma granular por padrão de URL.
- * Use prefixos específicos para não limpar tudo.
+ * Invalida TODOS os endpoints com determinado prefixo (use com cuidado).
+ * Prefira `invalidateEndpoints` para invalidações granulares.
  */
 export function invalidateRequestCache(prefix = '/api/'): void {
   for (const key of cache.keys()) {
@@ -100,10 +103,13 @@ export function invalidateRequestCache(prefix = '/api/'): void {
 
 /**
  * Invalida cache de endpoints específicos (mais granular).
+ * Suporta chaves com sufixo de tenant (url#tenant:xxx).
  */
 export function invalidateEndpoints(...patterns: string[]): void {
   for (const key of cache.keys()) {
-    if (patterns.some(p => key.includes(p))) {
+    // Strip tenant suffix before matching: "/api/eventos#tenant:abc" → "/api/eventos"
+    const path = key.split('#')[0].split('?')[0];
+    if (patterns.some((p) => path === p || path.startsWith(`${p}/`))) {
       cache.delete(key);
     }
   }

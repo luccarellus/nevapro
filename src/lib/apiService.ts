@@ -5,7 +5,7 @@
  */
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
-import { cachedFetchJson, invalidateRequestCache } from './requestCache';
+import { cachedFetchJson, invalidateEndpoints, invalidateRequestCache } from './requestCache';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -80,13 +80,32 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
 
   // Handle 204 No Content
   if (response.status === 204) {
-    invalidateRequestCache();
+    invalidateMutationCache(endpoint);
     return undefined as T;
   }
 
   const result = await response.json();
-  invalidateRequestCache();
+  invalidateMutationCache(endpoint);
   return result;
+}
+
+function invalidateMutationCache(endpoint: string): void {
+  const path = endpoint.split(/[?#]/, 1)[0];
+  if (path.startsWith('/api/auth/')) {
+    invalidateRequestCache();
+    return;
+  }
+
+  const specificCollections = ['/api/admin/users', '/api/study-plans/tasks'];
+  const collection = specificCollections.find((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+    || path.split('/').slice(0, 3).join('/');
+  const dependentEndpoints: Record<string, string[]> = {
+    '/api/admin/users': ['/api/leaderboard'],
+    '/api/user': ['/api/bootstrap', '/api/leaderboard', '/api/performance'],
+    // Bootstrap embeds materials list — bust it when materials change
+    '/api/materials': ['/api/bootstrap'],
+  };
+  invalidateEndpoints(collection, ...(dependentEndpoints[collection] || []));
 }
 
 /**

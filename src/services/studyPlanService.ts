@@ -1,5 +1,4 @@
 import { request } from '../lib/apiService';
-import { invalidateRequestCache } from '../lib/requestCache';
 
 export interface StudyTask {
   id: string;
@@ -37,34 +36,29 @@ export const studyPlanService = {
     target_tab?: string;
     task_date?: string;
   }): Promise<StudyTask> {
-    const result = await request<StudyTask>('/api/study-plans/tasks', {
+    return request<StudyTask>('/api/study-plans/tasks', {
       method: 'POST',
       body: data,
     });
-    invalidateRequestCache();
-    return result;
   },
 
   /**
    * Update a study task (toggle done, edit title, etc.).
    */
   async updateTask(id: string, data: Partial<StudyTask>): Promise<StudyTask> {
-    const result = await request<StudyTask>(`/api/study-plans/tasks/${id}`, {
+    return request<StudyTask>(`/api/study-plans/tasks/${id}`, {
       method: 'PUT',
       body: data,
     });
-    invalidateRequestCache();
-    return result;
   },
 
   /**
    * Delete a study task.
    */
   async deleteTask(id: string): Promise<void> {
-    await request<void>(`/api/study-plans/tasks/${id}`, {
+    return request<void>(`/api/study-plans/tasks/${id}`, {
       method: 'DELETE',
     });
-    invalidateRequestCache();
   },
 
   /**

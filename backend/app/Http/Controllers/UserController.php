@@ -112,6 +112,12 @@ class UserController extends Controller
         $this->cache->invalidate("profile:{$authUser->email}");
 
         $fresh = $model::where('email', $authUser->email)->first();
+        if ($type === 'student' && $fresh) {
+            $this->cache->invalidate(
+                ApiCache::ADMIN_USERS,
+                ...($fresh->tenant_id ? [ApiCache::ADMIN_USERS.":{$fresh->tenant_id}"] : []),
+            );
+        }
 
         return response()->json(['success' => true, 'user' => $fresh->toProfileArray()]);
     }
@@ -164,6 +170,11 @@ class UserController extends Controller
             ApiCache::LEADERBOARD,
             ApiCache::ADMIN_ACTIVITIES,
             "profile:{$authUser->email}",
+        );
+        $tenantId = $authUser->tenant_id;
+        $this->cache->invalidate(
+            ApiCache::ADMIN_USERS,
+            ...($tenantId ? [ApiCache::ADMIN_USERS.":{$tenantId}"] : []),
         );
 
         return response()->json([
@@ -228,6 +239,12 @@ class UserController extends Controller
             ApiCache::LEADERBOARD,
             ApiCache::ADMIN_ACTIVITIES,
         );
+        if ($type === 'student') {
+            $this->cache->invalidate(
+                ApiCache::ADMIN_USERS,
+                ...($user->tenant_id ? [ApiCache::ADMIN_USERS.":{$user->tenant_id}"] : []),
+            );
+        }
 
         return response()->json(['success' => true]);
     }

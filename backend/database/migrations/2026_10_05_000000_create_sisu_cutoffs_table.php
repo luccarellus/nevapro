@@ -9,12 +9,22 @@ return new class extends Migration
 {
     /**
      * Notas de corte oficiais do SISU, ingeridos por edição
-     * (scripts/ingestSisuCutoffs.ts). Mesmo schema da API Express.
+     * (scripts/ingestSisuCutoffs.ts).
+     *
+     * Em bancos já inicializados pela stack Express legada a tabela
+     * public.sisu_cutoffs já existe (criada pela ingestão Express,
+     * fora do migrator do Laravel). Nesses casos apenas registramos
+     * a migration, sem recriar — por isso o guard Schema::hasTable().
      */
     public function up(): void
     {
+        if (Schema::hasTable('sisu_cutoffs')) {
+            return;
+        }
+
         Schema::create('sisu_cutoffs', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
+            // Sem surrogate PK: a ingestão Express não escreve "id" e
+            // a API Laravel só lê — a chave natural é a unique abaixo.
             $table->string('course');
             $table->string('campus');
             $table->string('university');
@@ -27,8 +37,19 @@ return new class extends Migration
             $table->unsignedInteger('seats');
             $table->unsignedInteger('year');
             $table->string('edition');
+            // Escritos apenas pela ingestão Express (ingestSisuCutoffs.ts)
+            $table->string('source')->nullable();
+            $table->timestampTz('ingested_at')->nullable();
             $table->timestampTz('created_at')->useCurrent();
             $table->timestampTz('updated_at')->useCurrent();
+
+            // Upsert da ingestão: ON CONFLICT (year, edition, university,
+            // course, shift, modality) — sem esta constraint o INSERT do
+            // Express falha com "no unique or exclusion constraint matching".
+            $table->unique(
+                ['year', 'edition', 'university', 'course', 'shift', 'modality'],
+                'sisu_cutoffs_unique'
+            );
 
             $table->index(['modality', 'year', 'edition']);
             $table->index(['year', 'edition']);

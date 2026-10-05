@@ -24,6 +24,8 @@ class ApiCache
 
     public const ADMIN_ACTIVITIES = 'admin_activities';
 
+    public const ADMIN_USERS = 'admin_users';
+
     public function remember(string $key, int $ttlSeconds, Closure $callback): mixed
     {
         return Cache::remember("neva:{$key}", now()->addSeconds($ttlSeconds), $callback);
