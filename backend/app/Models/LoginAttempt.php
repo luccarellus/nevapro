@@ -11,6 +11,8 @@ class LoginAttempt extends Model
 {
     protected $table = 'login_attempts';
 
+    protected $primaryKey = 'email';
+
     public $incrementing = false;
 
     protected $keyType = 'string';

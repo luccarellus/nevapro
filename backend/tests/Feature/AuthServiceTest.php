@@ -70,4 +70,27 @@ class AuthServiceTest extends TestCase
         self::assertNotNull($cookie);
         self::assertNotNull(app(AuthService::class)->resolveFromToken($cookie->getValue()));
     }
+
+    public function test_failed_logins_update_attempts_using_email_as_the_primary_key(): void
+    {
+        StudentUser::create([
+            'id' => (string) Str::uuid(),
+            'email' => 'student@example.test',
+            'password_hash' => Hash::make('correct-password'),
+            'name' => 'Student',
+        ]);
+
+        $credentials = [
+            'email' => 'student@example.test',
+            'password' => 'wrong-password',
+        ];
+
+        $this->postJson('/api/auth/login', $credentials)->assertUnauthorized();
+        $this->postJson('/api/auth/login', $credentials)->assertUnauthorized();
+
+        self::assertDatabaseHas('login_attempts', [
+            'email' => 'student@example.test',
+            'attempts' => 2,
+        ]);
+    }
 }
