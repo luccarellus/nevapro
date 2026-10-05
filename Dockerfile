@@ -47,7 +47,8 @@ RUN set -eux; \
     echo "opcache.jit_buffer_size=64M" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
     echo "opcache.file_cache_consistency_checks=1" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini
 
-# Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)FROM base AS vendor
+# Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)
+FROM base AS vendor
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
