@@ -95,6 +95,9 @@ const proxyImageUrl = (urlOrObj: any) => {
 
 const normalizeStr = (str: string) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+const QUESTION_POOL_CACHE_TTL_MS = 8 * 60_000;
+const questionPoolCache = new Map<number, { promise: Promise<Question[]>; expiresAt: number }>();
+
 /** Busca questoes da EnemHub via proxy interno e normaliza para Question. */
 const enemhubService = {
   async getQuestionsByYear(year: number): Promise<Question[]> {
@@ -138,9 +141,26 @@ const enemhubService = {
 
 export const enemService = {
   async getQuestionsByYear(year: number): Promise<Question[]> {
+    const cached = questionPoolCache.get(year);
+    if (cached && cached.expiresAt > Date.now()) return cached.promise;
+    if (cached) questionPoolCache.delete(year);
+
+    const promise = this.fetchQuestionsByYear(year);
+    questionPoolCache.set(year, { promise, expiresAt: Date.now() + QUESTION_POOL_CACHE_TTL_MS });
+    void promise.then((questions) => {
+      if (questions.length === 0 && questionPoolCache.get(year)?.promise === promise) {
+        questionPoolCache.delete(year);
+      }
+    }, () => {
+      if (questionPoolCache.get(year)?.promise === promise) questionPoolCache.delete(year);
+    });
+    return promise;
+  },
+
+  async fetchQuestionsByYear(year: number): Promise<Question[]> {
     console.log(`[ENEM Service] Starting fetch for year ${year}`);
     const BATCH_SIZE = 50;
-    const TOTAL_REQUESTS = 5; // Fetch 250 items to be safe for 180 questions
+    const TOTAL_REQUESTS = 4; // 200 slots cover all 180 official questions
 
     try {
       // Fonte 2 (EnemHub) em paralelo — falha nao quebra o fluxo (fallback interno)

@@ -52,69 +52,99 @@ async function persistExternalQuestions(
   source: 'enem' | 'enemhub',
   year: number,
 ): Promise<void> {
+  const rows = questions.map((question) => {
+    const alternatives = question.alternatives;
+    if (!Array.isArray(alternatives) || alternatives.length < 2 || alternatives.length > MAX_OPTIONS) {
+      throw new Error('External question has an invalid alternatives list.');
+    }
+    if (alternatives.some((alternative) => typeof alternative.text !== 'string')) {
+      throw new Error('External question has an invalid alternative text.');
+    }
+
+    const id = externalQuestionId(question, source, year);
+    const subject = source === 'enem'
+      ? (typeof question.discipline === 'string' ? question.discipline : 'Geral')
+      : (typeof question.subject === 'object' && question.subject !== null &&
+          typeof (question.subject as Record<string, unknown>).name === 'string'
+          ? (question.subject as Record<string, string>).name : 'Geral');
+    const text = source === 'enem'
+      ? `${typeof question.context === 'string' ? question.context : ''}\n\n${typeof question.alternativesIntroduction === 'string' ? question.alternativesIntroduction : ''}`.trim()
+      : typeof question.statement === 'string' ? question.statement : '';
+    if (!id || id.length > 64 || !text) {
+      throw new Error('External question has invalid identifying or text fields.');
+    }
+
+    const correctIndexes = alternatives.flatMap((alternative, index) => {
+      const isCorrect = alternative.isCorrect === true || alternative.letter === question.correctAlternative;
+      return isCorrect ? [index] : [];
+    });
+    if (correctIndexes.length !== 1) {
+      throw new Error('External question has no unique, verifiable correct alternative.');
+    }
+
+    return {
+      id,
+      subject: subject.slice(0, 255),
+      text,
+      image_url: source === 'enem' && Array.isArray(question.files) && typeof question.files[0] === 'string'
+        ? question.files[0] : null,
+      correct_option_index: correctIndexes[0],
+      explanation: '',
+      difficulty: source === 'enemhub' && ['fácil', 'médio', 'difícil'].includes(String(question.difficulty))
+        ? question.difficulty : 'médio',
+      xp_reward: 15,
+      year,
+      question_index: source === 'enem' && Number.isInteger(question.index) ? question.index : null,
+      alternatives: alternatives.map((alternative, index) => ({
+        text: alternative.text,
+        image_url: typeof (source === 'enem' ? alternative.file : alternative.image) === 'string'
+          ? source === 'enem' ? alternative.file : alternative.image
+          : null,
+        letter: String.fromCharCode(65 + index),
+        is_correct: index === correctIndexes[0],
+      })),
+    };
+  });
+
+  if (rows.length === 0) return;
+
   const client = await getClient();
   try {
     await client.query('BEGIN');
-    for (const question of questions) {
-      const alternatives = question.alternatives;
-      if (!Array.isArray(alternatives) || alternatives.length < 2 || alternatives.length > MAX_OPTIONS) {
-        throw new Error('External question has an invalid alternatives list.');
-      }
-      const id = externalQuestionId(question, source, year);
-      const subject = source === 'enem'
-        ? (typeof question.discipline === 'string' ? question.discipline : 'Geral')
-        : (typeof question.subject === 'object' && question.subject !== null &&
-            typeof (question.subject as Record<string, unknown>).name === 'string'
-            ? (question.subject as Record<string, string>).name : 'Geral');
-      const text = source === 'enem'
-        ? `${typeof question.context === 'string' ? question.context : ''}\n\n${typeof question.alternativesIntroduction === 'string' ? question.alternativesIntroduction : ''}`.trim()
-        : typeof question.statement === 'string' ? question.statement : '';
-      if (!id || id.length > 64 || !text) {
-        throw new Error('External question has invalid identifying or text fields.');
-      }
+    const inserted = await client.query<{ id: string }>(
+      `INSERT INTO public.questions
+        (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index, tenant_id, created_at)
+       SELECT q.id, q.subject, q.text, q.image_url, q.correct_option_index, q.explanation,
+              q.difficulty, q.xp_reward, q.year, q.question_index, NULL, NOW()
+       FROM jsonb_to_recordset($1::jsonb) AS q(
+         id text, subject varchar(255), text text, image_url text,
+         correct_option_index integer, explanation text, difficulty varchar(20),
+         xp_reward integer, year integer, question_index integer
+       )
+       ON CONFLICT (id) DO NOTHING
+       RETURNING id`,
+      [JSON.stringify(rows)],
+    );
+    const insertedIds = new Set(inserted.rows.map(({ id }) => id));
+    const alternatives = rows
+      .filter((question) => insertedIds.has(question.id))
+      .flatMap((question) => question.alternatives.map((alternative) => ({
+        question_id: question.id,
+        ...alternative,
+      })));
 
-      const correctIndexes = alternatives.flatMap((alternative, index) => {
-        const isCorrect = alternative.isCorrect === true || alternative.letter === question.correctAlternative;
-        return isCorrect ? [index] : [];
-      });
-      if (correctIndexes.length !== 1) {
-        throw new Error('External question has no unique, verifiable correct alternative.');
-      }
-      const correctIndex = correctIndexes[0];
-      const inserted = await client.query(
-        `INSERT INTO public.questions
-          (id, subject, text, image_url, correct_option_index, explanation, difficulty, xp_reward, year, index, tenant_id, created_at)
-         VALUES ($1, $2, $3, $4, $5, '', $6, 15, $7, $8, NULL, NOW())
-         ON CONFLICT (id) DO NOTHING
-         RETURNING id`,
-        [
-          id,
-          subject.slice(0, 255),
-          text,
-          source === 'enem' && Array.isArray(question.files) && typeof question.files[0] === 'string'
-            ? question.files[0] : null,
-          correctIndex,
-          source === 'enemhub' && ['fácil', 'médio', 'difícil'].includes(String(question.difficulty))
-            ? question.difficulty : 'médio',
-          year,
-          source === 'enem' && Number.isInteger(question.index) ? question.index : null,
-        ],
+    if (alternatives.length > 0) {
+      await client.query(
+        `INSERT INTO public.question_options
+          (id, question_id, text, image_url, letter, is_correct)
+         SELECT gen_random_uuid(), option.question_id, option.text, option.image_url, option.letter, option.is_correct
+         FROM jsonb_to_recordset($1::jsonb) AS option(
+           question_id varchar(64), text text, image_url text, letter varchar(2), is_correct boolean
+         )`,
+        [JSON.stringify(alternatives)],
       );
-      if (inserted.rowCount === 0) continue;
-
-      for (const [index, alternative] of alternatives.entries()) {
-        if (typeof alternative.text !== 'string') {
-          throw new Error('External question has an invalid alternative text.');
-        }
-        const image = source === 'enem' ? alternative.file : alternative.image;
-        await client.query(
-          `INSERT INTO public.question_options
-            (id, question_id, text, image_url, letter, is_correct)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, $5)`,
-          [id, alternative.text, typeof image === 'string' ? image : null, String.fromCharCode(65 + index), index === correctIndex],
-        );
-      }
     }
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

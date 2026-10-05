@@ -169,7 +169,10 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
               {ENEM_YEARS.map(year => (
                 <button
                   key={year}
-                  onClick={() => setSelectedYear(year)}
+                  onClick={() => {
+                    setSelectedYear(year);
+                    void enemService.getQuestionsByYear(year);
+                  }}
                   className={`py-3 rounded-xl md:rounded-2xl font-bold text-[11px] transition-all cursor-pointer active:scale-95 ${
                     selectedYear === year
                       ? 'bg-brand-primary text-white'
