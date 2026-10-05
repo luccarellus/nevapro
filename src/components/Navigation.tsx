@@ -76,6 +76,7 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 onMouseEnter={() => onTabHover?.(tab.id)}
+                onFocus={() => onTabHover?.(tab.id)}
                 className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 group relative ${
                   isActive 
                   ? `${tab.color} ${tab.bgColor}` 
@@ -174,6 +175,8 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
                       <button
                         key={tab.id}
                         onClick={() => handleTabClick(tab.id)}
+                        onTouchStart={() => onTabHover?.(tab.id)}
+                        onFocus={() => onTabHover?.(tab.id)}
                         className={`flex flex-col items-center gap-1 py-2 px-1 transition-all ${
                           isActive ? tab.color : tab.id === 'logout' ? 'text-red-500/70 hover:text-red-500' : 'text-text-secondary hover:text-text-main'
                         }`}
@@ -201,6 +204,8 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id)}
+                  onTouchStart={() => onTabHover?.(tab.id)}
+                  onFocus={() => onTabHover?.(tab.id)}
                   className={`flex flex-col items-center gap-1 py-3 px-2 flex-1 transition-all ${
                     isActive ? tab.color : 'text-text-secondary hover:text-text-main'
                   }`}

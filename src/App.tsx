@@ -40,6 +40,24 @@ const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
 const ComingSoon = lazy(() => import('./components/ComingSoon'));
 const ResetPassword = lazy(() => import('./components/ResetPassword'));
 
+const tabComponentPrefetchers: Record<string, () => Promise<unknown>> = {
+  dashboard: () => import('./components/Dashboard'),
+  questions: () => import('./components/Questions'),
+  simulados: () => import('./components/Simulados'),
+  errors: () => import('./components/ErrorsBook'),
+  plano_estudos: () => import('./components/StudyPlan'),
+  desempenho: () => import('./components/Performance'),
+  flashcards: () => import('./components/Flashcards'),
+  metas: () => import('./components/Metas'),
+  simulador_sisu: () => import('./components/SimuladorSisu'),
+  ranking: () => import('./components/Leaderboard'),
+  materiais: () => import('./components/Materiais'),
+  mural: () => import('./components/Mural'),
+  calendar: () => import('./components/Calendar'),
+  admin: () => import('./components/AdminDashboard'),
+  profile: () => import('./components/Settings'),
+};
+
 const PageLoading = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <Spinner size={36} />
@@ -79,6 +97,13 @@ export default function App() {
 
   // Prefetch adjacent tabs on hover (desktop only)
   const handleNavHover = (tabId: string) => {
+    const prefetchComponent = tabComponentPrefetchers[tabId];
+    if (prefetchComponent) {
+      void prefetchComponent().catch((error) => {
+        console.warn(`[Navigation] Falha ao pré-carregar tela "${tabId}":`, error);
+      });
+    }
+
     if (!isLoggedIn || user.role === 'admin') return;
     // Prefetch data for likely next destinations
     const prefetchMap: Record<string, string[]> = {
