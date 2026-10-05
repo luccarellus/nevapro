@@ -6,6 +6,7 @@ use App\Models\AdminUser;
 use App\Models\StudentUser;
 use App\Services\ApiCache;
 use App\Services\B2StorageService;
+use App\Services\XpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,20 @@ class UserController extends Controller
             'gremio' => ['sometimes', 'nullable', 'string', 'max:255'],
             'showInLeaderboard' => ['sometimes', 'boolean'],
             'languagePreference' => ['sometimes', 'string', 'max:20'],
-            'avatarUrl' => ['sometimes', 'nullable', 'string', 'max:2048'],
+            'avatarUrl' => [
+                'sometimes', 'nullable', 'string', 'max:2048',
+                function ($attribute, $value, $fail) use ($authUser): void {
+                    if (! is_string($value) || $value === '') {
+                        return;
+                    }
+                    // Só aceita o próprio avatar: evita apontar o perfil
+                    // para objetos de outro usuário (IDOR de leitura).
+                    $key = B2StorageService::extractObjectKey($value);
+                    if ($key === null || ! str_starts_with($key, 'avatars/'.$authUser->id.'/')) {
+                        $fail('URL do avatar inválida.');
+                    }
+                },
+            ],
         ]);
 
         // Mass assignment protection: nunca via esta rota
@@ -102,6 +116,65 @@ class UserController extends Controller
         return response()->json(['success' => true, 'user' => $fresh->toProfileArray()]);
     }
 
+    /**
+     * Recalcula answered/correct/xp a partir das respostas REALMENTE
+     * registradas no banco (a última resposta por questão) e aplica de
+     * forma atômica. O cliente nunca envia valores — apenas dispara a
+     * sincronização após um simulado/atividade.
+     */
+    public function progressSync(Request $request): JsonResponse
+    {
+        $authUser = $request->attributes->get('auth_user');
+        $type = $request->attributes->get('auth_type');
+
+        // Somente alunos possuem histórico de respostas
+        if ($type !== 'student') {
+            return response()->json(['error' => 'Usuário não encontrado.'], 404);
+        }
+
+        $stats = DB::selectOne(
+            'WITH latest AS (
+               SELECT DISTINCT ON (question_id) question_id, is_correct
+               FROM answers
+               WHERE user_id = ?
+               ORDER BY question_id, created_at DESC
+             )
+             SELECT COUNT(*) AS answered,
+                    COALESCE(SUM(CASE WHEN is_correct THEN 1 ELSE 0 END), 0) AS correct
+             FROM latest',
+            [$authUser->id],
+        );
+
+        $answered = (int) ($stats->answered ?? 0);
+        $correct = (int) ($stats->correct ?? 0);
+        $incorrect = max($answered - $correct, 0);
+        $xp = $correct * XpService::XP_PER_CORRECT_ANSWER
+            + $incorrect * XpService::XP_PER_INCORRECT_ANSWER;
+        $level = XpService::levelFromXp($xp);
+
+        StudentUser::whereKey($authUser->id)->update([
+            'answered_questions' => $answered,
+            'correct_answers' => $correct,
+            'xp' => $xp,
+            'level' => $level,
+            'updated_at' => now(),
+        ]);
+
+        $this->cache->invalidate(
+            ApiCache::LEADERBOARD,
+            ApiCache::ADMIN_ACTIVITIES,
+            "profile:{$authUser->email}",
+        );
+
+        return response()->json([
+            'success' => true,
+            'answered' => $answered,
+            'correct' => $correct,
+            'xp' => $xp,
+            'level' => $level,
+        ]);
+    }
+
     public function deleteProfile(Request $request): JsonResponse
     {
         $authUser = $request->attributes->get('auth_user');
@@ -123,6 +196,11 @@ class UserController extends Controller
         }
 
         $objectKey = $user->avatar_url ? B2StorageService::extractObjectKey($user->avatar_url) : null;
+        // Só remove o objeto se estiver no diretório de avatar deste usuário:
+        // URLs legadas/invalidadas não podem deletar objetos arbitrários do bucket.
+        if ($objectKey !== null && ! str_starts_with($objectKey, 'avatars/'.$user->id.'/')) {
+            $objectKey = null;
+        }
         DB::transaction(function () use ($user, $model): void {
             foreach (['answers', 'xp_logs', 'notifications', 'user_study_tasks', 'user_tenant_roles', 'notification_reads', 'password_reset_tokens'] as $table) {
                 DB::table($table)->where('user_id', $user->id)->delete();

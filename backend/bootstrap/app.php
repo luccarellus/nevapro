@@ -4,6 +4,7 @@ use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\RateLimitByKey;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\VerifyCsrfToken;
 use App\Http\Middleware\VerifyRecaptcha;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -29,11 +30,16 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => ResolveTenant::class,
             'throttle.custom' => RateLimitByKey::class,
             'recaptcha' => VerifyRecaptcha::class,
+            'csrf' => VerifyCsrfToken::class,
         ]);
 
-        // Todas as rotas de /api/* retornam JSON
+        // Todas as rotas de /api/* retornam JSON.
+        // CSRF (double-submit HMAC) roda antes de tudo: só bloqueia
+        // requisições mutantes com cookie de sessão — login, register,
+        // cron e webhooks são anônimos (sem cookie) e passam direto.
         $middleware->api(prepend: [
             HandleCors::class,
+            VerifyCsrfToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

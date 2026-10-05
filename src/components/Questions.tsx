@@ -12,6 +12,7 @@ import { ArrowRight, Award, BookOpen } from 'lucide-react';
 import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
 import Spinner from './Spinner';
+import { csrfHeaders } from '../lib/apiService';
 
 interface QuestionsProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -103,7 +104,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
       if (answerBatch.length > 0) {
         const response = await fetch('/api/answers/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...csrfHeaders() },
         body: JSON.stringify({ answers: answerBatch }),
         });
         if (!response.ok) throw new Error('A API não validou as respostas.');

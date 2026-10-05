@@ -1,4 +1,4 @@
-import { request } from '../lib/apiService';
+import { request, csrfHeaders } from '../lib/apiService';
 import { UserProfile } from '../types';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 import { executeRecaptcha } from '../lib/recaptcha';
@@ -114,6 +114,7 @@ export const userService = {
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
+        ...csrfHeaders(),
       },
       body: JSON.stringify({ ...data, recaptcha_token }),
     });

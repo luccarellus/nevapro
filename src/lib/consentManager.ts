@@ -1,4 +1,5 @@
 import { ConsentPreferences, ConsentCategory } from '../types/consent';
+import { csrfHeaders } from './apiService';
 
 const STORAGE_KEY = 'neva_cookie_consent';
 
@@ -102,7 +103,7 @@ export const saveConsent = async (preferences: ConsentPreferences) => {
   try {
     await fetch('/api/lgpd/consent-log', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
       body: JSON.stringify({ 
         preferences: updatedPrefs,
         userAgent: navigator.userAgent

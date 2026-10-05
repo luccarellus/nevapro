@@ -14,6 +14,8 @@ import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
 import { UserProfile } from '../types';
 import Spinner from './Spinner';
+import { csrfHeaders } from '../lib/apiService';
+import { XP_PER_CORRECT_ANSWER, XP_PER_INCORRECT_ANSWER } from '../utils/xpUtils';
 
 interface ErrorQuestion {
   id: string;
@@ -141,25 +143,30 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
     const selected = retrySelectedOption[question.id];
     if (selected === undefined) return;
 
-    const isCorrect = selected === question.correctOptionIndex;
-
     try {
-      setRetryStatus(prev => ({ ...prev, [question.id]: isCorrect ? 'correct' : 'wrong' }));
-
-      // Envia resposta para a API
-      await fetch('/api/answers', {
+      // Envia resposta para a API — o servidor determina o gabarito
+      const response = await fetch('/api/answers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...csrfHeaders(),
+        },
         body: JSON.stringify({
           userId: user.id || 'u1',
           questionId: question.id,
           selectedOption: selected,
-          isCorrect,
-          xpReward: 10 // Recompensa menor por refazer erro
         })
       });
+      if (!response.ok) {
+        throw new Error('Falha ao enviar resposta de correção.');
+      }
+      const answerResult = await response.json();
+      const retryCorrect = answerResult.isCorrect === true;
 
-      if (isCorrect) {
+      setRetryStatus(prev => ({ ...prev, [question.id]: retryCorrect ? 'correct' : 'wrong' }));
+
+      if (retryCorrect) {
         // Animação de confetes premium
         confetti({
           particleCount: 100,
@@ -168,8 +175,8 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
           colors: ['#00b094', '#4aab96', '#d8b478', '#ffffff']
         });
 
-        // Concede XP e pontos de acerto
-        onEarnXp(15, 1, 1, false, `Corrigiu erro: Questão ${question.index} (${question.year})`);
+        // XP dinâmico: mesma recompensa do servidor por resposta correta
+        onEarnXp(XP_PER_CORRECT_ANSWER, 1, 1, false, `Corrigiu erro: Questão ${question.index} (${question.year})`);
 
         // Agenda remoção com animação suave de saída
         setTimeout(() => {
@@ -184,7 +191,10 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
       } else {
         // Vibração física/visual no erro (feedback imediato)
         if (navigator.vibrate) navigator.vibrate(200);
-        
+
+        // XP da tentativa incorreta, conforme tabela do servidor
+        onEarnXp(XP_PER_INCORRECT_ANSWER, 0, 1, false, `Tentativa no caderno de erros: Questão ${question.index} (${question.year})`);
+
         setTimeout(() => {
           setRetryStatus(prev => ({ ...prev, [question.id]: 'idle' }));
         }, 2000);

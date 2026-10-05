@@ -14,9 +14,17 @@ class VerifyCronSecret
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $secret = config('services.cron.secret');
+        $expected = (string) config('services.cron.secret');
+        $provided = (string) ($request->header('X-Cron-Secret') ?? '');
 
-        if (! $secret || ! hash_equals($secret, (string) $request->header('X-Cron-Secret'))) {
+        // Comparação em tempo constante com length equalizado via hash
+        // (não vaza o tamanho do segredo via timing).
+        $valid = $expected !== '' && hash_equals(
+            hash('sha256', $expected),
+            hash('sha256', $provided),
+        );
+
+        if (! $valid) {
             return response()->json(['error' => 'Não autorizado.'], 401);
         }
 

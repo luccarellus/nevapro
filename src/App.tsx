@@ -15,6 +15,7 @@ import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
 import { calculateLevelAndProgression } from './utils/xpUtils';
 import { invalidateRequestCache, prefetchEndpoint } from './lib/requestCache';
+import { csrfHeaders, request } from './lib/apiService';
 
 import Spinner from './components/Spinner';
 
@@ -299,7 +300,10 @@ export default function App() {
 
     logoutInFlight.current = (async () => {
       try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', ...csrfHeaders() },
+        });
       } catch (err) {
         console.error('Erro ao fazer logout no servidor:', err);
       } finally {
@@ -365,12 +369,36 @@ export default function App() {
 
     // Persist to server
     try {
-      const res = await userService.updateProfile(updatedUser);
-      if (res && res.user) {
-        const { nextLevelXp: syncNext, currentLevelMinXp: syncMin } = calculateLevelAndProgression(res.user.xp || 0);
-        const syncedUser = { ...res.user, nextLevelXp: syncNext, currentLevelMinXp: syncMin };
-        setUser(prev => ({ ...prev, ...syncedUser }));
-        localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+      if (isFlashQuiz) {
+        // Flash quiz: guard atômico no servidor concede o XP fixo uma única vez.
+        const res = await userService.updateProfile(updatedUser);
+        if (res && res.user) {
+          const { nextLevelXp: syncNext, currentLevelMinXp: syncMin } = calculateLevelAndProgression(res.user.xp || 0);
+          const syncedUser = { ...res.user, nextLevelXp: syncNext, currentLevelMinXp: syncMin };
+          setUser(prev => ({ ...prev, ...syncedUser }));
+          localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+        }
+      } else {
+        // XP e contadores são recalculados pelo servidor a partir das respostas
+        // registradas — o cliente nunca envia valores (mass assignment).
+        const sync = await request<{ success: boolean; answered: number; correct: number; xp: number; level: number }>(
+          '/api/user/progress/sync',
+          { method: 'POST', body: {} },
+        );
+        if (sync && sync.success) {
+          const { nextLevelXp: syncNext, currentLevelMinXp: syncMin } = calculateLevelAndProgression(sync.xp || 0);
+          const syncedUser = {
+            ...updatedUser,
+            xp: sync.xp,
+            level: sync.level,
+            correctAnswers: sync.correct,
+            answeredQuestions: sync.answered,
+            nextLevelXp: syncNext,
+            currentLevelMinXp: syncMin,
+          };
+          setUser(prev => ({ ...prev, ...syncedUser }));
+          localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+        }
       }
     } catch (error) {
       console.error('Failed to sync XP with server:', error);
@@ -484,7 +512,7 @@ export default function App() {
   const isUserAdmin = Boolean(
     user.isAdmin ||
     user.role === 'admin' ||
-    user.roles?.some((r) => ['super_admin', 'tenant_admin', 'teacher'].includes(r))
+    user.roles?.some((r) => ['super_admin', 'tenant_admin'].includes(r))
   );
 
   const isFullPageTab = ['admin', 'privacidade', 'cookies'].includes(activeTab) || (isUserAdmin && activeTab === 'admin');

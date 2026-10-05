@@ -1,3 +1,5 @@
+import { csrfHeaders } from '../lib/apiService';
+
 interface UploadResponse {
   url: string;
 }
@@ -32,6 +34,7 @@ export const uploadService = {
       method: 'POST',
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
+        ...csrfHeaders(),
       },
       body: formData,
     });

@@ -4,6 +4,7 @@ import { Lock, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 import Logo from './Logo';
 import Spinner from './Spinner';
 import { executeRecaptcha } from '../lib/recaptcha';
+import { csrfHeaders } from '../lib/apiService';
 
 interface ResetPasswordProps {
   onBack: () => void;
@@ -74,6 +75,7 @@ export default function ResetPassword({ onBack }: ResetPasswordProps) {
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest',
+          ...csrfHeaders(),
         },
         body: JSON.stringify({
           password,

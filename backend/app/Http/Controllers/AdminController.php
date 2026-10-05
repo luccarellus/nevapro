@@ -115,6 +115,11 @@ class AdminController extends Controller
             ->when($request->attributes->get('tenant_id'), fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
             ->findOrFail($id);
         $objectKey = $user->avatar_url ? B2StorageService::extractObjectKey($user->avatar_url) : null;
+        // Só remove o objeto se estiver no diretório de avatar deste usuário:
+        // URLs legadas/invalidadas não podem deletar objetos arbitrários do bucket.
+        if ($objectKey !== null && ! str_starts_with($objectKey, 'avatars/'.$user->id.'/')) {
+            $objectKey = null;
+        }
 
         DB::transaction(function () use ($user): void {
             DB::table('user_tenant_roles')->where('user_id', $user->id)->delete();

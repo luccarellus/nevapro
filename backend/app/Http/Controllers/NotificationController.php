@@ -30,12 +30,13 @@ class NotificationController extends Controller
             ->pluck('notification_id')
             ->all();
 
+        // Shape consumido pelo frontend (Header.tsx): { id, title, message, type, read, createdAt }
         $data = $notifications->map(fn ($n) => [
             'id' => $n->id,
             'title' => $n->title,
-            'content' => $n->content,
+            'message' => $n->content,
             'type' => $n->type,
-            'isRead' => $n->is_read || in_array($n->id, $readIds, true),
+            'read' => (bool) ($n->is_read || in_array($n->id, $readIds, true)),
             'createdAt' => $n->created_at?->toISOString(),
         ]);
 

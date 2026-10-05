@@ -14,21 +14,44 @@ class LgpdController extends Controller
 {
     public function consentLog(Request $request): JsonResponse
     {
+        // Shape consumido pelo frontend (consentManager.ts): { preferences, userAgent }
         $data = $request->validate([
-            'consent_type' => ['required', 'string', 'max:100'],
-            'granted' => ['required', 'boolean'],
-            'policy_version' => ['nullable', 'string', 'max:20'],
+            'preferences' => ['required', 'array'],
+            'preferences.*' => ['boolean'],
+            'userAgent' => ['nullable', 'string', 'max:512'],
         ]);
 
         $user = $request->attributes->get('auth_user');
 
+        $consentTypes = collect($data['preferences'])
+            ->filter(fn ($granted) => $granted === true)
+            ->keys()
+            ->slice(0, 20)
+            ->values()
+            ->all();
+
         Log::channel('daily')->info('[LGPD] consent', [
             'user_id' => $user?->id,
             'email' => $user?->email,
-            'ip' => $request->ip(),
-            ...$data,
+            'ip' => $this->anonymizeIp($request->ip()),
+            'userAgent' => $data['userAgent'] ?? $request->userAgent(),
+            'consentTypes' => $consentTypes ?: ['necessary_only'],
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Minimização de PII (LGPD): preserva apenas os 3 primeiros
+     * octetos do IPv4 — permite correlação por /24 sem
+     * identificar o usuário exato.
+     */
+    private function anonymizeIp(?string $ip): ?string
+    {
+        if ($ip === null || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            return $ip;
+        }
+
+        return implode('.', array_slice(explode('.', $ip), 0, 3)).'.0';
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\ApiCache;
 use App\Services\B2StorageService;
+use App\Services\CsrfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +82,8 @@ class BootstrapController extends Controller
             ];
         });
 
-        return response()->json($payload);
+        // Token anti-CSRF nunca vem do cache: depende do cookie
+        // de sessão corrente (double-submit HMAC, igual ao Express).
+        return response()->json([...$payload, 'csrfToken' => CsrfService::issue($request)]);
     }
 }

@@ -51,6 +51,53 @@ abstract class CrudController extends Controller
         return $this->model()::make()->getFillable();
     }
 
+    /** Regras de validação do create/update (vazia = apenas allowlist de campos). */
+    protected function validationRules(): array
+    {
+        return [];
+    }
+
+    /** Mapeia chaves do payload → colunas reais (ex.: category → type). */
+    protected function fieldMap(): array
+    {
+        return [];
+    }
+
+    /** Valores padrão aplicados na criação quando o campo não veio no payload. */
+    protected function defaults(): array
+    {
+        return [];
+    }
+
+    /** Payload validado e mapeado, respeitando a allowlist de campos. */
+    private function validatedPayload(Request $request, bool $isCreate): array
+    {
+        $data = $request->only($this->writableFields());
+        $rules = $this->validationRules();
+
+        if ($rules !== []) {
+            $subset = $isCreate
+                ? $rules
+                : array_intersect_key($rules, array_flip(array_keys($request->all())));
+            if ($subset !== []) {
+                $data = array_merge($data, $request->validate($subset));
+            }
+        }
+
+        foreach ($this->fieldMap() as $from => $to) {
+            if (array_key_exists($from, $data)) {
+                $data[$to] = $data[$from];
+                unset($data[$from]);
+            }
+        }
+
+        if ($isCreate) {
+            $data = array_merge($this->defaults(), $data);
+        }
+
+        return $data;
+    }
+
     /** Chaves extras de cache a invalidar nas escritas. */
     protected function extraCacheKeys(): array
     {
@@ -82,7 +129,7 @@ abstract class CrudController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $request->only($this->writableFields());
+        $data = $this->validatedPayload($request, true);
         [$col] = $this->orderBy();
 
         $row = $this->model()::create(array_merge($data, [
@@ -106,7 +153,15 @@ abstract class CrudController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $row = $this->findForTenant($request, $id);
-        $row->update($request->only($this->writableFields()));
+        $payload = $this->validatedPayload($request, false);
+
+        // Defesa em profundidade: um item nunca muda de tenant via API,
+        // mesmo que um campo tenant_id vaze para o payload.
+        if ($this->tenantScoped()) {
+            $payload['tenant_id'] = $request->attributes->get('tenant_id');
+        }
+
+        $row->update($payload);
 
         $this->invalidateCaches($request);
 

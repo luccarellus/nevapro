@@ -32,7 +32,7 @@ class RateLimitByKey
             if ($attempts > $max) {
                 return response()->json([
                     'error' => 'Muitas tentativas. Tente novamente em alguns minutos.',
-                ], 429);
+                ], 429)->header('Retry-After', (string) $windowSeconds);
             }
         }
 

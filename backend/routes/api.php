@@ -17,6 +17,7 @@ use App\Http\Controllers\MuralController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\SisuController;
 use App\Http\Controllers\StorageObjectController;
 use App\Http\Controllers\StudyPlanController;
 use App\Http\Controllers\TenantController;
@@ -68,6 +69,9 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     Route::get('user/profile', [UserController::class, 'profile']);
     Route::post('user/profile', [UserController::class, 'updateProfile'])
         ->middleware(['throttle.custom:10,60', 'recaptcha']);
+    // Recalcula progresso (XP/contadores) a partir das respostas — valores só no servidor
+    Route::post('user/progress/sync', [UserController::class, 'progressSync'])
+        ->middleware('throttle.custom:10,60');
     Route::delete('user/profile', [UserController::class, 'deleteProfile'])
         ->middleware(['throttle.custom:3,60', 'recaptcha']);
 
@@ -134,7 +138,12 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     Route::get('performance', [PerformanceController::class, 'index']);
     Route::get('performance/tri-scores', [PerformanceController::class, 'index']);
     Route::get('performance/subject-mastery', [PerformanceController::class, 'subjectMastery']);
-    Route::post('performance/calculate-tri', [PerformanceController::class, 'calculateTri']);
+    Route::post('performance/calculate-tri', [PerformanceController::class, 'calculateTri'])
+        ->middleware('throttle.custom:10,60');
+
+    // SISU — notas de corte oficiais (autenticado)
+    Route::get('sisu/cutoffs', [SisuController::class, 'cutoffs'])
+        ->middleware('throttle.custom:60,60');
 
     // Tenants (troca de instituição)
     Route::get('tenants', [TenantController::class, 'index']);
@@ -175,12 +184,12 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
 
 // ===== Cron (server-to-server, autentica via CRON_SECRET) =====
 Route::prefix('cron')->middleware(VerifyCronSecret::class)->group(function () {
-    Route::post('cleanup', [CronController::class, 'cleanup']);
-    Route::post('backup', [CronController::class, 'backup']);
+    Route::match(['get', 'post'], 'cleanup', [CronController::class, 'cleanup']);
+    Route::match(['get', 'post'], 'backup', [CronController::class, 'backup']);
 });
 
 // ===== Webhooks (server-to-server, sem CSRF) =====
 Route::prefix('webhooks')->group(function () {
     Route::post('eventease', [WebhookController::class, 'eventease'])
-        ->middleware(VerifyWebhookSecret::class);
+        ->middleware([VerifyWebhookSecret::class, 'throttle.custom:10,60']);
 });

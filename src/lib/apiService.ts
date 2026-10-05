@@ -25,6 +25,20 @@ export function setCsrfToken(token: string | null | undefined): void {
   csrfToken = token && typeof token === 'string' ? token : null;
 }
 
+/** Token anti-CSRF corrente (capturado no bootstrap). */
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+/**
+ * Headers de segurança para requisições mutantes feitas via `fetch`
+ * direto (fora de `request`). Sem cookie de sessão o servidor dispensa
+ * o token; com sessão ativa o header é obrigatório (403 sem ele).
+ */
+export function csrfHeaders(): Record<string, string> {
+  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+}
+
 async function request<T>(endpoint: string, config: RequestConfig = { method: 'GET' }): Promise<T> {
   const { method, body } = config;
   if (method === 'GET') return cachedFetchJson<T>(endpoint);

@@ -226,6 +226,7 @@ class QuestionController extends Controller
             'subject' => ['required', 'string', 'max:120'],
             'text' => ['required', 'string'],
             'options' => ['required', 'array', 'min:2', 'max:10'],
+            'options.*' => ['string', 'max:2000'],
             'correctOptionIndex' => ['required', 'integer', 'min:0'],
             'explanation' => ['nullable', 'string', 'max:10000'],
             'difficulty' => ['nullable', 'string', 'in:fácil,médio,difícil'],
@@ -233,6 +234,7 @@ class QuestionController extends Controller
             'year' => ['nullable', 'integer', 'min:1990', 'max:2100'],
             'imageUrl' => ['nullable', 'string', 'max:2048'],
             'optionImages' => ['nullable', 'array', 'max:10'],
+            'optionImages.*' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $options = array_values($data['options']);
@@ -249,7 +251,7 @@ class QuestionController extends Controller
                 'correct_option_index' => $data['correctOptionIndex'],
                 'explanation' => $this->sanitizeRichText($data['explanation'] ?? ''),
                 'difficulty' => $data['difficulty'] ?? 'médio',
-                'xp_reward' => $data['xpReward'] ?? 10,
+                'xp_reward' => $data['xpReward'] ?? 50,
                 'year' => $data['year'] ?? now()->year,
                 'tenant_id' => $request->attributes->get('tenant_id'),
             ]);
@@ -278,18 +280,99 @@ class QuestionController extends Controller
         return response()->json(['id' => $question->id], 201);
     }
 
-    /** Sanitização de rich-text (equivalente pragmático do sanitize-html). */
+    /** Tags mantidas no rich-text (o conteúdo é renderizado com rehype-raw no FE). */
+    private const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'u', 'b', 'i', 'span', 'div', 'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3'];
+
+    /** Atributos mantidos (href é validado separadamente). */
+    private const ALLOWED_ATTRS = ['href', 'title', 'target'];
+
+    /**
+     * Sanitização de rich-text por allowlist real via DOM:
+     * tags/atributos fora da lista são removidos (não apenas padrões
+     * conhecidos), eliminando XSS em conteúdo renderizado com rehype-raw.
+     */
     private function sanitizeRichText(?string $html): string
     {
-        if (! $html) {
+        if (! is_string($html) || $html === '') {
             return '';
         }
-        // Remove scripts/styles/event handlers; mantém texto e tags básicas
-        $html = preg_replace('#<(script|style)[^>]*>.*?</\1>#is', '', $html) ?? '';
-        $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/javascript\s*:/i', '', $html) ?? '';
 
-        return trim($html);
+        $previous = libxml_use_internal_errors(true);
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        // HTML-ENTITIES evita que o parser leia UTF-8 como ISO-8859-1;
+        // um <meta> antes do wrapper quebra o parsing do fragmento.
+        $wrapped = '<div id="__root__">'.mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8').'</div>';
+        $dom->loadHTML($wrapped, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $root = $dom->documentElement;
+        if ($root === null || strtolower($root->tagName) !== 'div' || $root->getAttribute('id') !== '__root__') {
+            return strip_tags($html);
+        }
+
+        return trim($this->sanitizeNode($root));
+    }
+
+    /** Serializa recursivamente mantendo apenas a allowlist de tags/atributos. */
+    private function sanitizeNode(\DOMNode $node): string
+    {
+        $output = '';
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof \DOMText) {
+                $output .= htmlspecialchars($child->wholeText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+                continue;
+            }
+            if (! $child instanceof \DOMElement) {
+                continue;
+            }
+
+            $tag = strtolower($child->tagName);
+            if (! in_array($tag, self::ALLOWED_TAGS, true)) {
+                // Tag desconhecida: preserva apenas o conteúdo textual
+                $output .= $this->sanitizeNode($child);
+
+                continue;
+            }
+
+            $attributes = '';
+            foreach ($child->attributes as $attribute) {
+                $name = strtolower($attribute->name);
+                if (! in_array($name, self::ALLOWED_ATTRS, true)) {
+                    continue;
+                }
+                $value = $attribute->value;
+                if ($name === 'href' && ! $this->isSafeUrl($value)) {
+                    continue;
+                }
+                $attributes .= ' '.$name.'="'.htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'"';
+            }
+
+            $inner = $this->sanitizeNode($child);
+            $output .= $tag === 'br' ? '<br>' : '<'.$tag.$attributes.'>'.$inner.'</'.$tag.'>';
+        }
+
+        return $output;
+    }
+
+    /** URLs relativas e http(s)/mailto/tel são permitidas; esquemas perigosos não. */
+    private function isSafeUrl(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+        if (str_starts_with($url, '//')) {
+            return false;
+        }
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $url) === 1
+            && preg_match('#^(https?://|mailto:|tel:)#i', $url) !== 1) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -372,10 +455,15 @@ class QuestionController extends Controller
                 $inserted = DB::table('questions')->insertOrIgnore([
                     'id' => $id,
                     'subject' => mb_substr(strip_tags((string) $subject), 0, 255),
-                    'text' => $text,
+                    'text' => $this->sanitizeRichText($text),
                     'image_url' => $imageUrl,
                     'correct_option_index' => $correctIndex,
-                    'explanation' => is_string($raw['explanation'] ?? null) ? $raw['explanation'] : '',
+                    // Conteúdo de provider externo: sanitizado com a
+                    // mesma allowlist de rich-text do store() (defesa
+                    // em profundidade — o FE também aplica rehype-sanitize).
+                    'explanation' => is_string($raw['explanation'] ?? null)
+                        ? $this->sanitizeRichText($raw['explanation'])
+                        : '',
                     'difficulty' => $difficulty,
                     'xp_reward' => $xpReward,
                     'year' => $year,

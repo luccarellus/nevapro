@@ -20,11 +20,45 @@ class ClientLogController extends Controller
             'context' => ['nullable', 'array'],
         ]);
 
-        Log::channel('daily')->{$data['level'] === 'warn' ? 'warning' : $data['level']}('[Client] '.$data['message'], [
+        // Log forging: quebras de linha viram espaços; o contexto é
+        // sanitizado recursivamente (apenas escalares, com limite).
+        $message = preg_replace('/[\r\n]+/', ' ', $data['message']) ?? $data['message'];
+
+        Log::channel('daily')->{$data['level'] === 'warn' ? 'warning' : $data['level']}('[Client] '.$message, [
             'user' => $request->attributes->get('auth_user')?->email,
-            'context' => $data['context'] ?? null,
+            'context' => $this->sanitizeContext($data['context'] ?? []),
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    /** @return mixed */
+    private function sanitizeContext(mixed $value, int $depth = 0): mixed
+    {
+        if ($depth > 4) {
+            return '(profundidade maxima)';
+        }
+        if (is_string($value)) {
+            return mb_substr((string) preg_replace('/[\r\n]+/', ' ', $value), 0, 500);
+        }
+        if (is_scalar($value) || $value === null) {
+            return $value;
+        }
+        if (! is_array($value)) {
+            return '(tipo ignorado)';
+        }
+
+        $sanitized = [];
+        foreach ($value as $key => $item) {
+            if (! is_string($key) && ! is_int($key)) {
+                continue;
+            }
+            $sanitizedKey = is_string($key)
+                ? mb_substr((string) preg_replace('/[\r\n]+/', ' ', $key), 0, 100)
+                : $key;
+            $sanitized[$sanitizedKey] = $this->sanitizeContext($item, $depth + 1);
+        }
+
+        return $sanitized;
     }
 }

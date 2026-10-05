@@ -12,6 +12,7 @@ import { ClipboardList, Clock, ArrowRight, Award, Check, X, Info, ChevronDown, A
 import { MarkdownImage } from './ProxiedImage';
 import QuestionOption from './QuestionOption';
 import Spinner from './Spinner';
+import { csrfHeaders } from '../lib/apiService';
 
 interface SimuladosProps {
   onEarnXp: (xp: number, correct?: number, answered?: number, isFlashQuiz?: boolean, activityName?: string) => void;
@@ -205,7 +206,7 @@ export default function Simulados({
       if (answerBatch.length > 0) {
         const response = await fetch('/api/answers/batch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...csrfHeaders() },
           body: JSON.stringify({ answers: answerBatch }),
         });
         if (!response.ok) throw new Error('A API não validou as respostas.');

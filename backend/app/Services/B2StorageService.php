@@ -72,6 +72,33 @@ class B2StorageService
      * Extrai a object key de uma URL B2 armazenada no banco.
      * Espelha extractObjectKey() do Express.
      */
+    /**
+     * Assina uma object key com HMAC-SHA256 (mesma semântica de storageUrl.ts do Express).
+     * Usada em URLs /api/storage/object?file=...&s=... para evitar acesso direto sem autorização.
+     */
+    public static function signObjectKey(string $key): string
+    {
+        $secret = (string) env('JWT_SECRET');
+        $raw = hash_hmac('sha256', 'storage:'.$key, $secret, true);
+        $base64Url = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+
+        return substr($base64Url, 0, 32);
+    }
+
+    /**
+     * Verifica a assinatura de uma object key em tempo constante.
+     */
+    public static function verifyObjectSignature(string $key, mixed $signature): bool
+    {
+        if (! is_string($signature) || $signature === '') {
+            return false;
+        }
+
+        $expected = self::signObjectKey($key);
+
+        return hash_equals($expected, $signature);
+    }
+
     public static function extractObjectKey(string $url): ?string
     {
         if (str_starts_with($url, '/api/storage/object?file=')) {
@@ -110,8 +137,10 @@ class B2StorageService
 
         $key = self::extractObjectKey($url);
 
-        return $key
-            ? '/api/storage/object?file='.rawurlencode($key)
-            : $url;
+        if (! $key) {
+            return $url;
+        }
+
+        return '/api/storage/object?file='.rawurlencode($key).'&s='.rawurlencode(self::signObjectKey($key));
     }
 }

@@ -255,6 +255,11 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
       await dbAdmin.from('xp_logs').delete().eq('user_id', userId);
       await dbAdmin.from('answers').delete().eq('user_id', userId);
       await dbAdmin.from('notifications').delete().eq('user_id', userId);
+      await dbAdmin.from('notification_reads').delete().eq('user_id', userId);
+      await dbAdmin.from('user_study_tasks').delete().eq('user_id', userId);
+      await dbAdmin.from('user_tenant_roles').delete().eq('user_id', userId);
+      await dbAdmin.from('personal_access_tokens').delete().eq('tokenable_id', userId).eq('tokenable_type', 'App\\Models\\StudentUser');
+      await dbAdmin.from('password_reset_tokens').delete().eq('user_id', userId);
       await dbAdmin.from('users').delete().eq('email', email);
     }
 
@@ -271,6 +276,15 @@ router.delete('/profile', verifyRecaptcha(), requireAuth, async (req: Authentica
       if (objectKey) {
         await dbAdmin.storage.from(B2_BUCKET).remove(objectKey).catch(() => {});
       }
+    }
+
+    // Dependências da conta administrativa (se existir).
+    // O query builder devolve erros em { error } sem lançar —
+    // falhas aqui não impedem a remoção da conta.
+    if (adminRows[0]?.id) {
+      await dbAdmin.from('notification_reads').delete().eq('user_id', adminRows[0].id);
+      await dbAdmin.from('personal_access_tokens').delete().eq('tokenable_id', adminRows[0].id).eq('tokenable_type', 'App\\Models\\AdminUser');
+      await dbAdmin.from('password_reset_tokens').delete().eq('user_id', adminRows[0].id);
     }
 
     await dbAdmin.from('admin_users').delete().eq('email', email);

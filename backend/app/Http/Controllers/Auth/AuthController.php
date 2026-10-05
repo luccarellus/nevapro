@@ -61,8 +61,10 @@ class AuthController extends Controller
         $token = $this->auth->issueToken($user, $type);
         $this->storeTokenVersion($user, $token, $type);
 
-        // Cookie HttpOnly com o token Sanctum — mesmo nome usado pelo Express
-        $cookie = cookie('session_token', $token, 24 * 60, '/', null, config('session.secure'), false, 'Lax');
+        // Cookie HttpOnly com o token Sanctum — mesmo nome usado pelo Express.
+        // Assinatura do helper: cookie($name, $value, $minutes, $path, $domain,
+        // $secure, $httpOnly, $raw, $sameSite) — HttpOnly=true, raw=false.
+        $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
 
         return response()->json(['success' => true, 'user' => $user->toProfileArray()])
             ->withCookie($cookie);
@@ -81,11 +83,16 @@ class AuthController extends Controller
 
         $email = $this->auth->normalizeEmail($data['email']);
 
-        if (AdminUser::where('email', $email)->exists()) {
-            return response()->json(['error' => 'E-mails administrativos devem ser gerenciados pelo banco de dados.'], 403);
+        // Rate limit por conta (anti-abuse de cadastro) — mesma política do login
+        if ($lock = $this->checkLock($email)) {
+            return response()->json(['error' => $lock], 429);
         }
-        if (StudentUser::where('email', $email)->exists()) {
-            return response()->json(['error' => 'E-mail já cadastrado.'], 400);
+
+        // Resposta 409 uniforme (anti-enumeração de contas) — mesma política do Express
+        if (AdminUser::where('email', $email)->exists() || StudentUser::where('email', $email)->exists()) {
+            $this->recordFailedAttempt($email);
+
+            return response()->json(['error' => 'Não foi possível concluir o cadastro com este e-mail. Se for você, tente entrar ou recuperar a senha.'], 409);
         }
 
         $user = StudentUser::create([
@@ -115,7 +122,7 @@ class AuthController extends Controller
         $token = $this->auth->issueToken($user, 'student');
         $this->storeTokenVersion($user, $token, 'student');
 
-        $cookie = cookie('session_token', $token, 24 * 60, '/', null, config('session.secure'), false, 'Lax');
+        $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
 
         return response()->json(['success' => true, 'user' => $user->toProfileArray()], 201)
             ->withCookie($cookie);

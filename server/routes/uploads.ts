@@ -13,6 +13,8 @@ import { requireAuth } from '../middleware/auth';
 import { verifyRecaptcha } from '../middleware/recaptcha';
 import { dbAdmin } from '../lib/dbQueryBuilder';
 import { isB2LogStorageConfigured } from '../services/b2LogStorage';
+import { hasPermission } from '../services/rbacService';
+import { PERMISSIONS } from '../lib/permissions';
 import { signObjectKey, verifyObjectSignature } from '../utils/storageUrl';
 import { fromBuffer as fileTypeFromBuffer } from 'file-type';
 
@@ -87,6 +89,16 @@ const receiveUpload = (req: any, res: any, next: any) => {
 // ===== Upload =====
 router.post('/upload', rateLimiter(5, 60_000), requireAuth, receiveUpload, verifyRecaptcha(), async (req: any, res: any) => {
   try {
+    // Upload de MATERIAL é restrito a professor/admin/tenant_admin
+    // (permissão RBAC materials:upload) — alunos só fazem avatar.
+    // Espelha a checagem do UploadController do Laravel.
+    if (req.query.kind === 'material') {
+      const context = (req as any).rbacContext;
+      if (!context || !hasPermission(context, PERMISSIONS.MATERIALS_UPLOAD, (req as any).tenantId)) {
+        res.status(403).json({ error: 'Acesso negado: permissões insuficientes.' });
+        return;
+      }
+    }
     if (!isB2LogStorageConfigured()) {
       log.error('[Upload] Backblaze B2 não configurada no ambiente de execução.');
       res.status(503).json({

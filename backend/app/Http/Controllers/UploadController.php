@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\B2StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -42,13 +43,38 @@ class UploadController extends Controller
         ]);
 
         $file = $request->file('file');
+        $this->assertSafeContent($file);
         $prefix = $isMaterial ? 'materials' : "avatars/{$user->id}";
         $key = $prefix.'/'.Str::uuid().'.'.$file->guessExtension();
 
         app(B2StorageService::class)->putFile($key, $file->getRealPath(), $file->getMimeType());
 
-        $url = '/api/storage/object?file='.rawurlencode($key);
+        $url = '/api/storage/object?file='.rawurlencode($key).'&s='.rawurlencode(B2StorageService::signObjectKey($key));
 
         return response()->json(['url' => $url]);
+    }
+
+    /**
+     * Valida o conteúdo real (magic bytes): a extensão declarada
+     * não prova o tipo do arquivo, e um formato inesperado pode
+     * explorar parsers downstream. Vídeos (mp4/webm) não têm
+     * assinatura textual confiável — ficam por conta de mimes+max.
+     */
+    private function assertSafeContent(UploadedFile $file): void
+    {
+        $extension = strtolower((string) $file->guessExtension());
+        $path = $file->getRealPath();
+        if ($path === false) {
+            abort(422, 'Arquivo inválido.');
+        }
+
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
+            && @getimagesize($path) === false) {
+            abort(422, 'Conteúdo da imagem inválido.');
+        }
+
+        if ($extension === 'pdf' && file_get_contents($path, false, null, 0, 5) !== '%PDF-') {
+            abort(422, 'Conteúdo do PDF inválido.');
+        }
     }
 }

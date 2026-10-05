@@ -112,8 +112,10 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
             setCoursesCatalog(mapped);
           }
         }
-      } catch {
-        // Fallback silencioso para o catálogo curado
+      } catch (err) {
+        // Fallback explícito para o catálogo curado (nunca silencioso)
+        console.warn('[SISU] Falha ao carregar notas de corte; usando catálogo local.', err);
+        if (active) setCoursesCatalog(FALLBACK_CATALOG);
       }
     };
     fetchCutoffs();

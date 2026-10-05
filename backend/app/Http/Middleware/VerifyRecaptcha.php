@@ -20,8 +20,16 @@ class VerifyRecaptcha
         $secret = config('services.recaptcha.secret');
         $token = $request->input('recaptcha_token');
 
-        if (! $secret || ! is_string($token) || $token === '') {
+        // Sem segredo configurado o recurso fica sem proteção (documentado
+        // em .env.example) — mesma política do Express.
+        if (! $secret) {
             return $next($request); // desconfigurado: sem bloqueio
+        }
+
+        // Com segredo configurado, token ausente/vazio NÃO passa (fail closed):
+        // omitir o token não pode burlar a proteção.
+        if (! is_string($token) || trim($token) === '') {
+            return response()->json(['error' => 'Verificação de segurança falhou. Tente novamente.'], 403);
         }
 
         try {
@@ -34,9 +42,17 @@ class VerifyRecaptcha
 
             $data = $response->json();
 
-            // Só bloqueia em score explicitamente baixo (mesma política do Express)
-            if (($data['success'] ?? false) === true && isset($data['score']) && $data['score'] < 0.5) {
+            // Fail-closed: mesma política do Express (auth.ts) — sucesso=false ou score baixo bloqueia.
+            if (($data['success'] ?? false) !== true) {
+                Log::warning('[Recaptcha] verificação rejeitada pelo Google.');
+
+                return response()->json(['error' => 'Verificação de segurança falhou. Tente novamente.'], 403);
+            }
+
+            if (isset($data['score']) && $data['score'] < 0.5) {
                 Log::warning('[Recaptcha] score baixo: '.$data['score']);
+
+                return response()->json(['error' => 'Verificação de segurança falhou. Tente novamente.'], 403);
             }
         } catch (\Throwable $e) {
             Log::warning('[Recaptcha] erro (non-blocking): '.$e->getMessage());

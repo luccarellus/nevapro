@@ -1,3 +1,7 @@
+// Espelha XpService do backend: XP concedido por resposta.
+export const XP_PER_CORRECT_ANSWER = 10;
+export const XP_PER_INCORRECT_ANSWER = 2;
+
 export const calculateLevelAndProgression = (totalXp: number): { 
   level: number; 
   currentLevelMinXp: number; 

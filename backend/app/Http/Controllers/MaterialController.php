@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Material;
+use App\Services\ApiCache;
 use App\Services\B2StorageService;
 
 /**
@@ -29,6 +30,32 @@ class MaterialController extends CrudController
     protected function notificationType(): string
     {
         return 'material';
+    }
+
+    /** Campos graváveis: id/tenant_id/uploaded_at nunca vêm do cliente. */
+    protected function writableFields(): array
+    {
+        return ['title', 'subject', 'foco', 'description', 'url', 'type'];
+    }
+
+    protected function validationRules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'subject' => ['nullable', 'string', 'max:120'],
+            'foco' => ['nullable', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'type' => ['nullable', 'string', 'max:40'],
+            'url' => [
+                'required', 'string', 'max:2048',
+                function ($attribute, $value, $fail): void {
+                    $key = is_string($value) ? B2StorageService::extractObjectKey($value) : null;
+                    if ($key === null || ! str_starts_with($key, 'materials/')) {
+                        $fail('URL do material inválida.');
+                    }
+                },
+            ],
+        ];
     }
 
     protected function extraCacheKeys(): array

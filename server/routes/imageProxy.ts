@@ -8,6 +8,7 @@
 
 import { Router, Response } from 'express';
 import { rateLimiter } from '../middleware/rateLimiter';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -55,7 +56,9 @@ const fetchImageWithRedirects = async (rawUrl: string, signal: AbortSignal) => {
   throw new Error('limite de redirecionamentos excedido');
 };
 
-router.get('/', rateLimiter(120, 60_000), async (req, res: Response) => {
+// Autenticado (cookie session_token ou Bearer) + limite 120/min —
+// paridade com a rota Laravel (auth.custom + throttle.custom:120,60).
+router.get('/', requireAuth, rateLimiter(120, 60_000), async (req, res: Response) => {
   const imageUrl = req.query.url as string;
   if (!imageUrl) {
     res.status(400).send('URL missing');

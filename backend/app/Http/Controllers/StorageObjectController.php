@@ -23,14 +23,23 @@ class StorageObjectController extends Controller
             return response()->json(['error' => 'Armazenamento de arquivos indisponível.'], 503);
         }
 
+        if (! B2StorageService::verifyObjectSignature($file, $request->query('s'))) {
+            return response()->json(['error' => 'Assinatura de arquivo inválida.'], 403);
+        }
+
         $storage = app(B2StorageService::class);
         if (str_starts_with($file, 'materials/')) {
+            // Compara pela object key normalizada: URLs assinadas (com &s=),
+            // chaves brutas e URLs B2 legadas apontam para o mesmo objeto.
+            // (A comparação literal quebrava: o FE persiste a URL assinada.)
             $tenantId = $request->attributes->get('tenant_id');
-            $proxyUrl = '/api/storage/object?file='.rawurlencode($file);
-            $belongsToTenant = DB::table('materials')
+            $storedUrls = DB::table('materials')
                 ->when($tenantId, fn ($query) => $query->where('tenant_id', $tenantId))
-                ->whereIn('url', [$proxyUrl, $file, $storage->url($file)])
-                ->exists();
+                ->pluck('url');
+            $belongsToTenant = $storedUrls->contains(
+                fn (mixed $storedUrl): bool => is_string($storedUrl)
+                    && B2StorageService::extractObjectKey($storedUrl) === $file,
+            );
             if (! $belongsToTenant) {
                 return response()->json(['error' => 'Arquivo não encontrado.'], 404);
             }

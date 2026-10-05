@@ -115,20 +115,26 @@ export default function Performance({ user, onTabChange }: PerformanceProps) {
         setStats(triData.stats || { hit_rate: 0, answered: 0, correct: 0, xp: 0 });
         setSubjectsMastery(masteryData.subjects || []);
 
-        // Auto-trigger TRI calculation based on latest answers
+        // Recalcula TRI só quando há respostas novas desde a última
+        // execução (evita reprocessar o histórico a cada montagem).
         setCalculatingTri(true);
         try {
-          const triResult = await performanceService.calculateTri();
-          if (triResult.calculated && triResult.overall) {
-            setLatestTriScore({
-              id: triResult.overall.id,
-              estimated_score: triResult.overall.estimated_score,
-              math_score: triResult.by_subject?.math_score || null,
-              nature_score: triResult.by_subject?.nature_score || null,
-              humanities_score: triResult.by_subject?.humanities_score || null,
-              languages_score: triResult.by_subject?.languages_score || null,
-              calculated_at: triResult.overall.calculated_at,
-            });
+          const answeredNow = triData.stats?.answered || 0;
+          const lastSynced = Number(sessionStorage.getItem('neva_tri_last_answered') || '0');
+          if (answeredNow > lastSynced) {
+            const triResult = await performanceService.calculateTri();
+            sessionStorage.setItem('neva_tri_last_answered', String(answeredNow));
+            if (triResult.calculated && triResult.overall) {
+              setLatestTriScore({
+                id: triResult.overall.id,
+                estimated_score: triResult.overall.estimated_score,
+                math_score: triResult.by_subject?.math_score || null,
+                nature_score: triResult.by_subject?.nature_score || null,
+                humanities_score: triResult.by_subject?.humanities_score || null,
+                languages_score: triResult.by_subject?.languages_score || null,
+                calculated_at: triResult.overall.calculated_at,
+              });
+            }
           }
         } catch (calcErr) {
           console.error('[Performance] Erro no cálculo TRI:', calcErr);

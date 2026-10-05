@@ -4,6 +4,7 @@ import { Sun, Moon, Bell, X, BookOpen, MessageSquare, Calendar as CalendarIcon }
 import Logo from './Logo';
 import TenantSwitcher from './TenantSwitcher';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
+import { csrfHeaders } from '../lib/apiService';
 
 import { UserProfile } from '../types';
 
@@ -25,7 +26,10 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
   const handleNotificationClick = async (n: any) => {
     if (!n.read) {
       try {
-        const response = await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
+        const response = await fetch(`/api/notifications/${n.id}/read`, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', ...csrfHeaders() },
+        });
         if (response.ok) {
           invalidateRequestCache('/api/notifications');
           setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif));
@@ -68,7 +72,10 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
   const markAllAsRead = async () => {
     try {
       const url = userEmail ? `/api/notifications/read-all?email=${encodeURIComponent(userEmail)}` : '/api/notifications/read-all';
-      const response = await fetch(url, { method: 'POST' });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', ...csrfHeaders() },
+      });
       if (response.ok) {
         invalidateRequestCache('/api/notifications');
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));

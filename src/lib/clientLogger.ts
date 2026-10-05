@@ -1,3 +1,5 @@
+import { csrfHeaders } from './apiService';
+
 type LogLevel = 'info' | 'warn' | 'error';
 
 interface ClientLogEntry {
@@ -54,6 +56,7 @@ export async function flushClientLogs() {
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
+        ...csrfHeaders(),
       },
       body: JSON.stringify({ entries }),
     });
