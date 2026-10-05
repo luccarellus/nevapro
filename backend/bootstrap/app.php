@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\HttpCacheHeaders;
 use App\Http\Middleware\RateLimitByKey;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\VerifyCsrfToken;
@@ -40,6 +41,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             HandleCors::class,
             VerifyCsrfToken::class,
+        ]);
+
+        // Headers de cache por endpoint (roda por último, sobre a resposta final)
+        $middleware->api(append: [
+            HttpCacheHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

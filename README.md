@@ -44,8 +44,6 @@ nevapro/
 │   ├── types/           # Tipos e interfaces TypeScript
 │   └── utils/           # Funções utilitárias (XP, cálculos)
 ├── nginx/               # Configuração do Nginx (proxy reverso)
-├── cron/                # Scripts legados de cron
-├── schema.sql           # Schema completo do banco de dados
 ├── docker-compose.yml   # Nginx + Laravel + worker + scheduler
 ├── Dockerfile           # Build multi-stage da aplicação
 └── vite.config.ts       # Configuração do bundler Vite
@@ -173,9 +171,6 @@ cp .env.example .env
 ```
 
 ```env
-# Chave da API Gemini (Google AI)
-GEMINI_API_KEY="sua_chave_aqui"
-
 # URL da aplicação
 APP_URL="http://localhost:3000"
 
@@ -202,6 +197,9 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 - No Supabase Auth, marque o usuário com `app_metadata.role = "admin"` ou mantenha o e-mail correspondente em `public.admin_users`.
 - A primeira autenticação do admin sincroniza `admin_users.auth_user_id` automaticamente.
 - O login e a troca de senha do admin dependem exclusivamente do Supabase Auth.
+
+> **Nota:** o schema do banco é gerenciado pelas migrations do Laravel
+> (`backend/database/migrations`); execute `php artisan migrate --force`.
 
 ### Runtime local Laravel
 
@@ -279,10 +277,10 @@ JWT_SECRET="[seu-secret]"
 
 ### 4. Configure o banco de dados
 
-Execute o schema no seu PostgreSQL:
+O schema é gerenciado pelas migrations do Laravel:
 
 ```bash
-psql -U seu_usuario -d nevapro -f schema.sql
+cd backend && php artisan migrate --force
 ```
 
 ### 5. Inicie o servidor de desenvolvimento

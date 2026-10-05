@@ -1,4 +1,0 @@
-# Horários em UTC (mesmos do vercel.json)
-# minuto hora dia mês dia-da-semana comando
-0 3 * * * /usr/local/bin/run-cron.sh cleanup
-0 4 * * * /usr/local/bin/run-cron.sh backup

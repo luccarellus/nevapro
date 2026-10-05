@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\ResolveTenant;
 use App\Models\Tenant;
 use App\Services\B2StorageService;
 use App\Services\TenantAccess;
@@ -89,6 +90,7 @@ class TenantController extends Controller
 
         $tenant = Tenant::findOrFail($id);
         $tenant->update($data);
+        ResolveTenant::forgetActiveCache($id);
 
         return response()->json($tenant->fresh());
     }
@@ -104,6 +106,7 @@ class TenantController extends Controller
 
         $tenant = Tenant::findOrFail($id);
         $tenant->update(['active' => false]);
+        ResolveTenant::forgetActiveCache($id);
 
         return response()->json(['success' => true, 'data' => $tenant->fresh()]);
     }

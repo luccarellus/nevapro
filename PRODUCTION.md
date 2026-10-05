@@ -204,8 +204,7 @@ docker compose run --rm certbot certificates
 #### Renovação automática
 
 O Certbot renova automaticamente certificados com menos de 30 dias para
-vencer. Adicione um cron no **host** (o container `cron` do compose não tem
-acesso ao socket do Docker):
+vencer. Adicione um cron no **host**:
 
 ```cron
 # crontab -e (horário em UTC)
@@ -323,6 +322,16 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 - No EasyPanel ou em outro runtime fora do Compose, forneça um Redis externo e
   configure `REDIS_CLIENT=predis`, `REDIS_HOST`/`REDIS_PORT` (ou `REDIS_URL`),
   `CACHE_STORE=redis`, `SESSION_DRIVER=redis` e `QUEUE_CONNECTION=redis`.
+  O entrypoint da imagem standalone já detecta `REDIS_URL`/`REDIS_HOST` e promove
+  o cache para Redis automaticamente quando `CACHE_STORE` não é definido (ou está
+  em `database`). Para sessões/filas em Redis, defina `SESSION_DRIVER=redis` e
+  `QUEUE_CONNECTION=redis` no painel.
+- A imagem standalone também cacheia config/rotas/eventos no boot
+  (`php artisan config:cache` etc.), eliminando o re-parse de configuração a cada
+  request. Com a config cacheada, `env()` retorna `null` em runtime — use sempre
+  `config()` no código de aplicação. `NEVA_SKIP_OPTIMIZE=1` desativa esse
+  bootstrap cacheado; OPcache de produção (`validate_timestamps=0`, JIT) já vem
+  configurado na imagem.
 - Mantenha o Redis na mesma rede privada da aplicação sempre que possível: Redis
   remoto adiciona a latência de rede a cada cache miss e operação de sessão/fila.
   `REDIS_PASSWORD` e `REDIS_USERNAME` podem complementar uma `REDIS_URL` sem

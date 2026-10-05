@@ -15,7 +15,7 @@ final class CsrfService
     /** Emite o token para a sessão corrente (cookie session_token). */
     public static function issue(Request $request): string
     {
-        $secret = (string) (env('JWT_SECRET') ?? '');
+        $secret = (string) config('services.jwt_secret');
         $sid = (string) ($request->cookie('session_token') ?? '');
 
         return hash_hmac('sha256', 'csrf:'.$sid, $secret);

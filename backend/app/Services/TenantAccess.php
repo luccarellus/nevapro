@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Middleware\ResolveTenant;
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ class TenantAccess
             return true;
         }
 
-        if (! Tenant::query()->whereKey($tenantId)->where('active', true)->exists()) {
+        // Cacheado em ResolveTenant (300s) — evita a 2ª query idêntica por request.
+        if (! ResolveTenant::tenantIsActive($tenantId)) {
             return false;
         }
         if ((string) ($user->tenant_id ?? '') === $tenantId) {

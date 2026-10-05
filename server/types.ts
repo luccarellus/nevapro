@@ -69,7 +69,5 @@ export const CACHE_TTL: Record<string, number> = {
   [CACHE_KEYS.ADMIN_ACTIVITIES]: 120,
 };
 
-export const CACHE_TTL_QUESTOES = 600;
-
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;

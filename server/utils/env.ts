@@ -12,7 +12,6 @@ const REQUIRED_VARS: string[] = [
 const CONDITIONAL_VARS: { vars: string[]; purpose: string }[] = [
   { vars: ['B2_ENDPOINT', 'B2_KEY_ID', 'B2_APPLICATION_KEY', 'B2_BUCKET_NAME'], purpose: 'Backblaze B2 file storage' },
   { vars: ['SENTRY_DSN'], purpose: 'Sentry error tracking' },
-  { vars: ['GEMINI_API_KEY'], purpose: 'Gemini AI API' },
   { vars: ['RESEND_API_KEY', 'RESEND_FROM_EMAIL'], purpose: 'Resend (envio de e‑mails de redefinição de senha)' },
   { vars: ['EVENTEASE_WEBHOOK_SECRET'], purpose: 'Integração Webhook EventEase' },
 ];

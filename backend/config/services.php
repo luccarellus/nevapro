@@ -2,6 +2,10 @@
 
 return [
 
+    // ===== Segredo compartilhado (CSRF HMAC, assinatura de storage object) =====
+    // Acessado via config() para ser compatível com `artisan config:cache`.
+    'jwt_secret' => env('JWT_SECRET'),
+
     // ===== reCAPTCHA v3 (server-side) =====
     'recaptcha' => [
         'secret' => env('RECAPTCHA_SECRET_KEY'),

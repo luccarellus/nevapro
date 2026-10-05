@@ -26,8 +26,12 @@ class RateLimitByKey
         }
 
         foreach (array_filter([$key, $accountKey]) as $k) {
+            // Janela fixa: o TTL é definido apenas na criação da chave (add);
+            // o increment dos requests seguintes NÃO prorroga a janela.
+            // Antes cada request fazia put() com TTL novo — a janela deslizava
+            // para sempre sob tráfego contínuo (e eram 2 writes por request).
+            Cache::add($k, 0, now()->addSeconds($windowSeconds));
             $attempts = Cache::increment($k);
-            Cache::put($k, $attempts, now()->addSeconds($windowSeconds));
 
             if ($attempts > $max) {
                 return response()->json([

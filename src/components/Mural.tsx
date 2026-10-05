@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { muralService } from '../services/muralService';
+import { muralService } from '../services/crudService';
 import { Notice } from '../types';
 import Spinner from './Spinner';
 
@@ -27,7 +27,7 @@ export default function Mural() {
   useEffect(() => {
     const fetchNotices = async () => {
       try {
-        const data = await muralService.getRecados();
+        const data = await muralService.list();
         setNotices(data);
       } catch (error) {
         console.error('Failed to fetch notices:', error);

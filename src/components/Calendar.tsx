@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Calendar as CalendarIcon, Clock, Video, FileText, Send, ArrowRight } from 'lucide-react';
-import { eventService } from '../services/eventService';
+import { eventService } from '../services/crudService';
 import { StudyEvent } from '../types';
 import Spinner from './Spinner';
 
@@ -13,7 +13,7 @@ export default function Calendar() {
   useEffect(() => {
     const fetchEventos = async () => {
       try {
-        const data = await eventService.getEventos();
+        const data = await eventService.list();
         setEventos(data);
       } catch (error) {
         console.error('Failed to fetch eventos:', error);

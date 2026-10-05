@@ -33,15 +33,27 @@ RUN apk upgrade --no-cache \
     && docker-php-ext-install curl mbstring opcache pcntl pdo_pgsql zip \
     && apk del .build-dependencies
 
-# Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)
-FROM base AS vendor
+# OPcache de produção: sem revalidação de timestamps a cada request (o Laravel
+# revalida milhares de arquivos do vendor por request sem isso) e JIT ligado.
+# O código da imagem é imutável — validate_timestamps=0 é seguro aqui.
+RUN set -eux; \
+    echo "opcache.enable=1" > /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.enable_cli=0" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.memory_consumption=192" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.max_accelerated_files=16229" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.jit_buffer_size=64M" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "opcache.file_cache_consistency_checks=1" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini
+
+# Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)FROM base AS vendor
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
-
 COPY backend/ ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --classmap-authoritative
 
 FROM base AS api
 

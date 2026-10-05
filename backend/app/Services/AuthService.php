@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AdminUser;
 use App\Models\StudentUser;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -51,34 +52,117 @@ class AuthService
         return $user->createToken("auth:{$type}", ['*'], now()->addDay())->plainTextToken;
     }
 
-    /** Resolve o usuário a partir de um personal access token Sanctum. */
+    /**
+     * Cache da resolução de token por requisição: corta 2 queries de DB
+     * (personal_access_tokens + users/admin_users) em toda chamada autenticada.
+     * O payload em cache contém APENAS o id/tipo — o model do usuário é
+     * recarregado a cada request para refletir dados frescos; a revogação por
+     * token_version continua sendo avaliada ao vivo. Invalidação explícita
+     * em logout (e na exclusão de token) mantém a revogação efetiva.
+     */
     public function resolveFromToken(string $token): ?array
     {
-        $accessToken = PersonalAccessToken::findToken($token);
-        if (! $accessToken || $accessToken->expires_at?->isPast()) {
+        $cacheKey = 'auth:token:'.hash('sha256', $token);
+
+        $cached = Cache::get($cacheKey);
+
+        if (! is_array($cached)) {
+            $accessToken = PersonalAccessToken::findToken($token);
+            if (! $accessToken || $accessToken->expires_at?->isPast()) {
+                return null;
+            }
+
+            $type = str_starts_with($accessToken->name, 'auth:admin') ? 'admin' : 'student';
+
+            $user = $type === 'admin'
+                ? AdminUser::find($accessToken->tokenable_id)
+                : StudentUser::find($accessToken->tokenable_id);
+
+            if (! $user) {
+                return null;
+            }
+
+            // Revogação por versão (senha trocada → todas as sessões anteriores caem)
+            $tokenVersion = (int) ($user->token_version ?? 0);
+            $tokenTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $accessToken->name, $matches)
+                ? (int) $matches[1]
+                : 0;
+            if ($tokenVersion > $tokenTv) {
+                return null;
+            }
+
+            $cached = [
+                'token_id' => $accessToken->id,
+                'token_name' => $accessToken->name,
+                'expires_at' => $accessToken->expires_at?->toIso8601String(),
+                'type' => $type,
+                'tokenable_id' => (string) $accessToken->tokenable_id,
+                'tokenable_type' => $type === 'admin' ? AdminUser::class : StudentUser::class,
+            ];
+            Cache::put($cacheKey, $cached, now()->addSeconds(self::TOKEN_CACHE_TTL));
+        }
+
+        $accessToken = $this->reconstructAccessToken($cached);
+        if (! $accessToken) {
+            Cache::forget($cacheKey);
+
             return null;
         }
 
-        $type = str_starts_with($accessToken->name, 'auth:admin') ? 'admin' : 'student';
-
-        $user = $type === 'admin'
-            ? AdminUser::find($accessToken->tokenable_id)
-            : StudentUser::find($accessToken->tokenable_id);
+        $user = $cached['type'] === 'admin'
+            ? AdminUser::find($cached['tokenable_id'])
+            : StudentUser::find($cached['tokenable_id']);
 
         if (! $user) {
+            Cache::forget($cacheKey);
+
             return null;
         }
 
         // Revogação por versão (senha trocada → todas as sessões anteriores caem)
         $tokenVersion = (int) ($user->token_version ?? 0);
-        $tokenTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $accessToken->name, $matches)
+        $tokenTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $cached['token_name'], $matches)
             ? (int) $matches[1]
             : 0;
         if ($tokenVersion > $tokenTv) {
             return null;
         }
 
-        return ['user' => $user, 'type' => $type, 'accessToken' => $accessToken];
+        return ['user' => $user, 'type' => $cached['type'], 'accessToken' => $accessToken];
+    }
+
+    /** Reconstrói o PersonalAccessToken a partir do payload em cache. */
+    private function reconstructAccessToken(array $cached): ?PersonalAccessToken
+    {
+        $expiresAt = isset($cached['expires_at']) && is_string($cached['expires_at'])
+            ? \Carbon\Carbon::parse($cached['expires_at'])
+            : null;
+        if ($expiresAt && $expiresAt->isPast()) {
+            return null;
+        }
+
+        $accessToken = new PersonalAccessToken;
+        $accessToken->forceFill([
+            'id' => (int) $cached['token_id'],
+            'name' => (string) $cached['token_name'],
+            'tokenable_type' => (string) $cached['tokenable_type'],
+            'tokenable_id' => (string) $cached['tokenable_id'],
+            'expires_at' => $expiresAt,
+        ]);
+
+        return $accessToken;
+    }
+
+    /** TTL do cache de resolução de token (segundos). */
+    public const TOKEN_CACHE_TTL = 60;
+
+    /**
+     * Remove a resolução em cache de um token — chamado no logout para que a
+     * revogação seja efetiva imediatamente (mesma política do Express).
+     */
+    public function forgetTokenCacheBySecret(string $plainToken): void
+    {
+        Cache::forget('auth:token:'.hash('sha256', $plainToken));
     }
 
     public function normalizeEmail(string $email): string

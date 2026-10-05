@@ -78,7 +78,7 @@ class B2StorageService
      */
     public static function signObjectKey(string $key): string
     {
-        $secret = (string) env('JWT_SECRET');
+        $secret = (string) config('services.jwt_secret');
         $raw = hash_hmac('sha256', 'storage:'.$key, $secret, true);
         $base64Url = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
 

@@ -80,20 +80,34 @@ class QuestionController extends Controller
             return response()->json(['error' => 'Parâmetros limit ou offset inválidos.'], 400);
         }
         $cacheKey = "questions:v2:{$year}:{$limit}:{$offset}";
-        $payload = $this->cache->remember($cacheKey, 600, function () use ($year, $limit, $offset) {
-            $response = Http::timeout(15)->get(
-                "https://api.enem.dev/v1/exams/{$year}/questions",
-                ['limit' => $limit, 'offset' => $offset],
-            );
 
-            if (! $response->successful()) {
-                return ['_status' => $response->status(), 'error' => 'ENEM API error: '.$response->reason()];
-            }
+        try {
+            $payload = $this->cache->remember($cacheKey, 600, function () use ($year, $limit, $offset) {
+                $response = Http::timeout(15)->get(
+                    "https://api.enem.dev/v1/exams/{$year}/questions",
+                    ['limit' => $limit, 'offset' => $offset],
+                );
 
-            $data = $response->json();
+                if (! $response->successful()) {
+                    return ['_status' => $response->status(), 'error' => 'ENEM API error: '.$response->reason()];
+                }
 
-            return ['questions' => $data['questions'] ?? $data];
-        });
+                $data = $response->json();
+                $questions = $data['questions'] ?? $data;
+
+                // Persistência do gabarito SOMENTE no cache miss: este closure
+                // roda uma vez a cada 10 min por combinação year/limit/offset.
+                // Reprocessar em todo request (~50 sanitizações DOM + transação
+                // de inserts) era o principal gargalo da listagem de questões.
+                $this->persistExternalQuestions($questions, 'enem', $year);
+
+                return ['questions' => $questions];
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json(['error' => 'Não foi possível validar o gabarito das questões ENEM.'], 502);
+        }
 
         if (isset($payload['_status'])) {
             $status = $payload['_status'];
@@ -106,14 +120,6 @@ class QuestionController extends Controller
         $questions = $payload['questions'] ?? null;
         if (! is_array($questions) || ! array_is_list($questions)) {
             return response()->json(['error' => 'Resposta inválida da API ENEM.'], 502);
-        }
-
-        try {
-            $this->persistExternalQuestions($questions, 'enem', $year);
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            return response()->json(['error' => 'Não foi possível validar o gabarito das questões ENEM.'], 502);
         }
 
         return response()->json([
@@ -170,28 +176,40 @@ class QuestionController extends Controller
             return response()->json(['error' => 'Parâmetros limit ou page inválidos.'], 400);
         }
         $cacheKey = "enemhub:questions:v2:{$year}:{$limit}:{$page}";
-        $payload = $this->cache->remember($cacheKey, 600, function () use ($key, $year, $limit, $page) {
-            $url = 'https://api.enemhub.com.br/v1/enem/questions';
-            $response = Http::withHeaders(['X-API-Key' => $key])
-                ->timeout(20)
-                ->get($url, ['year' => $year, 'limit' => $limit, 'page' => $page]);
 
-            if ($response->status() === 429) {
-                usleep(2_500_000);
+        try {
+            $payload = $this->cache->remember($cacheKey, 600, function () use ($key, $year, $limit, $page) {
+                $url = 'https://api.enemhub.com.br/v1/enem/questions';
                 $response = Http::withHeaders(['X-API-Key' => $key])
                     ->timeout(20)
                     ->get($url, ['year' => $year, 'limit' => $limit, 'page' => $page]);
-            }
 
-            if (! $response->successful()) {
-                return ['_status' => $response->status(), 'error' => 'EnemHub API error: '.$response->reason()];
-            }
+                if ($response->status() === 429) {
+                    usleep(2_500_000);
+                    $response = Http::withHeaders(['X-API-Key' => $key])
+                        ->timeout(20)
+                        ->get($url, ['year' => $year, 'limit' => $limit, 'page' => $page]);
+                }
 
-            return [
-                'questions' => $response->json('data') ?? [],
-                'meta' => $response->json('meta'),
-            ];
-        });
+                if (! $response->successful()) {
+                    return ['_status' => $response->status(), 'error' => 'EnemHub API error: '.$response->reason()];
+                }
+
+                $questions = $response->json('data') ?? [];
+
+                // Igual ao endpoint ENEM: persistência do gabarito só no miss.
+                $this->persistExternalQuestions(is_array($questions) ? $questions : [], 'enemhub', $year);
+
+                return [
+                    'questions' => $questions,
+                    'meta' => $response->json('meta'),
+                ];
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json(['error' => 'Não foi possível validar o gabarito da EnemHub.'], 502);
+        }
 
         if (isset($payload['_status'])) {
             $status = $payload['_status'];
@@ -204,14 +222,6 @@ class QuestionController extends Controller
         $questions = $payload['questions'] ?? null;
         if (! is_array($questions) || ! array_is_list($questions)) {
             return response()->json(['error' => 'Resposta inválida da EnemHub.'], 502);
-        }
-
-        try {
-            $this->persistExternalQuestions($questions, 'enemhub', $year);
-        } catch (\Throwable $exception) {
-            report($exception);
-
-            return response()->json(['error' => 'Não foi possível validar o gabarito da EnemHub.'], 502);
         }
 
         return response()->json([

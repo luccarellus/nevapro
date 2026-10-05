@@ -7,11 +7,3 @@ export interface ConsentPreferences {
   preferences: boolean;
   updatedAt: number;
 }
-
-export interface ConsentLog {
-  id: string;
-  preferences: ConsentPreferences;
-  userAgent: string;
-  timestamp: number;
-  ip_anonymized: string;
-}

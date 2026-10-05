@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { materialService } from '../services/materialService';
+import { materialService } from '../services/crudService';
 import { Material } from '../types';
 import PdfVisualizer from './PdfVisualizer';
 import Spinner from './Spinner';
@@ -34,7 +34,7 @@ export default function Materiais() {
 
   const fetchMaterials = async () => {
     try {
-      const data = await materialService.getMaterials();
+      const data = await materialService.list();
       setMaterials(data);
     } catch (error) {
       console.error('Failed to fetch materials:', error);

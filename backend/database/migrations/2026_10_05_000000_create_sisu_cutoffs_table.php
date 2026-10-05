@@ -53,8 +53,11 @@ return new class extends Migration
 
             $table->index(['modality', 'year', 'edition']);
             $table->index(['year', 'edition']);
-            $table->index(DB::raw('lower(course)'));
-            $table->index(DB::raw('lower(university)'));
+            // Índice funcional: precisa de rawIndex com nome explícito —
+            // $table->index(DB::raw(...)) gera o índice "lower(course)"
+            // (identificador citado) e o Postgres rejeita com 42703.
+            $table->rawIndex('lower(course)', 'sisu_cutoffs_lower_course_index');
+            $table->rawIndex('lower(university)', 'sisu_cutoffs_lower_university_index');
         });
     }
 

@@ -130,10 +130,17 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        // Revoga o token atual se presente
+        // Revoga o token atual se presente e limpa o cache de resolução
+        // para que a revogação seja efetiva imediatamente. A exclusão é por id
+        // porque o accessToken pode ter sido reconstruído a partir do cache
+        // (modelo não persistido — delete() em memória seria no-op).
         $token = $request->cookie('session_token');
-        if ($token && ($resolved = $this->auth->resolveFromToken($token))) {
-            optional($resolved['accessToken'])->delete();
+        if ($token) {
+            $resolved = $this->auth->resolveFromToken($token);
+            if ($resolved && ! empty($resolved['accessToken']->id)) {
+                PersonalAccessToken::whereKey($resolved['accessToken']->id)->delete();
+            }
+            $this->auth->forgetTokenCacheBySecret($token);
         }
 
         return response()->json(['success' => true])

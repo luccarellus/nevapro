@@ -2,9 +2,7 @@ import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trash2, CheckCircle2, ShieldCheck, X, ChevronDown } from 'lucide-react';
 import Spinner from './Spinner';
-import { materialService } from '../services/materialService';
-import { muralService } from '../services/muralService';
-import { eventService } from '../services/eventService';
+import { materialService, muralService, eventService } from '../services/crudService';
 import { adminService } from '../services/adminService';
 import { uploadService } from '../services/uploadService';
 import { Material, Notice, StudyEvent, UserProfile } from '../types';
@@ -174,15 +172,15 @@ export default function AdminDashboard({
   const gremiosMA = useMemo(() => getUniqueNormalized(students.map(s => s.gremio)), [students]);
 
   const refreshMaterials = async () => {
-    setMaterials(await materialService.getMaterials());
+    setMaterials(await materialService.list());
   };
 
   const refreshRecados = async () => {
-    setRecados(await muralService.getRecados());
+    setRecados(await muralService.list());
   };
 
   const refreshEventos = async () => {
-    setEventos(await eventService.getEventos());
+    setEventos(await eventService.list());
   };
 
   const refreshStudents = async () => {
@@ -247,9 +245,9 @@ export default function AdminDashboard({
     setIsLoading(true);
     try {
       if (editingId) {
-        await muralService.updateRecado(editingId, { title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content });
+        await muralService.update(editingId, { title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content });
       } else {
-        await muralService.addRecado({ title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content, sender: 'Administração', date: new Date().toISOString() });
+        await muralService.create({ title: muralForm.title, category: muralForm.category as any, tag: muralForm.tag, content: muralForm.content, sender: 'Administração', date: new Date().toISOString() });
       }
       await refreshRecados();
       setIsSuccess(true);
@@ -266,8 +264,8 @@ export default function AdminDashboard({
     try {
       const parts = eventForm.releaseDate.split('T');
       const payload = { title: eventForm.title, date: parts[0], time: parts[1] || '00:00', type: 'evento' as const, category: eventForm.category, xpReward: parseInt(eventForm.xpReward), observation: eventForm.observation };
-      if (editingId) { await eventService.updateEvento(editingId, payload); }
-      else { await eventService.addEvento(payload); }
+      if (editingId) { await eventService.update(editingId, payload); }
+      else { await eventService.create(payload); }
       await refreshEventos();
       setIsSuccess(true);
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
@@ -286,8 +284,8 @@ export default function AdminDashboard({
         finalUrl = await uploadService.uploadFile(selectedFile, 'Falha no upload', true, 'material');
       }
       const payload = { title: materialForm.title, type: materialForm.type as any, foco: materialForm.foco, url: finalUrl, description: materialForm.description };
-      if (editingId) { await materialService.updateMaterial(editingId, payload); }
-      else { await materialService.addMaterial(payload); }
+      if (editingId) { await materialService.update(editingId, payload); }
+      else { await materialService.create(payload); }
       await refreshMaterials();
       setIsSuccess(true);
       setTimeout(() => { handleCloseModal(); setIsSuccess(false); }, 1500);
@@ -317,9 +315,9 @@ export default function AdminDashboard({
     if (!deleteConfirm) return;
     const { id, type } = deleteConfirm;
     try {
-      if (type === 'evento') await eventService.deleteEvento(id);
-      else if (type === 'material') await materialService.deleteMaterial(id);
-      else if (type === 'recado') await muralService.deleteRecado(id);
+      if (type === 'evento') await eventService.remove(id);
+      else if (type === 'material') await materialService.remove(id);
+      else if (type === 'recado') await muralService.remove(id);
       setDeleteConfirm(null);
       if (type === 'evento') await refreshEventos();
       else if (type === 'material') await refreshMaterials();
