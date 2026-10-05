@@ -1,0 +1,37 @@
+# =============================================================================
+# Neva Pro — Deploy com imagens imutáveis do GHCR (sem compilar na VPS)
+#
+# Sobrepõe os serviços do docker-compose.yml, trocando o build local pelas
+# imagens publicadas pelo GitHub Actions (.github/workflows/publish.yml):
+#   ghcr.io/<owner>/<repo>-api:<SHA>  (api, scheduler, worker)
+#   ghcr.io/<owner>/<repo>-web:<SHA>  (nginx)
+#
+# Uso via deploy.sh (recomendado):
+#   ./deploy.sh ghcr [SHA]        # padrão: SHA curto do HEAD
+#
+# Uso direto:
+#   GIT_SHA=$(git rev-parse --short HEAD) \
+#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
+#   GIT_SHA=$(git rev-parse --short HEAD) \
+#     docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --no-build
+#
+# Rollback: repita o comando com o SHA do commit anterior.
+#
+# Variáveis de ambiente:
+#   GIT_SHA      (obrigatório) SHA curto do commit, ex.: git rev-parse --short HEAD
+#   GHCR_OWNER   (opcional, padrão: luccarellus)
+#   GHCR_REPO    (opcional, padrão: nevapro)
+# =============================================================================
+
+services:
+  nginx:
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-web:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+
+  api:
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+
+  scheduler:
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+
+  worker:
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}

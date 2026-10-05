@@ -5,6 +5,8 @@
 - [ ] **Firewall (UFW):** `ufw allow 80/tcp && ufw allow 443/tcp && ufw enable`
 - [ ] **HTTPS:** Certificados instalados via Certbot.
 - [ ] **APP_KEY:** Chave Laravel persistente e exclusiva por ambiente.
+- [ ] **Probe de uptime:** monitor externo apontado para `/api/health/readiness`.
+- [ ] **Imagens GHCR:** pipeline de publicação ativo (`.github/workflows/publish.yml`).
 - [ ] **Cookies:** Flag `Secure=true` e `HttpOnly=true` em todas as rotas de auth.
 - [ ] **Rate Limit:** Configurado no NGINX e no middleware Laravel.
 
@@ -66,6 +68,32 @@ No dia-a-dia:
 
 > Os mesmos comandos funcionam com `make` (`make setup`, `make up`, ...).
 > Réplicas adicionais da API não estão documentadas/testadas; valide DNS do upstream Nginx e armazenamento compartilhado antes de escalar.
+
+### 🚀 Deploy via GHCR (sem compilar na VPS)
+
+O GitHub Actions compila, escaneia (Trivy) e publica imagens imutáveis
+no GHCR a cada push em `main`, com tag por commit:
+
+```
+ghcr.io/luccarellus/nevapro-api:<SHA>   (api, scheduler, worker)
+ghcr.io/luccarellus/nevapro-web:<SHA>   (nginx)
+```
+
+Para deployar sem compilar na VPS, use o override `docker-compose.deploy.yml`:
+
+```bash
+# Deploy do HEAD atual (ou de um SHA específico)
+./deploy.sh ghcr
+./deploy.sh ghcr 1a2b3c4
+
+# Rollback: repita com o SHA do commit anterior
+./deploy.sh ghcr <SHA-anterior>
+```
+
+> O `deploy.sh ghcr` executa `docker compose pull` + `up -d --no-build`
+> com as imagens do GHCR. Migrations **não** são executadas automaticamente
+> nesse fluxo — rode `docker compose exec api php artisan migrate --force`
+> depois do deploy, como no fluxo manual.
 
 ### 🔧 Fluxo manual (referência)
 
@@ -200,8 +228,73 @@ docker compose run --rm certbot renew --dry-run
 | 03:00 | Laravel `CronService::cleanup()` | Limpeza de logs/tokens expirados |
 | 04:00 | Laravel `DatabaseBackupJob` | Backup PostgreSQL no Backblaze B2 |
 
-O serviço `scheduler` executa `php artisan schedule:work`; não é necessário
-configurar um container cron nem chamadas HTTP periódicas.
+O serviço `scheduler` do Compose já executa `php artisan schedule:work`;
+não é necessário configurar um container cron, chamadas HTTP periódicas
+nem um scheduler separado. (Pendência registrada: o comando
+`audit:verify-chain` mencionado em planos anteriores **não existe** no
+código — não há cadeia de auditoria implementada para verificar.)
+
+### 5. Hardening do host (Ubuntu 24.04 LTS)
+
+Itens a aplicar diretamente no sistema operacional da VPS (fora do Compose):
+
+```bash
+# 1) UFW — libere apenas 22, 80 e 443
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable          # confirme o acesso SSH antes de habilitar
+sudo ufw status verbose
+
+# 2) fail2ban — proteção contra força bruta no SSH
+sudo apt install -y fail2ban
+sudo systemctl enable --now fail2ban
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+# Em jail.local: bantime = 1h, findtime = 10m, maxretry = 3
+sudo systemctl restart fail2ban
+sudo fail2ban-client status sshd
+
+# 3) systemd timer para renovação do Certbot (alternativa ao crontab do §3)
+sudo tee /etc/systemd/system/certbot-renew.service >/dev/null <<'EOF'
+[Unit]
+Description=Renovação do certificado Let's Encrypt (NevaPro)
+[Service]
+Type=oneshot
+WorkingDirectory=/caminho/para/nevapro
+ExecStart=/usr/bin/docker compose run --rm certbot renew --webroot -w /var/www/certbot --quiet
+ExecStartPost=/usr/bin/docker compose exec nginx nginx -s reload
+EOF
+sudo tee /etc/systemd/system/certbot-renew.timer >/dev/null <<'EOF'
+[Unit]
+Description=Renovação diária do Certbot
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now certbot-renew.timer
+sudo systemctl list-timers certbot-renew.timer
+```
+
+### 6. Pendências de provisionamento (VPS / provedor)
+
+Não são executáveis a partir do repositório — requerem acesso à VPS ou ao
+painel do provedor:
+
+1. **Backup offsite (rclone + age):** instalar rclone na VPS
+   (`curl https://rclone.org/install.sh | sudo bash`), criar o remote do
+   Backblaze B2 ou S3 (`rclone config`) e uma chave age (`age-keygen`).
+   Sincronizar `backups/` diariamente com criptografia client-side.
+2. **Monitoramento externo:** registrar um probe em UptimeRobot, Pingdom ou
+   Better Stack apontado para `https://<domínio>/api/health/readiness`
+   (intervalo de 5 min; alertas por e-mail/Slack). O endpoint responde
+   200 quando o banco atende e 503 caso contrário.
+3. **Bucket de armazenamento:** criar o bucket do Backblaze B2/S3 usado pelo
+   `DatabaseBackupJob` e pelo rclone (chaves no `.env` — veja `.env.example`).
 
 ## 🔋 Banco de dados
 
@@ -245,7 +338,10 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 ## 📊 Monitoramento Recomendado
 
 1. **Logging:** Laravel Monolog (stdout/stderr) + CloudWatch ou ELK Stack.
-2. **Uptime:** [Uptime Kuma](https://github.com/louislam/uptime-kuma) (Auto-hospedado na própria VPS).
+2. **Uptime:** probe externo (UptimeRobot/Pingdom/Better Stack) no endpoint
+   público `/api/health/readiness`, ou [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+   (auto-hospedado na própria VPS). O endpoint faz `SELECT 1` no banco e
+   retorna 503 se ele não responder.
 3. **Observabilidade:** [Sentry.io](https://sentry.io) para captura de erros em tempo real.
 4. **Performance:** [Prometheus](https://prometheus.io/) + [Grafana] para métricas de CPU/RAM dos containers.
 

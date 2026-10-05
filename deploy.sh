@@ -9,6 +9,8 @@
 #   ssl      — emite o certificado Let's Encrypt (primeira vez) via Certbot
 #   up       — build e sobe todos os serviços (docker compose up -d --build)
 #   update   — git pull + up (deploy de uma nova versão)
+#   ghcr     — deploy de uma imagem imutável do GHCR (sem compilar na VPS)
+#              uso: ./deploy.sh ghcr [SHA]   (padrão: SHA curto do HEAD)
 #   down     — para todos os serviços
 #   restart  — reinicia os serviços
 #   status   — status dos containers
@@ -185,6 +187,21 @@ cmd_update() {
   cmd_up
 }
 
+cmd_ghcr() {
+  check_docker
+  require_env
+  check_env_vars
+
+  local sha="${1:-$(git rev-parse --short HEAD)}"
+  local stack="-f docker-compose.yml -f docker-compose.deploy.yml"
+
+  info "Fazendo deploy das imagens GHCR do commit $sha (sem compilar na VPS)..."
+  GIT_SHA="$sha" $COMPOSE $stack pull
+  GIT_SHA="$sha" $COMPOSE $stack up -d --no-build
+  GIT_SHA="$sha" $COMPOSE $stack ps
+  info "Concluído. Rollback: ./deploy.sh ghcr <SHA-anterior>"
+}
+
 cmd_down()    { check_docker; $COMPOSE down; }
 cmd_restart() { check_docker; $COMPOSE restart; }
 cmd_status()  { check_docker; $COMPOSE ps; }
@@ -216,6 +233,7 @@ case "$COMMAND" in
   renew)   cmd_renew ;;
   up)      cmd_up ;;
   update)  cmd_update ;;
+  ghcr)    shift; cmd_ghcr "$@" ;;
   down)    cmd_down ;;
   restart) cmd_restart ;;
   status)  cmd_status ;;
