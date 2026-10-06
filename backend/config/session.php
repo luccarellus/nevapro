@@ -156,7 +156,19 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Domain
+    |--------------------------------------------------------------------------
+    |
+    | Este valor define o domínio do cookie de sessão. Em produção, usar o
+    | domínio específico do aplicativo (sem wildcard) para restringir o
+    | envio do cookie apenas ao domínio do aplicativo.
+    |
+    | Evitar usar .domínio.com.br (wildcard) a menos que haja subdomínios
+    | confiáveis que precisam compartilhar a sessão.
+    */
+    'domain' => env('SESSION_DOMAIN', null),
 
     /*
     |--------------------------------------------------------------------------
