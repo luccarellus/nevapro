@@ -38,7 +38,7 @@ class ClientLogController extends Controller
             }
 
             Log::channel('daily')->{$entry['level'] === 'warn' ? 'warning' : $entry['level']}('[Client] '.$message, [
-                'user' => $request->attributes->get('auth_user')?->email,
+                'user' => $request->attributes->get('auth_user')?->email ?? 'anonymous',
                 'context' => $this->sanitizeContext($context),
             ]);
         }

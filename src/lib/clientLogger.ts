@@ -48,25 +48,28 @@ export async function flushClientLogs() {
   flushing = true;
   const entries = queue.splice(0, 20);
 
-  try {
-    const response = await fetch('/api/client-logs', {
-      method: 'POST',
-      credentials: 'include',
-      keepalive: true,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        ...csrfHeaders(),
-      },
-      body: JSON.stringify({ entries }),
-    });
-    if (!response.ok) queue.unshift(...entries);
-  } catch {
-    queue.unshift(...entries);
-  } finally {
-    flushing = false;
-    if (queue.length > 0) scheduleFlush();
-  }
+    try {
+     const response = await fetch('/api/client-logs', {
+       method: 'POST',
+       credentials: 'include',
+       keepalive: true,
+       headers: {
+         'Content-Type': 'application/json',
+         'X-Requested-With': 'XMLHttpRequest',
+         ...csrfHeaders(),
+       },
+       body: JSON.stringify({ entries }),
+     });
+     if (!response.ok) {
+       if (response.status >= 400 && response.status < 500) return;
+       queue.unshift(...entries);
+     }
+   } catch {
+     queue.unshift(...entries);
+   } finally {
+     flushing = false;
+     if (queue.length > 0) scheduleFlush();
+   }
 }
 
 export function installClientLogger() {

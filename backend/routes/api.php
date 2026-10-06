@@ -172,10 +172,6 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     Route::post('upload', [UploadController::class, 'store'])
         ->middleware(['throttle.custom:5,60', 'recaptcha']);
 
-    // Logs do cliente (observabilidade, rate limit próprio)
-    Route::post('client-logs', [ClientLogController::class, 'store'])
-        ->middleware('throttle.custom:30,60');
-
     // Admin (RBAC: super_admin / tenant_admin)
     Route::prefix('admin')->middleware('role:admin,tenant_admin')->group(function () {
         Route::get('users', [AdminController::class, 'users']);
@@ -192,6 +188,12 @@ Route::prefix('cron')->middleware(VerifyCronSecret::class)->group(function () {
     Route::match(['get', 'post'], 'cleanup', [CronController::class, 'cleanup']);
     Route::match(['get', 'post'], 'backup', [CronController::class, 'backup']);
 });
+
+// ===== Public routes (no auth required) =====
+
+// Logs do cliente - telemetria deve ser coletada mesmo de visitantes não autenticados
+Route::post('client-logs', [ClientLogController::class, 'store'])
+    ->middleware('throttle.custom:30,60');
 
 // ===== Webhooks (server-to-server, sem CSRF) =====
 Route::prefix('webhooks')->group(function () {

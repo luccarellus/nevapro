@@ -32,42 +32,52 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        try {
+            $data = $request->validate([
+                'email' => ['required', 'email'],
+                'password' => ['required', 'string'],
+            ]);
 
-        $email = $this->auth->normalizeEmail($data['email']);
+            $email = $this->auth->normalizeEmail($data['email']);
 
-        // Rate limit por conta (brute force) — mesma política do Express
-        if ($lock = $this->checkLock($email)) {
-            return response()->json(['error' => $lock], 429);
+            // Rate limit por conta (brute force) — mesma política do Express
+            if ($lock = $this->checkLock($email)) {
+                return response()->json(['error' => $lock], 429);
+            }
+
+            $result = $this->auth->attempt($email, $data['password']);
+
+            if (isset($result['error'])) {
+                $this->recordFailedAttempt($email);
+
+                return response()->json(['error' => $result['error']], 401);
+            }
+
+            LoginAttempt::where('email', $email)->delete();
+
+            /** @var StudentUser|AdminUser $user */
+            $user = $result['user'];
+            $type = $result['type'];
+
+            $token = $this->auth->issueToken($user, $type);
+            $this->storeTokenVersion($user, $token, $type);
+
+            // Cookie HttpOnly com o token Sanctum — mesmo nome usado pelo Express.
+            // Assinatura do helper: cookie($name, $value, $minutes, $path, $domain,
+            // $secure, $httpOnly, $raw, $sameSite) — HttpOnly=true, raw=false.
+            $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
+
+            return response()->json(['success' => true, 'user' => $user->toProfileArray()])
+                ->withCookie($cookie);
+        } catch (\Throwable $e) {
+            Log::error('[Auth] Login error', [
+                'email' => $request->input('email') ?? 'unknown',
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json(['error' => 'Erro interno do servidor.'], 500);
         }
-
-        $result = $this->auth->attempt($email, $data['password']);
-
-        if (isset($result['error'])) {
-            $this->recordFailedAttempt($email);
-
-            return response()->json(['error' => $result['error']], 401);
-        }
-
-        LoginAttempt::where('email', $email)->delete();
-
-        /** @var StudentUser|AdminUser $user */
-        $user = $result['user'];
-        $type = $result['type'];
-
-        $token = $this->auth->issueToken($user, $type);
-        $this->storeTokenVersion($user, $token, $type);
-
-        // Cookie HttpOnly com o token Sanctum — mesmo nome usado pelo Express.
-        // Assinatura do helper: cookie($name, $value, $minutes, $path, $domain,
-        // $secure, $httpOnly, $raw, $sameSite) — HttpOnly=true, raw=false.
-        $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
-
-        return response()->json(['success' => true, 'user' => $user->toProfileArray()])
-            ->withCookie($cookie);
     }
 
     public function register(Request $request): JsonResponse
