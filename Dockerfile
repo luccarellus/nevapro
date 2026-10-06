@@ -89,7 +89,7 @@ RUN apk upgrade --no-cache \
 ENV APP_ENV=production \
     APP_DEBUG=false \
     DB_CONNECTION=pgsql \
-    DB_SSLMODE=require \
+    DB_SSLMODE=prefer \
     CACHE_STORE=redis \
     SESSION_DRIVER=array \
     SESSION_SECURE_COOKIE=true \

@@ -132,7 +132,7 @@ O Compose injeta as variáveis do `.env` nos containers Laravel. `DATABASE_URL`
 ```env
 # Banco PostgreSQL
 DATABASE_URL="postgresql://usuario:senha@host:5432/banco"
-DB_SSLMODE="require"
+DB_SSLMODE="prefer"
 
 # URL pública e CORS
 APP_URL="https://seu-dominio.com"
@@ -146,11 +146,10 @@ EVENTEASE_WEBHOOK_SECRET="[segredo do webhook]"
 # Backblaze B2, EnemHub, Resend, Sentry e reCAPTCHA — conforme .env.example
 ```
 
-> **PostgreSQL:** `DB_SSLMODE` usa `require` por padrão no Compose e no Laravel.
-> São aceitos `require`, `verify-ca` e `verify-full`; modos que permitem conexão
-> sem TLS (como `prefer` e `disable`) fazem a aplicação falhar durante a carga
-> da configuração. Prefira `verify-full` quando o provedor e a CA estiverem
-> configurados para validação do certificado e hostname.
+> **PostgreSQL:** `DB_SSLMODE` usa `prefer` por padrão (usa TLS se o banco
+> oferecer; senão conecta sem). Em bancos com TLS, prefira `require` — ou
+> `verify-full` com a CA e o hostname validados. Modos sem TLS garantido
+> (`prefer`/`allow`/`disable`) emitem um aviso no log, mas não impedem o boot.
 
 ### 3. HTTPS (Certbot / Let's Encrypt)
 
@@ -302,7 +301,7 @@ painel do provedor:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@host:5432/banco"
-DB_SSLMODE="require"
+DB_SSLMODE="prefer"
 ```
 
 Cadastre administradores em `public.admin_users`; o login Laravel valida essa

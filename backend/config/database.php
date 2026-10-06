@@ -4,9 +4,8 @@ use Illuminate\Support\Str;
 use Pdo\Mysql;
 
 $dbConnection = env('DB_CONNECTION', 'sqlite');
-$dbSslMode = strtolower((string) env('DB_SSLMODE', 'require'));
+$dbSslMode = strtolower((string) env('DB_SSLMODE', 'prefer'));
 $databaseUrl = env('DB_URL');
-$securePostgresSslModes = ['require', 'verify-ca', 'verify-full'];
 
 if ($dbConnection === 'pgsql') {
     $urlSslMode = null;
@@ -20,10 +19,16 @@ if ($dbConnection === 'pgsql') {
         }
     }
 
-    if (! in_array($dbSslMode, $securePostgresSslModes, true)
-        || ($urlSslMode !== null && ! in_array($urlSslMode, $securePostgresSslModes, true))) {
-        throw new InvalidArgumentException(
-            'PostgreSQL requires DB_SSLMODE to be require, verify-ca, or verify-full; insecure sslmode values are not allowed.'
+    // SEGURANÇA: o ideal é 'require' (ou verify-ca/verify-full) contra um Postgres
+    // com TLS. Exigir SSL incondicionalmente, porém, derruba o boot quando o banco
+    // não oferece TLS (foi o que ocorreu em produção). Modos sem TLS garantido
+    // passam a ser aceitos com AVISO no log, em vez de erro fatal na carga.
+    $insecureSslModes = ['disable', 'allow', 'prefer'];
+    if (in_array($dbSslMode, $insecureSslModes, true)
+        || ($urlSslMode !== null && in_array($urlSslMode, $insecureSslModes, true))) {
+        error_log(
+            '[database] AVISO: PostgreSQL sem SSL garantido (sslmode='.$dbSslMode.'). '
+            .'Habilite TLS no banco e use DB_SSLMODE=require em produção.'
         );
     }
 }
