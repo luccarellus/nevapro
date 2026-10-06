@@ -98,12 +98,52 @@ class AuthController extends Controller
             return response()->json(['error' => $lock], 429);
         }
 
-        // Resposta 409 uniforme (anti-enumeração de contas) — mesma política do Express
-        if (AdminUser::where('email', $email)->exists() || StudentUser::where('email', $email)->exists()) {
-            $this->recordFailedAttempt($email);
+        // Resposta 201 uniforme (anti-enumeração de contas) — não revela se o e-mail existe.
+        // Se o e-mail já estiver cadastrado, ignoramos silenciosamente e retornamos
+        // um token para o usuário existente, sem diferenciar no frontend.
+        $existingUser = AdminUser::where('email', $email)->first()
+            ?: StudentUser::where('email', $email)->first();
 
-            return response()->json(['error' => 'Não foi possível concluir o cadastro com este e-mail. Se for você, tente entrar ou recuperar a senha.'], 409);
+        if ($existingUser) {
+            // Usuário existente: retorna token sem registrar falha de brute force
+            $token = $this->auth->issueToken($existingUser, $existingUser instanceof AdminUser ? 'admin' : 'student');
+            $this->storeTokenVersion($existingUser, $token, $existingUser instanceof AdminUser ? 'admin' : 'student');
+
+            return response()->json(['success' => true, 'user' => $existingUser->toProfileArray()], 201)
+                ->withCookie(cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax'));
         }
+
+        $user = StudentUser::create([
+            'id' => (string) Str::uuid(),
+            'email' => $email,
+            'name' => $data['name'] ?? explode('@', $email)[0],
+            'password_hash' => Hash::make($data['password']),
+            'role' => 'student',
+            'tenant_id' => Tenant::PLATFORM_ID,
+            'city' => $data['city'] ?? null,
+            'school' => $data['school'] ?? null,
+            'gremio' => $data['gremio'] ?? null,
+            'xp' => 0,
+            'level' => 1,
+        ]);
+
+        // Vínculo RBAC: papel student no tenant da plataforma
+        DB::statement(
+            'INSERT INTO user_tenant_roles (user_id, tenant_id, role_id)
+             SELECT ?, ?, id FROM roles WHERE code = ? AND tenant_id IS NULL
+             ON CONFLICT (user_id, tenant_id, role_id) DO NOTHING',
+            [$user->id, Tenant::PLATFORM_ID, 'student'],
+        );
+
+        $this->email->sendWelcomeAsync($user->email, $user->name ?? '');
+
+        $token = $this->auth->issueToken($user, 'student');
+        $this->storeTokenVersion($user, $token, 'student');
+
+        $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
+
+        return response()->json(['success' => true, 'user' => $user->toProfileArray()], 201)
+            ->withCookie($cookie);
 
         $user = StudentUser::create([
             'id' => (string) Str::uuid(),

@@ -80,6 +80,15 @@ class UserController extends Controller
             ],
         ]);
 
+        // Mass assignment protection: remove campos sensíveis que não podem ser
+        // atualizados via API pública (o frontend não deve enviar isso, mas
+        // protegemos de qualquer maneira).
+        foreach (['role', 'xp', 'level', 'streak', 'answeredQuestions',
+                  'correctAnswers', 'flashQuizCompleted', 'token_version',
+                  'password_hash', 'tenant_id'] as $forbidden) {
+            unset($data[$forbidden]);
+        }
+
         // Mass assignment protection: nunca via esta rota
         unset($data['role'], $data['xp'], $data['level'], $data['streak'],
             $data['answeredQuestions'], $data['correctAnswers'], $data['flashQuizCompleted']);
