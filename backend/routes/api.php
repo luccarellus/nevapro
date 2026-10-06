@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Route;
 
 // ===== Health (público, igual ao Express) =====
 Route::get('/health', [HealthController::class, 'index']);
+Route::get('redis/diagnose', [RedisDiagnosticController::class, 'diagnose']);
 // Alias para probes de disponibilidade externos (UptimeRobot, Pingdom, ...).
 // Mesmo comportamento de /health: 200 quando o banco responde, 503 caso contrário.
 Route::get('/health/readiness', [HealthController::class, 'index']);
