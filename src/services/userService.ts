@@ -41,14 +41,14 @@ export const userService = {
 
   async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {
     const recaptcha_token = await executeRecaptcha('login').catch(() => '');
-    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/login', { ...credentials, recaptcha_token }, {});
+    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/login', { ...credentials, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
     invalidateRequestCache();
     return result;
   },
 
   async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
     const recaptcha_token = await executeRecaptcha('register').catch(() => '');
-    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/register', { ...userData, recaptcha_token }, {});
+    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/register', { ...userData, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
     invalidateRequestCache();
     return result;
   },
@@ -64,7 +64,7 @@ export const userService = {
 
   async forgotPassword(email: string): Promise<{ success: boolean; message?: string }> {
     const recaptcha_token = await executeRecaptcha('forgot_password').catch(() => '');
-    const result = await postJson<{ success: boolean; message?: string }>('/api/auth/forgot-password', { email, recaptcha_token }, {});
+    const result = await postJson<{ success: boolean; message?: string }>('/api/auth/forgot-password', { email, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
     return result;
   },
 
