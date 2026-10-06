@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import {
   Sparkles, SlidersHorizontal, RotateCcw, AlertTriangle, RefreshCw
@@ -20,6 +20,7 @@ interface CourseEntry {
   category: string;
   year?: number;
   edition?: string;
+  uf?: string;
 }
 
 interface Scores {
@@ -50,15 +51,29 @@ const MODALITIES = [
 
 type CatalogStatus = 'loading' | 'ready' | 'empty' | 'error';
 
+interface SisuApiResponse {
+  edition: { year: number; edition: string } | null;
+  source: string;
+  count: number;
+  cutoffs: CourseEntry[];
+}
+
+const SISU_API_BASE = '/api/sisu/cutoffs';
+const DEBOUNCE_MS = 300;
+
 export default function SimuladorSisu({ user }: SimuladorProps) {
   const [coursesCatalog, setCoursesCatalog] = useState<CourseEntry[]>([]);
   const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('loading');
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogEmptyReason, setCatalogEmptyReason] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedCourseName, setSelectedCourseName] = useState('');
   const [selectedUniversity, setSelectedUniversity] = useState('');
   const [selectedModality, setSelectedModality] = useState(MODALITIES[0].apiValue);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'searching' | 'no-results'>('idle');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Notas por área — preenchidas apenas com valores reais do TRI
   const [scores, setScores] = useState<Scores>(EMPTY_SCORES);
@@ -94,90 +109,174 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
     return () => { active = false; };
   }, [user.email]);
 
-  // Catálogo oficial de notas de corte (recarrega ao trocar a modalidade)
+  // Cancela debounce pendente em caso de desmontagem
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Filtros que são repassados como query params na API
+  const courseFilterParam = useMemo(() => {
+    const v = selectedCourseName.trim();
+    return v.length > 0 ? v : '';
+  }, [selectedCourseName]);
+
+  const universityFilterParam = useMemo(() => {
+    const v = selectedUniversity.trim();
+    return v.length > 0 ? v : '';
+  }, [selectedUniversity]);
+
+  const selectedModalityLabel =
+    MODALITIES.find((m) => m.apiValue === selectedModality)?.label || selectedModality;
+
+  // Catálogo oficial de notas de corte (recarrega ao trocar a modalidade,
+  // ou ao digitar/alterar curso ou universidade — agora com filtro server-side)
   useEffect(() => {
     let active = true;
+    let cancelled = false;
+
     const fetchCutoffs = async () => {
       setCatalogStatus('loading');
       setCatalogError(null);
+      setCatalogEmptyReason(null);
+      setSearchStatus('idle');
+
+      const params = new URLSearchParams({
+        modality: selectedModality,
+        limit: '300',
+      });
+      if (courseFilterParam) params.set('course', courseFilterParam);
+      if (universityFilterParam) params.set('university', universityFilterParam);
+
       try {
-        const res = await fetch(
-          `/api/sisu/cutoffs?modality=${encodeURIComponent(selectedModality)}&limit=300`,
-          { headers: { 'X-Requested-With': 'XMLHttpRequest' } },
-        );
+        const res = await fetch(`${SISU_API_BASE}?${params.toString()}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
         if (!res.ok) {
           throw new Error('Não foi possível carregar as notas de corte oficiais.');
         }
-        const data = await res.json();
-        if (!active) return;
+        const data: SisuApiResponse = await res.json();
+        if (cancelled) return;
 
-        const cutoffRows: any[] = Array.isArray(data?.cutoffs) ? data.cutoffs : [];
-        if (cutoffRows.length === 0) {
-          setCoursesCatalog([]);
-          setCatalogStatus('empty');
+        const rawRows: Array<{
+          course: string;
+          campus: string | null;
+          university: string;
+          degree: string | null;
+          shift: string | null;
+          cutoff: number | string;
+          modalityCategory?: string | null;
+          year?: number | string;
+          edition?: string;
+          uf?: string | null;
+        }> = Array.isArray(data?.cutoffs) ? data.cutoffs : [];
+
+        // Popula o catálogo com os resultados (dados reais do servidor)
+        setCoursesCatalog(
+          rawRows.map((c) => ({
+            course: c.course,
+            campus: c.campus || 'Campus não informado',
+            university: c.university,
+            degree: c.degree || 'Bacharelado',
+            shift: c.shift ?? null,
+            cutoff: Math.round(Number(c.cutoff)),
+            category: (c as any).modalityCategory || 'Geral',
+            year: c.year ? Number(c.year) : undefined,
+            edition: c.edition ?? undefined,
+            uf: c.uf ?? undefined,
+          }))
+        );
+
+        if (rawRows.length === 0) {
+          // Diferenciar: foi filtro vazio ou modalidade sem dados?
+          if (courseFilterParam || universityFilterParam) {
+            setCatalogStatus('empty');
+            setCatalogEmptyReason(
+              !courseFilterParam
+                ? 'Nenhuma instituição encontrada para este filtro.'
+                : !universityFilterParam
+                  ? 'Nenhum curso encontrado para este filtro.'
+                  : 'Nenhum curso encontrado para este curso e instituição.'
+            );
+          } else {
+            setCatalogStatus('empty');
+            setCatalogEmptyReason(
+              'Sem notas de corte oficiais para "' + selectedModalityLabel + '".'
+            );
+          }
           return;
         }
 
-        setCoursesCatalog(cutoffRows.map((c) => ({
-          course: c.course,
-          campus: c.campus || 'Campus não informado',
-          university: c.university,
-          degree: c.degree || 'Bacharelado',
-          shift: c.shift ?? null,
-          cutoff: Math.round(Number(c.cutoff)),
-          category: c.modalityCategory || 'Geral',
-          year: c.year,
-          edition: c.edition,
-        })));
         setCatalogStatus('ready');
       } catch (err: any) {
-        if (!active) return;
+        if (cancelled) return;
         console.warn('[SISU] Falha ao carregar notas de corte oficiais.', err);
         setCoursesCatalog([]);
         setCatalogError(err?.message || 'Falha ao carregar as notas de corte oficiais.');
         setCatalogStatus('error');
       }
     };
-    fetchCutoffs();
-    return () => { active = false; };
-  }, [selectedModality, refreshKey]);
 
-  // Cursos únicos disponíveis
+    fetchCutoffs();
+    return () => { cancelled = true; };
+  }, [selectedModality, courseFilterParam, universityFilterParam, refreshKey, selectedModalityLabel]);
+
+  // Cursos únicos disponíveis no catálogo atual (já filtrado pela API)
   const allCourses = useMemo(() => {
     const list = Array.from(new Set(coursesCatalog.map((c) => c.course)));
     return list.sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog]);
 
-  // Filtro de cursos em tempo real (flexível: permite busca parcial)
-  const filteredCourses = useMemo(() => {
-    const query = selectedCourseName.trim().toLowerCase();
-    if (!query) return allCourses;
-    return allCourses.filter((c) => c.toLowerCase().includes(query));
-  }, [allCourses, selectedCourseName]);
-
-  // Universidades disponíveis para o curso selecionado (busca flexível)
+  // Universidades disponíveis para o curso digitado (após filtro de servidor).
+  // Quando não há curso filtrado, mostra universidades do catálogo inteiro.
   const availableUniversities = useMemo(() => {
-    const query = selectedCourseName.trim().toLowerCase();
-    let matching: typeof coursesCatalog = [];
-    if (!query) {
-      // Sem curso selecionado: mostra todas as universidades do catálogo
-      matching = coursesCatalog;
-    } else {
-      // Busca flexível: cursos que contêm o termo (não igualdade exata)
-      matching = coursesCatalog.filter((c) => c.course.toLowerCase().includes(query));
+    if (selectedCourseName.trim().length === 0) {
+      return Array.from(new Set(coursesCatalog.map((c) => c.university)))
+        .sort((a, b) => a.localeCompare(b));
     }
-    return Array.from(new Set(matching.map((c) => c.university))).sort((a, b) => a.localeCompare(b));
+
+    // Quando há curso digitado, filtramos os cursos que CONTÉM o termo (case-insensitive)
+    // e listamos as universidades desses cursos.
+    const q = selectedCourseName.trim().toLowerCase();
+    const universities = Array.from(
+      new Set(
+        coursesCatalog
+          .filter((c) => c.course.toLowerCase().includes(q))
+          .map((c) => c.university)
+      )
+    );
+    return universities.sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog, selectedCourseName]);
 
-  // Entrada de curso selecionada (busca flexível também)
+  // Entrada de curso+universidade selecionada.
+  // Usa correspondência de CURSO exato (mesmo nome) + universidade exata para evitar
+  // falso-positivo (ex.: 'Medicina' não deve corresponder a 'Medicina Veterinária').
   const activeCourseEntry = useMemo(() => {
-    if (!selectedUniversity) return null;
-    const query = selectedCourseName.trim().toLowerCase();
-    return coursesCatalog.find(
+    if (!selectedUniversity || selectedCourseName.trim().length === 0) return null;
+
+    const courseName = selectedCourseName.trim();
+    const universityName = selectedUniversity.trim();
+
+    // Primeiro tenta correspondência exata de curso + universidade
+    let entry = coursesCatalog.find(
       (c) =>
-        c.course.toLowerCase().includes(query) &&
-        c.university.toLowerCase() === selectedUniversity.toLowerCase(),
-    ) || null;
+        c.course.toLowerCase() === courseName.toLowerCase() &&
+        c.university.toLowerCase() === universityName.toLowerCase()
+    );
+
+    // Se não achou exato, tenta correspondência parcial do curso (mas universidade exata)
+    if (!entry) {
+      entry = coursesCatalog.find(
+        (c) =>
+          c.course.toLowerCase().includes(courseName.toLowerCase()) &&
+          c.university.toLowerCase() === universityName.toLowerCase()
+      );
+    }
+
+    return entry || null;
   }, [coursesCatalog, selectedCourseName, selectedUniversity]);
 
   // Cálculo da média aritmética simples das 5 notas do ENEM
@@ -197,8 +296,50 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
   const diffPoints = effectiveCutoff !== null ? userAverage - effectiveCutoff : null;
   const missingPoints = diffPoints !== null ? Math.max(0, -diffPoints) : null;
 
-  const selectedModalityLabel =
-    MODALITIES.find((m) => m.apiValue === selectedModality)?.label || selectedModality;
+  // Busca de cursos com debounce — atualiza o catálogo via API (course param)
+  const handleCourseInputChange = useCallback(
+    (value: string) => {
+      setSelectedCourseName(value);
+      setSelectedUniversity('');
+      setCatalogEmptyReason(null);
+
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Estado imediato: idle (busca ainda não começou)
+      setSearchStatus('idle');
+
+      if (value.trim().length === 0) {
+        // Sem valor: o efeito recarregará o catálogo completo da modalidade
+        return;
+      }
+
+      // Debounce: espera DEBOUNCE_MS ms antes de marcar como searching
+      debounceTimerRef.current = setTimeout(() => {
+        // O efeito já reexecuta quando courseFilterParam muda — apenas atualiza estado visual
+        setSearchStatus('searching');
+      }, DEBOUNCE_MS);
+    },
+    []
+  );
+
+  // Efeito colateral: quando o usuário digita um curso e a busca retorna zero,
+  // mostramos feedback visual de "sem resultados".
+  useEffect(() => {
+    if (catalogStatus === 'empty' && courseFilterParam.length > 0) {
+      setSearchStatus('no-results');
+    } else if (catalogStatus === 'ready') {
+      setSearchStatus('idle');
+    }
+  }, [catalogStatus, courseFilterParam]);
+
+  // Efeito: quando a busca termina em erro, voltamos para idle
+  useEffect(() => {
+    if (catalogStatus === 'error') {
+      setSearchStatus('idle');
+    }
+  }, [catalogStatus]);
 
   // Dica dinâmica do Professor IA baseada nas menores notas
   const aiTip = useMemo(() => {
@@ -229,6 +370,15 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
     setSelectedModality(value);
     setSelectedCourseName('');
     setSelectedUniversity('');
+    setSearchStatus('idle');
+    setCatalogEmptyReason(null);
+  };
+
+  // Ao escolher uma universidade, o efeito de busca já reexecuta com university param.
+  const handleUniversityChange = (value: string) => {
+    setSelectedUniversity(value);
+    setCatalogEmptyReason(null);
+    setSearchStatus('idle');
   };
 
   return (
@@ -259,29 +409,33 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
               </label>
               <div className="relative">
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={selectedCourseName}
-                  onChange={(e) => {
-                    setSelectedCourseName(e.target.value);
-                    setSelectedUniversity('');
+                  onChange={(e) => handleCourseInputChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter confirma o curso digitado sem esperar debounce final
+                    if (e.key === 'Enter' && selectedCourseName.trim().length > 0) {
+                      e.preventDefault();
+                      searchInputRef.current?.blur();
+                    }
                   }}
                   onFocus={() => {
-                    // Ao focar, se não houver curso selecionado, pré-seleciona o primeiro disponível
-                    if (!selectedCourseName && filteredCourses.length > 0) {
-                      setSelectedCourseName(filteredCourses[0]);
+                    // Ao focar, se não houver curso selecionado e houver cursos disponíveis,
+                    // pré-seleciona o primeiro para facilitar
+                    if (!selectedCourseName && allCourses.length > 0) {
+                      setSelectedCourseName(allCourses[0]);
                     }
                   }}
                   placeholder="Digite para buscar (Ex: Medicina)"
-                  disabled={catalogStatus !== 'ready'}
+                  disabled={catalogStatus === 'loading' || catalogStatus === 'error'}
                   className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all placeholder:text-text-secondary/40 disabled:opacity-50"
                 />
-                {filteredCourses.length > 0 && (
-                  <datalist id="courses-options">
-                    {filteredCourses.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                )}
+                <datalist id="courses-options">
+                  {allCourses.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -292,8 +446,8 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
               </label>
               <select
                 value={selectedUniversity}
-                onChange={(e) => setSelectedUniversity(e.target.value)}
-                disabled={availableUniversities.length === 0}
+                onChange={(e) => handleUniversityChange(e.target.value)}
+                disabled={availableUniversities.length === 0 || catalogStatus === 'loading'}
                 className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all cursor-pointer disabled:opacity-50"
               >
                 <option value="">[Escolha a universidade]</option>
@@ -328,7 +482,10 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
           {catalogStatus === 'loading' && (
             <p className="mt-4 text-xs font-semibold text-text-secondary flex items-center gap-2">
               <RefreshCw size={13} className="animate-spin" />
-              Carregando notas de corte oficiais...
+              {courseFilterParam || universityFilterParam
+                ? 'Buscando resultados para "' + (courseFilterParam || selectedUniversity) + '"…'
+                : 'Carregando notas de corte oficiais...'
+              }
             </p>
           )}
 
@@ -351,12 +508,41 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
             <div className="mt-4 rounded-xl bg-bg-main/40 border border-border-color px-4 py-3">
               <p className="text-xs font-semibold text-text-secondary flex items-center gap-2">
                 <AlertTriangle size={14} className="text-amber-400" />
-                Sem notas de corte oficiais para “{selectedModalityLabel}”.
+                {catalogEmptyReason || 'Sem notas de corte oficiais para "' + selectedModalityLabel + '".'}
               </p>
-              <p className="text-[11px] font-medium text-text-secondary/70 mt-1">
-                Os dados oficiais disponíveis hoje são de Ampla Concorrência.
-              </p>
+              {!courseFilterParam && !universityFilterParam && (
+                <p className="text-[11px] font-medium text-text-secondary/70 mt-1">
+                  Os dados oficiais disponíveis hoje são de Ampla Concorrência.
+                </p>
+              )}
+              {(courseFilterParam || universityFilterParam) && (
+                <button
+                  onClick={() => {
+                    setSelectedCourseName('');
+                    setSelectedUniversity('');
+                    setCatalogEmptyReason(null);
+                  }}
+                  className="mt-2 text-[11px] font-semibold text-brand-primary hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Feedback visual da busca em tempo real */}
+          {searchStatus === 'searching' && (
+            <p className="mt-2 text-[11px] font-semibold text-text-secondary/70 flex items-center gap-1">
+              <RefreshCw size={10} className="animate-spin" />
+              Buscando cursos…
+            </p>
+          )}
+
+          {searchStatus === 'no-results' && courseFilterParam.length > 0 && (
+            <p className="mt-2 text-[11px] font-semibold text-amber-400/90 flex items-center gap-1">
+              <AlertTriangle size={10} />
+              Nenhum curso encontrado para "{courseFilterParam}".
+            </p>
           )}
         </div>
 
@@ -418,7 +604,7 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
 
               {!hasTriScores && (
                 <p className="text-[11px] font-semibold text-text-secondary/70 mb-4">
-                  Sem notas do TRI calculadas ainda — use “Simular notas” para estimar sua média.
+                  Sem notas do TRI calculadas ainda — use "Simular notas" para estimar sua média.
                 </p>
               )}
 
