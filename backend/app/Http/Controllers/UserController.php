@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminUser;
 use App\Models\StudentUser;
+use Carbon\Carbon;
 use App\Services\ApiCache;
 use App\Services\B2StorageService;
 use App\Services\XpService;
@@ -120,6 +121,50 @@ class UserController extends Controller
         }
 
         return response()->json(['success' => true, 'user' => $fresh->toProfileArray()]);
+    }
+
+    public function activityStats(Request $request): JsonResponse
+    {
+        $user = $request->attributes->get('auth_user');
+        $weekStart = now()->startOfWeek();
+        $weekEnd = $weekStart->copy()->addDays(6)->endOfDay();
+
+        // Agrega o XP em PHP pelo fuso da aplicação: o DATE() do banco usa o fuso
+        // da sessão do Postgres, que pode divergir do fuso da app (a contagem vira
+        // "ontem"/"amanhã" perto da meia-noite) e não existe no SQLite dos testes.
+        $timezone = (string) config('app.timezone', 'UTC');
+        $xpByDate = DB::table('xp_logs')
+            ->where('user_id', $user->id)
+            ->whereBetween('created_at', [$weekStart, $weekEnd])
+            ->get(['amount', 'created_at'])
+            ->reduce(function (array $carry, $row) use ($timezone): array {
+                $dateKey = Carbon::parse($row->created_at)->timezone($timezone)->toDateString();
+                $carry[$dateKey] = ($carry[$dateKey] ?? 0) + (int) $row->amount;
+
+                return $carry;
+            }, []);
+
+        $days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        $weekly = collect(range(0, 6))->map(function (int $offset) use ($weekStart, $days, $xpByDate): array {
+            $dateKey = $weekStart->copy()->addDays($offset)->toDateString();
+
+            return [
+                'day' => $days[$offset],
+                'xp' => $xpByDate[$dateKey] ?? 0,
+                'fullDate' => $dateKey,
+            ];
+        });
+
+        $questionsAnswered = DB::table('answers')
+            ->where('user_id', $user->id)
+            ->whereBetween('created_at', [$weekStart, $weekEnd])
+            ->distinct()
+            ->count('question_id');
+
+        return response()->json([
+            'weekly' => $weekly,
+            'questionsAnswered' => $questionsAnswered,
+        ]);
     }
 
     /**
@@ -248,5 +293,4 @@ class UserController extends Controller
 
         return response()->json(['success' => true]);
     }
-
 }

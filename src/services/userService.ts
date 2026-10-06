@@ -3,10 +3,19 @@ import { UserProfile } from '../types';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 import { executeRecaptcha } from '../lib/recaptcha';
 
+export interface WeeklyActivityStats {
+  weekly: { day: string; xp: number; fullDate: string }[];
+  questionsAnswered: number;
+}
+
 export const userService = {
   async getProfile(email?: string): Promise<UserProfile> {
     const url = email ? `/api/user/profile?email=${encodeURIComponent(email)}` : '/api/user/profile';
     return cachedFetchJson<UserProfile>(url, 60_000);
+  },
+
+  async getActivityStats(): Promise<WeeklyActivityStats> {
+    return request<WeeklyActivityStats>('/api/user/stats');
   },
 
   async updateProfile(data: Partial<UserProfile>): Promise<{ success: boolean; user: UserProfile }> {

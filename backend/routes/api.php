@@ -70,6 +70,8 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
 
     // Perfil
     Route::get('user/profile', [UserController::class, 'profile']);
+    Route::get('user/stats', [UserController::class, 'activityStats'])
+        ->middleware('throttle.custom:60,60');
     Route::post('user/profile', [UserController::class, 'updateProfile'])
         ->middleware(['throttle.custom:10,60', 'recaptcha']);
     // Recalcula progresso (XP/contadores) a partir das respostas — valores só no servidor

@@ -355,6 +355,19 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
     const best = Math.max(...xps, 0);
     const average = Math.round(total / 7);
 
+    // Questões únicas respondidas na semana atual (espelha activityStats do Laravel).
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    weekStart.setHours(0, 0, 0, 0);
+
+    const { data: weekAnswers } = await dbAdmin
+      .from('answers')
+      .select('question_id')
+      .eq('user_id', user.id)
+      .gte('created_at', weekStart.toISOString());
+
+    const questionsAnswered = new Set((weekAnswers || []).map((row: any) => row.question_id)).size;
+
     // Check flash quiz status
     const { data: lastQuizLog } = await dbAdmin
       .from('xp_logs')
@@ -373,7 +386,7 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res: Respons
       secondsRemaining = 0;
     }
 
-    const stats = { weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining };
+    const stats = { weekly, summary: { average, best, total }, flashQuizCompleted: quizDone, quizSecondsRemaining: secondsRemaining, questionsAnswered };
     await setUserCache(userCacheKeys.stats(email), stats, 60);
     res.json(stats);
   } catch (err) {

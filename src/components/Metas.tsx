@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import {
-  X, Flame, Award, BookOpen, PenTool, Trophy, Star
+  X, Flame, Award, BookOpen, Trophy, Star
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { performanceService } from '../services/performanceService';
+import { userService } from '../services/userService';
 
 interface MetasProps {
   user: UserProfile;
@@ -14,58 +15,53 @@ interface MetasProps {
 
 interface WeeklyGoals {
   questionsTarget: number;
-  hoursTarget: number;
-  essaysTarget: number;
-  flashcardsTarget: number;
 }
 
-const STORAGE_GOALS_KEY = 'neva_weekly_goals_v1';
 const WEEK_DAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 export default function Metas({ user, onTabChange }: MetasProps) {
   const [goals, setGoals] = useState<WeeklyGoals>({
     questionsTarget: 200,
-    hoursTarget: 15,
-    essaysTarget: 2,
-    flashcardsTarget: 150,
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [weeklyActivity, setWeeklyActivity] = useState<{ day: string; xp: number; fullDate: string }[]>([]);
+  const [weeklyQuestions, setWeeklyQuestions] = useState<number | null>(null);
+  const [activityError, setActivityError] = useState(false);
   const [triScore, setTriScore] = useState<number | null>(null);
 
   // Carrega metas salvas ou padrão
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_GOALS_KEY);
+      const saved = localStorage.getItem(`neva_weekly_goals_v1:${user.id}`);
       if (saved) {
-        setGoals(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Number.isInteger(parsed?.questionsTarget) && parsed.questionsTarget > 0) {
+          setGoals({ questionsTarget: parsed.questionsTarget });
+        }
       }
     } catch {
       // Ignora erro
     }
-  }, []);
+  }, [user.id]);
 
-  // Atividade real da semana (XP por dia) vinda do servidor
+  // Atividade real da semana e questões únicas respondidas, vindas do servidor.
   useEffect(() => {
     let active = true;
     const loadWeeklyActivity = async () => {
       try {
-        const res = await fetch(`/api/user/stats?email=${encodeURIComponent(user.email || '')}`, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (active && Array.isArray(data?.weekly)) {
+        const data = await userService.getActivityStats();
+        if (active) {
           setWeeklyActivity(data.weekly);
+          setWeeklyQuestions(data.questionsAnswered);
         }
       } catch {
-        // Sem atividade registrada: nenhum dia fica marcado
+        if (active) setActivityError(true);
       }
     };
     loadWeeklyActivity();
     return () => { active = false; };
-  }, [user.email]);
+  }, [user.id]);
 
   // Nota TRI mais recente (base da conquista de nota 900)
   useEffect(() => {
@@ -86,12 +82,8 @@ export default function Metas({ user, onTabChange }: MetasProps) {
 
   // Métricas reais do aluno (sem valores de exemplo)
   const streakDays = user.streak ?? 0;
-  const questionsResolved = user.answeredQuestions ?? 0;
-  // Horas de estudo, redações enviadas e cards revisados ainda não são
-  // registrados pela plataforma — não inventamos progresso (ficam em 0).
-  const hoursStudied = 0;
-  const essaysSent = 0;
-  const cardsReviewed = 0;
+  const questionsResolved = weeklyQuestions ?? 0;
+  const lifetimeQuestions = user.answeredQuestions ?? 0;
 
   // Dias da semana (Seg–Dom) marcados conforme atividade real (XP do dia)
   const weekDays = useMemo(() => {
@@ -104,7 +96,11 @@ export default function Metas({ user, onTabChange }: MetasProps) {
     return WEEK_DAY_LABELS.map((label, index) => {
       const date = new Date(monday);
       date.setDate(monday.getDate() + index);
-      const key = date.toISOString().split('T')[0];
+      const key = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('-');
       return { label, active: (xpByDate.get(key) || 0) > 0 };
     });
   }, [weeklyActivity]);
@@ -119,9 +115,8 @@ export default function Metas({ user, onTabChange }: MetasProps) {
 
   // Conquistas derivadas de dados reais
   const achievements = [
-    { id: 'first_essay', label: 'Primeira redação', unlocked: essaysSent >= 1, icon: PenTool },
     { id: 'streak_7', label: '7 dias seguidos', unlocked: streakDays >= 7, icon: Flame },
-    { id: 'questions_100', label: '100 questões', unlocked: questionsResolved >= 100, icon: BookOpen },
+    { id: 'questions_100', label: '100 questões', unlocked: lifetimeQuestions >= 100, icon: BookOpen },
     { id: 'score_900', label: 'Nota 900 em simulado', unlocked: (triScore ?? 0) >= 900, icon: Trophy },
     { id: 'streak_30', label: '30 dias seguidos', unlocked: streakDays >= 30, icon: Award },
     { id: 'top_10', label: 'Top 10 do ranking', unlocked: (user.rank ?? 0) > 0 && (user.rank ?? 0) <= 10, icon: Star },
@@ -130,7 +125,7 @@ export default function Metas({ user, onTabChange }: MetasProps) {
   const handleSaveGoals = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      localStorage.setItem(STORAGE_GOALS_KEY, JSON.stringify(goals));
+      localStorage.setItem(`neva_weekly_goals_v1:${user.id}`, JSON.stringify(goals));
       confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
     } catch {}
     setIsEditModalOpen(false);
@@ -212,7 +207,7 @@ export default function Metas({ user, onTabChange }: MetasProps) {
                 <div className="flex items-center justify-between text-xs sm:text-sm font-medium mb-1.5">
                   <span className="text-text-main font-semibold">Questões resolvidas</span>
                   <span className="text-text-main font-bold">
-                    {questionsResolved} / {goals.questionsTarget}
+                    {weeklyQuestions === null ? '—' : questionsResolved} / {goals.questionsTarget}
                   </span>
                 </div>
                 <div className="bg-[#141b2a] h-2.5 rounded-full overflow-hidden">
@@ -223,57 +218,9 @@ export default function Metas({ user, onTabChange }: MetasProps) {
                 </div>
               </div>
 
-              {/* Item 2: Horas */}
-              <div>
-                <div className="flex items-center justify-between text-xs sm:text-sm font-medium mb-1.5">
-                  <span className="text-text-main font-semibold">Horas de estudo</span>
-                  <span className="text-text-main font-bold">
-                    {hoursStudied} / {goals.hoursTarget} h
-                  </span>
-                </div>
-                <div className="bg-[#141b2a] h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-brand-primary h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(0,176,148,0.4)]"
-                    style={{ width: `${Math.min(100, (hoursStudied / goals.hoursTarget) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Item 3: Redações */}
-              <div>
-                <div className="flex items-center justify-between text-xs sm:text-sm font-medium mb-1.5">
-                  <span className="text-text-main font-semibold">Redações enviadas</span>
-                  <span className="text-text-main font-bold">
-                    {essaysSent} / {goals.essaysTarget}
-                  </span>
-                </div>
-                <div className="bg-[#141b2a] h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-brand-primary h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(0,176,148,0.4)]"
-                    style={{ width: `${Math.min(100, (essaysSent / goals.essaysTarget) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Item 4: Flashcards */}
-              <div>
-                <div className="flex items-center justify-between text-xs sm:text-sm font-medium mb-1.5">
-                  <span className="text-text-main font-semibold">Cards revisados</span>
-                  <span className="text-text-main font-bold">
-                    {cardsReviewed} / {goals.flashcardsTarget}
-                  </span>
-                </div>
-                <div className="bg-[#141b2a] h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-brand-primary h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(0,176,148,0.4)]"
-                    style={{ width: `${Math.min(100, (cardsReviewed / goals.flashcardsTarget) * 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              {(hoursStudied === 0 || essaysSent === 0 || cardsReviewed === 0) && (
+              {activityError && (
                 <p className="text-[11px] font-medium text-text-secondary/60 leading-relaxed pt-1">
-                  Horas de estudo, redações e cards revisados aparecem zerados enquanto essas atividades não são registradas pela plataforma.
+                  Não foi possível carregar a atividade semanal. Tente novamente mais tarde.
                 </p>
               )}
             </div>
@@ -361,51 +308,6 @@ export default function Metas({ user, onTabChange }: MetasProps) {
                     step="10"
                     value={goals.questionsTarget}
                     onChange={(e) => setGoals({ ...goals, questionsTarget: Number(e.target.value) })}
-                    className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-2.5 text-sm font-semibold text-text-main"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
-                    Meta de horas de estudo
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    step="1"
-                    value={goals.hoursTarget}
-                    onChange={(e) => setGoals({ ...goals, hoursTarget: Number(e.target.value) })}
-                    className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-2.5 text-sm font-semibold text-text-main"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
-                    Meta de redações enviadas
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={goals.essaysTarget}
-                    onChange={(e) => setGoals({ ...goals, essaysTarget: Number(e.target.value) })}
-                    className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-2.5 text-sm font-semibold text-text-main"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1.5">
-                    Meta de cards revisados
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    max="500"
-                    step="10"
-                    value={goals.flashcardsTarget}
-                    onChange={(e) => setGoals({ ...goals, flashcardsTarget: Number(e.target.value) })}
                     className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-2.5 text-sm font-semibold text-text-main"
                   />
                 </div>

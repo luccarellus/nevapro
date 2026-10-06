@@ -11,90 +11,33 @@ interface FlashcardItem {
   hint?: string;
   subject: string;
   deck: string;
-  source: 'errors' | 'curated' | 'custom';
-  stage?: number;
+  source: 'errors' | 'custom';
 }
 
 interface FlashcardsProps {
   user: UserProfile;
 }
 
-const DEFAULT_CURATED_CARDS: FlashcardItem[] = [
-  {
-    id: 'bio-1',
-    deck: 'Biologia · Citologia',
-    subject: 'Biologia',
-    front: 'Qual é a principal função da mitocôndria na célula?',
-    back: 'Produção de energia celular através da respiração celular aeróbica (síntese de ATP).',
-    hint: 'Possui DNA próprio e dupla membrana.',
-    source: 'curated',
-  },
-  {
-    id: 'bio-2',
-    deck: 'Biologia · Citologia',
-    subject: 'Biologia',
-    front: 'Qual a diferença entre retículo endoplasmático rugoso e liso?',
-    back: 'O rugoso possui ribossomos aderidos e sintetiza proteínas; o liso sintetiza lipídios e atua na desintoxicação.',
-    source: 'curated',
-  },
-  {
-    id: 'quim-1',
-    deck: 'Química · Estequiometria',
-    subject: 'Química',
-    front: 'Qual é o volume ocupado por 1 mol de gás ideal nas CNTP?',
-    back: '22,4 litros (a 0 °C e 1 atm).',
-    source: 'curated',
-  },
-  {
-    id: 'quim-2',
-    deck: 'Química · Estequiometria',
-    subject: 'Química',
-    front: 'O que define o reagente limitante em uma reação química?',
-    back: 'É o reagente consumido primeiro por completo, determinando a quantidade máxima de produto formado.',
-    source: 'curated',
-  },
-  {
-    id: 'hist-1',
-    deck: 'História · Era Vargas',
-    subject: 'História',
-    front: 'Qual documento instaurou a ditadura do Estado Novo em 1937?',
-    back: 'A Constituição de 1937 (conhecida como "A Polaca"), outorgada por Getúlio Vargas.',
-    source: 'curated',
-  },
-  {
-    id: 'hist-2',
-    deck: 'História · Era Vargas',
-    subject: 'História',
-    front: 'O que foi a CLT criada no governo de Vargas?',
-    back: 'A Consolidação das Leis do Trabalho (1943), unificando leis trabalhistas como salário mínimo e jornada de 8h.',
-    source: 'curated',
-  },
-  {
-    id: 'mat-1',
-    deck: 'Matemática · Fórmulas',
-    subject: 'Matemática',
-    front: 'Qual é a fórmula do volume de um cone reto?',
-    back: 'V = (1/3) · π · r² · h (um terço da área da base pela altura).',
-    source: 'curated',
-  },
-  {
-    id: 'mat-2',
-    deck: 'Matemática · Fórmulas',
-    subject: 'Matemática',
-    front: 'Como calcular o vértice de uma parábola (Xv e Yv)?',
-    back: 'Xv = -b / (2a)  e  Yv = -Δ / (4a).',
-    source: 'curated',
-  },
-];
-
 const STORAGE_CUSTOM_KEY = 'neva_custom_flashcards';
+const STORAGE_REVIEW_KEY = 'neva_flashcard_reviews';
+const REVIEW_INTERVALS = {
+  again: 60_000,
+  hard: 24 * 60 * 60 * 1000,
+  good: 3 * 24 * 60 * 60 * 1000,
+  easy: 7 * 24 * 60 * 60 * 1000,
+};
 
 export default function Flashcards({ user }: FlashcardsProps) {
   const [activeTab, setActiveTab] = useState<'today' | 'decks' | 'errors'>('today');
   const [selectedDeckFilter, setSelectedDeckFilter] = useState<string | null>(null);
   const [customCards, setCustomCards] = useState<FlashcardItem[]>([]);
   const [errorCards, setErrorCards] = useState<FlashcardItem[]>([]);
+  const [reviewDueAt, setReviewDueAt] = useState<Record<string, number>>({});
   const [isLoadingErrors, setIsLoadingErrors] = useState(true);
+  const [errorsLoadError, setErrorsLoadError] = useState(false);
+  const [retryErrorsKey, setRetryErrorsKey] = useState(0);
+  const [storageError, setStorageError] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -106,70 +49,106 @@ export default function Flashcards({ user }: FlashcardsProps) {
   const [newBack, setNewBack] = useState('');
   const [newHint, setNewHint] = useState('');
 
-  // Carrega cards customizados salvos localmente
+  const customStorageKey = `${STORAGE_CUSTOM_KEY}:${user.id}`;
+  const reviewStorageKey = `${STORAGE_REVIEW_KEY}:${user.id}`;
+
+  // Cards e revisões são isolados por usuário neste navegador.
   useEffect(() => {
+    setCustomCards([]);
+    setReviewDueAt({});
     try {
-      const saved = localStorage.getItem(STORAGE_CUSTOM_KEY);
+      const saved = localStorage.getItem(`${STORAGE_CUSTOM_KEY}:${user.id}`);
       if (saved) {
         const parsed: FlashcardItem[] = JSON.parse(saved);
         setCustomCards(Array.isArray(parsed) ? parsed.filter((c) => c?.source === 'custom') : []);
       }
     } catch {
-      // Ignora erro de storage corrompido
+      setStorageError(true);
     }
-  }, []);
+    try {
+      const savedReviews = localStorage.getItem(`${STORAGE_REVIEW_KEY}:${user.id}`);
+      if (savedReviews) {
+        const parsed = JSON.parse(savedReviews);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setReviewDueAt(parsed);
+        }
+      }
+    } catch {
+      setStorageError(true);
+    }
+  }, [user.id]);
 
   // Carrega erros do caderno de erros do aluno (viram cards automaticamente)
   useEffect(() => {
     let active = true;
     const fetchErrors = async () => {
       setIsLoadingErrors(true);
+      setErrorsLoadError(false);
+      setErrorCards([]);
       try {
-        const res = await fetch(`/api/user/errors?email=${encodeURIComponent(user.email || '')}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (active && Array.isArray(data)) {
-            const converted: FlashcardItem[] = data.map((e: any) => {
-              const correctOption = Array.isArray(e?.options) && typeof e?.correctOptionIndex === 'number'
-                ? e.options[e.correctOptionIndex]
-                : '';
-              return {
-                id: `error-${e.id}`,
-                deck: `${e.subject || 'Geral'} · Caderno de Erros`,
-                subject: e.subject || 'Geral',
-                front: e.text || 'Pergunta do Caderno de Erros',
-                back: correctOption || 'Abra a questão no Caderno de Erros para ver a resolução.',
-                hint: e.explanation || '',
-                source: 'errors' as const,
-              };
-            });
-            setErrorCards(converted);
-          }
+        const res = await fetch('/api/user/errors', {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!res.ok) {
+          throw new Error(`Falha ao carregar erros (HTTP ${res.status}).`);
+        }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          throw new Error('A resposta do caderno de erros está inválida.');
+        }
+        if (active) {
+          const converted: FlashcardItem[] = data.map((e: any) => {
+            const correctOption = Array.isArray(e?.options) && typeof e?.correctOptionIndex === 'number'
+              ? e.options[e.correctOptionIndex]
+              : '';
+            return {
+              id: `error-${e.id}`,
+              deck: `${e.subject || 'Geral'} · Caderno de Erros`,
+              subject: e.subject || 'Geral',
+              front: e.text || 'Pergunta do Caderno de Erros',
+              back: correctOption || 'Abra a questão no Caderno de Erros para ver a resolução.',
+              hint: e.explanation || '',
+              source: 'errors' as const,
+            };
+          });
+          setErrorCards(converted);
         }
       } catch {
-        if (active) setErrorCards([]);
+        if (active) setErrorsLoadError(true);
       } finally {
         if (active) setIsLoadingErrors(false);
       }
     };
     fetchErrors();
     return () => { active = false; };
-  }, [user.email]);
+  }, [user.id, retryErrorsKey]);
 
-  // Deck curado (conteúdo base) + cards criados pelo aluno
-  const allCards = useMemo(() => [...DEFAULT_CURATED_CARDS, ...customCards], [customCards]);
+  const allCards = useMemo(() => customCards, [customCards]);
+  const allUserCards = useMemo(() => [...allCards, ...errorCards], [allCards, errorCards]);
 
-  // Baralho ativo de acordo com a aba e o filtro de deck
+  // Descarta agendamentos de cards que não existem mais (ex.: erro já corrigido),
+  // evitando acúmulo de revisões órfãs. Retorna o mesmo objeto quando nada mudou.
+  useEffect(() => {
+    const validIds = new Set(allUserCards.map((card) => card.id));
+    setReviewDueAt((prev) => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([id]) => validIds.has(id)),
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [allUserCards]);
+
+  // Só exibe cards vencidos; cada avaliação agenda a próxima revisão.
   const activeDeck = useMemo(() => {
     const pool: FlashcardItem[] = activeTab === 'errors'
       ? errorCards
-      : [...allCards, ...errorCards];
+      : allUserCards;
 
-    if (selectedDeckFilter) {
-      return pool.filter((c) => c.deck === selectedDeckFilter);
-    }
-    return pool;
-  }, [activeTab, allCards, errorCards, selectedDeckFilter]);
+    return pool.filter((card) =>
+      (!selectedDeckFilter || card.deck === selectedDeckFilter)
+      && (reviewDueAt[card.id] ?? 0) <= now,
+    );
+  }, [activeTab, allUserCards, errorCards, selectedDeckFilter, reviewDueAt, now]);
 
   const currentCard = activeDeck.length > 0 ? activeDeck[currentIndex % activeDeck.length] : null;
 
@@ -177,17 +156,39 @@ export default function Flashcards({ user }: FlashcardsProps) {
     setIsFlipped(prev => !prev);
   };
 
-  const handleReviewAnswer = () => {
-    if (activeDeck.length === 0) return;
-    setIsFlipped(false);
+  const handleReviewAnswer = (intervalMs: number) => {
+    if (!currentCard) return;
+    const updatedDueAt = { ...reviewDueAt, [currentCard.id]: Date.now() + intervalMs };
+    try {
+      localStorage.setItem(reviewStorageKey, JSON.stringify(updatedDueAt));
+    } catch {
+      setStorageError(true);
+      return;
+    }
 
-    if (currentIndex + 1 >= activeDeck.length) {
+    setReviewDueAt(updatedDueAt);
+    setNow(Date.now());
+    setIsFlipped(false);
+    setCurrentIndex(0);
+
+    if (activeDeck.length === 1) {
       confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      setCurrentIndex(0);
-    } else {
-      setCurrentIndex(prev => prev + 1);
     }
   };
+
+  useEffect(() => {
+    const nextDueAt = Object.values(reviewDueAt)
+      .filter((dueAt) => dueAt > now)
+      .reduce<number | null>((soonest, dueAt) => soonest === null ? dueAt : Math.min(soonest, dueAt), null);
+    if (nextDueAt === null) return;
+
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, nextDueAt - Date.now()),
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [reviewDueAt, now]);
 
   const handleSaveNewCard = (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,10 +205,13 @@ export default function Flashcards({ user }: FlashcardsProps) {
     };
 
     const updated = [newCard, ...customCards];
-    setCustomCards(updated);
     try {
-      localStorage.setItem(STORAGE_CUSTOM_KEY, JSON.stringify(updated));
-    } catch {}
+      localStorage.setItem(customStorageKey, JSON.stringify(updated));
+    } catch {
+      setStorageError(true);
+      return;
+    }
+    setCustomCards(updated);
 
     setNewFront('');
     setNewBack('');
@@ -215,15 +219,17 @@ export default function Flashcards({ user }: FlashcardsProps) {
     setIsCreateModalOpen(false);
   };
 
-  // Decks reais derivados dos cards (curado + criados + vindos de erros)
+  // Decks e contagens derivados dos cards reais que estão vencidos.
   const decksList = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const card of [...allCards, ...errorCards]) {
+    for (const card of allUserCards) {
+      if ((reviewDueAt[card.id] ?? 0) > now) continue;
       counts.set(card.deck, (counts.get(card.deck) || 0) + 1);
     }
     return Array.from(counts, ([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allCards, errorCards]);
+  }, [allUserCards, reviewDueAt, now]);
+  const dueErrorCount = errorCards.filter((card) => (reviewDueAt[card.id] ?? 0) <= now).length;
 
   return (
     <div className="max-w-6xl mx-auto pt-6 sm:pt-10 pb-20 px-4 sm:px-6">
@@ -240,7 +246,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
               Flashcards
             </h1>
             <p className="text-text-secondary text-sm sm:text-base font-medium">
-              Revisão espaçada: o app mostra cada card no momento certo.
+              Revise seus cards e agende quando cada um deve aparecer novamente.
             </p>
           </div>
 
@@ -268,7 +274,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
                 : 'bg-bg-card/60 hover:bg-bg-card border border-border-color text-text-secondary hover:text-text-main'
             }`}
           >
-            Revisar hoje · {allCards.length + errorCards.length}
+            Revisar hoje · {decksList.reduce((total, deck) => total + deck.count, 0)}
           </button>
 
           <button
@@ -300,7 +306,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
                 : 'bg-bg-card/60 hover:bg-bg-card border border-border-color text-text-secondary hover:text-text-main'
             }`}
           >
-            Vindos do Caderno de Erros · {errorCards.length}
+            Vindos do Caderno de Erros · {dueErrorCount}
           </button>
         </div>
 
@@ -312,14 +318,37 @@ export default function Flashcards({ user }: FlashcardsProps) {
               <div className="my-auto text-center flex flex-col items-center justify-center py-10 px-4">
                 <p className="text-sm font-bold text-text-main mb-2">
                   {activeTab === 'errors'
-                    ? (isLoadingErrors ? 'Carregando seus erros...' : 'Nenhum erro virou card ainda')
-                    : 'Nenhum card disponível'}
+                    ? (isLoadingErrors
+                      ? 'Carregando seus erros...'
+                      : errorsLoadError
+                        ? 'Não foi possível carregar o Caderno de Erros.'
+                        : errorCards.length === 0
+                          ? 'Nenhum erro virou card ainda'
+                          : 'Nenhum erro pendente para revisar')
+                    : allUserCards.length === 0
+                      ? 'Nenhum card disponível'
+                      : 'Tudo revisado por agora'}
                 </p>
                 <p className="text-xs font-medium text-text-secondary max-w-sm leading-relaxed">
-                  {activeTab === 'errors'
-                    ? 'Marque questões no Caderno de Erros e elas aparecerão aqui automaticamente para revisão.'
-                    : 'Crie um card novo para começar a revisar.'}
+                  {errorsLoadError && activeTab === 'errors'
+                    ? 'Verifique sua conexão e tente carregar novamente.'
+                    : allUserCards.length === 0
+                      ? 'Crie um card novo ou responda questões incorretamente para gerar cards do Caderno de Erros.'
+                      : 'Os cards avaliados voltarão no intervalo escolhido.'}
                 </p>
+                {errorsLoadError && activeTab === 'errors' && (
+                  <button
+                    onClick={() => setRetryErrorsKey((key) => key + 1)}
+                    className="mt-3 px-4 py-2 rounded-xl bg-brand-primary text-black text-xs font-black"
+                  >
+                    Tentar novamente
+                  </button>
+                )}
+                {storageError && (
+                  <p className="mt-3 text-xs font-semibold text-amber-400">
+                    Não foi possível salvar os cards ou revisões neste navegador.
+                  </p>
+                )}
               </div>
             ) : (
             <>
@@ -388,7 +417,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <button
-                    onClick={handleReviewAnswer}
+                    onClick={() => handleReviewAnswer(REVIEW_INTERVALS.again)}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-red-500/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-red-400">Errei</span>
@@ -396,7 +425,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={handleReviewAnswer}
+                    onClick={() => handleReviewAnswer(REVIEW_INTERVALS.hard)}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-amber-500/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-amber-400">Difícil</span>
@@ -404,7 +433,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={handleReviewAnswer}
+                    onClick={() => handleReviewAnswer(REVIEW_INTERVALS.good)}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-brand-primary/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-brand-primary">Bom</span>
@@ -412,7 +441,7 @@ export default function Flashcards({ user }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={handleReviewAnswer}
+                    onClick={() => handleReviewAnswer(REVIEW_INTERVALS.easy)}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-emerald-400/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-emerald-400">Fácil</span>
