@@ -143,25 +143,39 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
   }, [selectedModality, refreshKey]);
 
   // Cursos únicos disponíveis
-  const availableCourses = useMemo(() => {
+  const allCourses = useMemo(() => {
     const list = Array.from(new Set(coursesCatalog.map((c) => c.course)));
     return list.sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog]);
 
-  // Universidades disponíveis para o curso selecionado
+  // Filtro de cursos em tempo real (flexível: permite busca parcial)
+  const filteredCourses = useMemo(() => {
+    const query = selectedCourseName.trim().toLowerCase();
+    if (!query) return allCourses;
+    return allCourses.filter((c) => c.toLowerCase().includes(query));
+  }, [allCourses, selectedCourseName]);
+
+  // Universidades disponíveis para o curso selecionado (busca flexível)
   const availableUniversities = useMemo(() => {
-    const matching = coursesCatalog.filter(
-      (c) => c.course.toLowerCase() === selectedCourseName.toLowerCase(),
-    );
+    const query = selectedCourseName.trim().toLowerCase();
+    let matching: typeof coursesCatalog = [];
+    if (!query) {
+      // Sem curso selecionado: mostra todas as universidades do catálogo
+      matching = coursesCatalog;
+    } else {
+      // Busca flexível: cursos que contêm o termo (não igualdade exata)
+      matching = coursesCatalog.filter((c) => c.course.toLowerCase().includes(query));
+    }
     return Array.from(new Set(matching.map((c) => c.university))).sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog, selectedCourseName]);
 
-  // Entrada de curso selecionada
+  // Entrada de curso selecionada (busca flexível também)
   const activeCourseEntry = useMemo(() => {
     if (!selectedUniversity) return null;
+    const query = selectedCourseName.trim().toLowerCase();
     return coursesCatalog.find(
       (c) =>
-        c.course.toLowerCase() === selectedCourseName.toLowerCase() &&
+        c.course.toLowerCase().includes(query) &&
         c.university.toLowerCase() === selectedUniversity.toLowerCase(),
     ) || null;
   }, [coursesCatalog, selectedCourseName, selectedUniversity]);
@@ -246,21 +260,28 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
               <div className="relative">
                 <input
                   type="text"
-                  list="courses-options"
                   value={selectedCourseName}
                   onChange={(e) => {
                     setSelectedCourseName(e.target.value);
                     setSelectedUniversity('');
                   }}
-                  placeholder="Ex: Medicina"
+                  onFocus={() => {
+                    // Ao focar, se não houver curso selecionado, pré-seleciona o primeiro disponível
+                    if (!selectedCourseName && filteredCourses.length > 0) {
+                      setSelectedCourseName(filteredCourses[0]);
+                    }
+                  }}
+                  placeholder="Digite para buscar (Ex: Medicina)"
                   disabled={catalogStatus !== 'ready'}
                   className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all placeholder:text-text-secondary/40 disabled:opacity-50"
                 />
-                <datalist id="courses-options">
-                  {availableCourses.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
+                {filteredCourses.length > 0 && (
+                  <datalist id="courses-options">
+                    {filteredCourses.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                )}
               </div>
             </div>
 
