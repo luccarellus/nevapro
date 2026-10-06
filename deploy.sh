@@ -10,7 +10,7 @@
 #   up       — build e sobe todos os serviços (docker compose up -d --build)
 #   update   — git pull + up (deploy de uma nova versão)
 #   ghcr     — deploy de uma imagem imutável do GHCR (sem compilar na VPS)
-#              uso: ./deploy.sh ghcr [SHA]   (padrão: SHA curto do HEAD)
+#              uso: ./deploy.sh ghcr [SHA]   (padrão: SHA completo do HEAD)
 #   down     — para todos os serviços
 #   restart  — reinicia os serviços
 #   status   — status dos containers
@@ -192,7 +192,9 @@ cmd_ghcr() {
   require_env
   check_env_vars
 
-  local sha="${1:-$(git rev-parse --short HEAD)}"
+  # A tag das imagens do GHCR é o SHA COMPLETO (github.sha), conforme publish.yml;
+  # usar o SHA curto aqui faz o `docker compose pull` falhar com "manifest unknown".
+  local sha="${1:-$(git rev-parse HEAD)}"
   local stack="-f docker-compose.yml -f docker-compose.deploy.yml"
 
   info "Fazendo deploy das imagens GHCR do commit $sha (sem compilar na VPS)..."

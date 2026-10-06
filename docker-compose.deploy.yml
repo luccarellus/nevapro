@@ -7,31 +7,31 @@
 #   ghcr.io/<owner>/<repo>-web:<SHA>  (nginx)
 #
 # Uso via deploy.sh (recomendado):
-#   ./deploy.sh ghcr [SHA]        # padrão: SHA curto do HEAD
+#   ./deploy.sh ghcr [SHA]        # padrão: SHA completo do HEAD
 #
 # Uso direto:
-#   GIT_SHA=$(git rev-parse --short HEAD) \
+#   GIT_SHA=$(git rev-parse HEAD) \
 #     docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull
-#   GIT_SHA=$(git rev-parse --short HEAD) \
+#   GIT_SHA=$(git rev-parse HEAD) \
 #     docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d --no-build
 #
 # Rollback: repita o comando com o SHA do commit anterior.
 #
 # Variáveis de ambiente:
-#   GIT_SHA      (obrigatório) SHA curto do commit, ex.: git rev-parse --short HEAD
+#   GIT_SHA      (obrigatório) SHA completo do commit, ex.: git rev-parse HEAD
 #   GHCR_OWNER   (opcional, padrão: luccarellus)
 #   GHCR_REPO    (opcional, padrão: nevapro)
 # =============================================================================
 
 services:
   nginx:
-    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-web:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-web:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse HEAD)}
 
   api:
-    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse HEAD)}
 
   scheduler:
-    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse HEAD)}
 
   worker:
-    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse --short HEAD)}
+    image: ghcr.io/${GHCR_OWNER:-luccarellus}/${GHCR_REPO:-nevapro}-api:${GIT_SHA:?GIT_SHA obrigatorio (git rev-parse HEAD)}
