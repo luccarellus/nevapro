@@ -5,16 +5,16 @@ if [ -z "${DB_URL:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
     export DB_URL="${DATABASE_URL}"
 fi
 
-# ===== Cache em Redis quando disponível =====
-# O default da imagem standalone é CACHE_STORE=database (cache no Postgres) —
-# com Redis configurado no painel (REDIS_URL ou REDIS_HOST), migrar o cache
-# para o Redis corta round-trips de DB em TODO request autenticado
-# (rate limit, bootstrap, leaderboard, auth). Respeita CACHE_STORE explícito.
-if [ -z "${CACHE_STORE:-}" ] || [ "${CACHE_STORE}" = "database" ]; then
-    if [ -n "${REDIS_URL:-}" ] || [ -n "${REDIS_HOST:-}" ]; then
-        export CACHE_STORE=redis
-        echo "[entrypoint] CACHE_STORE=redis (detectado via REDIS_URL/REDIS_HOST)"
-    fi
+# ===== Cache em Redis por padrão =====
+if [ -z "${CACHE_STORE:-}" ]; then
+    export CACHE_STORE=redis
+fi
+
+if [ "${CACHE_STORE:-redis}" = "redis" ] \
+    && [ -z "${REDIS_URL:-}" ] \
+    && [ -z "${REDIS_HOST:-}" ]; then
+    echo "[entrypoint] CACHE_STORE=redis, mas REDIS_URL ou REDIS_HOST não foi configurado." >&2
+    exit 1
 fi
 
 # ===== Otimizações de bootstrap (grande ganho de latência por request) =====

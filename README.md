@@ -269,9 +269,10 @@ JWT_SECRET="[seu-secret]"
 
 > O deploy Docker Compose conecta a API Laravel ao Redis pela rede privada do Compose
 > (`CACHE_STORE=redis`, `REDIS_HOST=redis`), compartilhando cache, sessões e filas sem
-> tráfego pela internet. O target standalone/EasyPanel usa PostgreSQL por padrão;
-> para habilitar Redis, forneça um Redis privado/acessível pelo serviço e configure
-> `CACHE_STORE=redis`, `REDIS_CLIENT=predis` e `REDIS_HOST`/`REDIS_PORT` ou `REDIS_URL`.
+> tráfego pela internet. O target standalone/EasyPanel também usa Redis como cache
+> padrão: forneça um Redis privado/acessível pelo serviço e configure
+> `REDIS_CLIENT=predis` e `REDIS_HOST`/`REDIS_PORT` ou `REDIS_URL`. Sem endereço Redis,
+> o container falha no boot em vez de recorrer silenciosamente à tabela `cache` do PostgreSQL.
 > A API Express legada também aceita `REDIS_PASSWORD`/`REDIS_USERNAME` junto com uma
 > `REDIS_URL` sem credenciais. O backend inclui Predis e não depende da extensão PHP `phpredis`.
 

@@ -38,7 +38,7 @@ class DatabaseBackupJob implements ShouldQueue
 
         $process = Process::env([
             'PGPASSWORD' => $password,
-            'PGSSLMODE' => $connection['sslmode'] ?? 'prefer',
+            'PGSSLMODE' => $connection['sslmode'] ?? 'require',
         ])->run([
             'pg_dump',
             '-h', (string) $host,

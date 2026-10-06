@@ -146,8 +146,11 @@ EVENTEASE_WEBHOOK_SECRET="[segredo do webhook]"
 # Backblaze B2, EnemHub, Resend, Sentry e reCAPTCHA — conforme .env.example
 ```
 
-> **PostgreSQL:** `DB_SSLMODE` usa `require` por padrão no Compose. Defina `prefer`
-> se o servidor de banco não oferecer TLS.
+> **PostgreSQL:** `DB_SSLMODE` usa `require` por padrão no Compose e no Laravel.
+> São aceitos `require`, `verify-ca` e `verify-full`; modos que permitem conexão
+> sem TLS (como `prefer` e `disable`) fazem a aplicação falhar durante a carga
+> da configuração. Prefira `verify-full` quando o provedor e a CA estiverem
+> configurados para validação do certificado e hostname.
 
 ### 3. HTTPS (Certbot / Let's Encrypt)
 
@@ -320,11 +323,11 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
   dependências PHP, sem exigir a extensão `phpredis`. O hostname `redis` mantém o
   tráfego na rede privada do Compose; não substitua por um IP público no deploy.
 - No EasyPanel ou em outro runtime fora do Compose, forneça um Redis externo e
-  configure `REDIS_CLIENT=predis`, `REDIS_HOST`/`REDIS_PORT` (ou `REDIS_URL`),
-  `CACHE_STORE=redis`, `SESSION_DRIVER=redis` e `QUEUE_CONNECTION=redis`.
-  O entrypoint da imagem standalone já detecta `REDIS_URL`/`REDIS_HOST` e promove
-  o cache para Redis automaticamente quando `CACHE_STORE` não é definido (ou está
-  em `database`). Para sessões/filas em Redis, defina `SESSION_DRIVER=redis` e
+  configure `REDIS_CLIENT=predis`, `REDIS_HOST`/`REDIS_PORT` (ou `REDIS_URL`).
+  Redis é o padrão do cache Laravel; a imagem standalone falha no boot se o cache
+  estiver configurado para Redis sem endereço Redis. `CACHE_STORE=database` só
+  deve ser definido explicitamente se você quiser usar o PostgreSQL para cache.
+  Para sessões/filas em Redis, defina também `SESSION_DRIVER=redis` e
   `QUEUE_CONNECTION=redis` no painel.
 - A imagem standalone também cacheia config/rotas/eventos no boot
   (`php artisan config:cache` etc.), eliminando o re-parse de configuração a cada

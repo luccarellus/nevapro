@@ -3,6 +3,31 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$dbConnection = env('DB_CONNECTION', 'sqlite');
+$dbSslMode = strtolower((string) env('DB_SSLMODE', 'require'));
+$databaseUrl = env('DB_URL');
+$securePostgresSslModes = ['require', 'verify-ca', 'verify-full'];
+
+if ($dbConnection === 'pgsql') {
+    $urlSslMode = null;
+    if (is_string($databaseUrl) && $databaseUrl !== '') {
+        $urlParts = parse_url($databaseUrl);
+        if (is_array($urlParts) && isset($urlParts['query'])) {
+            parse_str($urlParts['query'], $urlQuery);
+            $urlSslMode = isset($urlQuery['sslmode'])
+                ? strtolower((string) $urlQuery['sslmode'])
+                : null;
+        }
+    }
+
+    if (! in_array($dbSslMode, $securePostgresSslModes, true)
+        || ($urlSslMode !== null && ! in_array($urlSslMode, $securePostgresSslModes, true))) {
+        throw new InvalidArgumentException(
+            'PostgreSQL requires DB_SSLMODE to be require, verify-ca, or verify-full; insecure sslmode values are not allowed.'
+        );
+    }
+}
+
 return [
 
     /*
@@ -17,7 +42,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => $dbConnection,
 
     /*
     |--------------------------------------------------------------------------
@@ -96,7 +121,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'sslmode' => $dbSslMode,
         ],
 
         'sqlsrv' => [
