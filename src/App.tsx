@@ -13,9 +13,10 @@ import { UserProfile } from './types';
 import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
 import { initConsentMode } from './lib/consentManager';
-import { calculateLevelAndProgression } from './utils/xpUtils';
 import { invalidateRequestCache, prefetchEndpoint } from './lib/requestCache';
 import { csrfHeaders, request } from './lib/apiService';
+import { calculateLevelAndProgression } from './utils/xpUtils';
+import { getSession, saveSession, clearSession } from './lib/sessionStorage';
 
 import Spinner from './components/Spinner';
 
@@ -85,12 +86,12 @@ export default function App() {
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(
-    () => Boolean(localStorage.getItem('neva_student_session')),
+    () => Boolean(getSession()),
   );
   const logoutInFlight = useRef<Promise<void> | null>(null);
 
   const clearLocalSession = () => {
-    localStorage.removeItem('neva_student_session');
+    clearSession();
     invalidateRequestCache();
     setIsLoggedIn(false);
     setActiveTab('dashboard');
@@ -154,10 +155,10 @@ export default function App() {
     }
     
     // Recovery session for students
-    const savedUser = localStorage.getItem('neva_student_session');
+    const savedUser = getSession();
     if (savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser);
+        const parsedUser = savedUser as UserProfile;
         // Immediately show cached user data (instant UI), then verify in background
         if (parsedUser.email) {
           setUser(prev => ({ ...prev, ...parsedUser }));
@@ -171,7 +172,7 @@ export default function App() {
         } else {
           setIsRestoringSession(false);
         }
-      } catch (e) {
+      } catch {
         clearLocalSession();
         setIsRestoringSession(false);
       }
@@ -201,8 +202,7 @@ export default function App() {
           localStorage.setItem('neva_active_tenant', profile.tenantId);
         }
 
-        // Atualiza a sessão no localStorage para ambos os perfis (aluno e admin) para persistir no F5
-        localStorage.setItem('neva_student_session', JSON.stringify(profileWithNextLevel));
+        saveSession(profileWithNextLevel);
         
         if (profile.role === 'admin') {
           setActiveTab('admin');
@@ -275,8 +275,7 @@ export default function App() {
       localStorage.setItem('neva_active_tenant', userWithProgression.tenantId);
     }
     
-    // Persiste a sessão local para ambos os perfis (aluno e admin)
-    localStorage.setItem('neva_student_session', JSON.stringify(userWithProgression));
+    saveSession(userWithProgression);
 
     if (loggedUser.role === 'admin') {
       setActiveTab('admin');
@@ -365,7 +364,7 @@ export default function App() {
 
     // Update locally
     setUser(updatedUser);
-    localStorage.setItem('neva_student_session', JSON.stringify(updatedUser));
+    saveSession(updatedUser);
 
     // Persist to server
     try {
@@ -376,7 +375,7 @@ export default function App() {
           const { nextLevelXp: syncNext, currentLevelMinXp: syncMin } = calculateLevelAndProgression(res.user.xp || 0);
           const syncedUser = { ...res.user, nextLevelXp: syncNext, currentLevelMinXp: syncMin };
           setUser(prev => ({ ...prev, ...syncedUser }));
-          localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+          saveSession(syncedUser);
         }
       } else {
         // XP e contadores são recalculados pelo servidor a partir das respostas
@@ -397,7 +396,7 @@ export default function App() {
             currentLevelMinXp: syncMin,
           };
           setUser(prev => ({ ...prev, ...syncedUser }));
-          localStorage.setItem('neva_student_session', JSON.stringify(syncedUser));
+          saveSession(syncedUser);
         }
       }
     } catch (error) {

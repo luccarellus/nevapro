@@ -1,6 +1,8 @@
-import { request, csrfHeaders } from '../lib/apiService';
+import { invalidateRequestCache, cachedFetchJson } from '../lib/requestCache';
+import { request } from '../lib/apiService';
+import { postJson } from '../lib/fetchHelpers';
+import { csrfHeaders } from '../lib/apiService';
 import { UserProfile } from '../types';
-import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 import { executeRecaptcha } from '../lib/recaptcha';
 
 export interface WeeklyActivityStats {
@@ -39,57 +41,21 @@ export const userService = {
 
   async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {
     const recaptcha_token = await executeRecaptcha('login').catch(() => '');
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ ...credentials, recaptcha_token }),
-    });
-    if (!response.ok) {
-      let errorMsg = 'Falha no login';
-      try {
-        const error = await response.json();
-        errorMsg = error.error || errorMsg;
-      } catch {
-        errorMsg = 'Servidor indisponível (Erro 500)';
-      }
-      throw new Error(errorMsg);
-    }
-    const result = await response.json();
+    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/login', { ...credentials, recaptcha_token }, {});
     invalidateRequestCache();
     return result;
   },
 
   async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
     const recaptcha_token = await executeRecaptcha('register').catch(() => '');
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ ...userData, recaptcha_token }),
-    });
-    if (!response.ok) {
-      let errorMsg = 'Falha no cadastro';
-      try {
-        const error = await response.json();
-        errorMsg = error.error || errorMsg;
-      } catch {
-        errorMsg = 'Servidor indisponível (Erro 500)';
-      }
-      throw new Error(errorMsg);
-    }
-    const result = await response.json();
+    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/register', { ...userData, recaptcha_token }, {});
     invalidateRequestCache();
     return result;
   },
 
   async getLeaderboard(): Promise<UserProfile[]> {
     try {
-      return request<UserProfile[]>('/api/leaderboard');
+      return request('/api/leaderboard');
     } catch {
       console.error('Error fetching leaderboard:');
       return [];
@@ -98,44 +64,13 @@ export const userService = {
 
   async forgotPassword(email: string): Promise<{ success: boolean; message?: string }> {
     const recaptcha_token = await executeRecaptcha('forgot_password').catch(() => '');
-    const response = await fetch('/api/auth/forgot-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ email, recaptcha_token }),
-    });
-    if (!response.ok) {
-      let errorMsg = 'Erro ao solicitar recuperação';
-      try {
-        const error = await response.json();
-        errorMsg = error.error || errorMsg;
-      } catch {}
-      throw new Error(errorMsg);
-    }
-    return response.json();
+    const result = await postJson<{ success: boolean; message?: string }>('/api/auth/forgot-password', { email, recaptcha_token }, {});
+    return result;
   },
 
   async changePassword(data: { email: string; currentPassword?: string; newPassword?: string }): Promise<{ success: boolean; message?: string }> {
     const recaptcha_token = await executeRecaptcha('change_password').catch(() => '');
-    const response = await fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        ...csrfHeaders(),
-      },
-      body: JSON.stringify({ ...data, recaptcha_token }),
-    });
-    if (!response.ok) {
-      let errorMsg = 'Falha ao alterar senha';
-      try {
-        const error = await response.json();
-        errorMsg = error.error || errorMsg;
-      } catch {}
-      throw new Error(errorMsg);
-    }
-    return response.json();
+    const result = await postJson<{ success: boolean; message?: string }>('/api/auth/change-password', { ...data, recaptcha_token }, { ...csrfHeaders() });
+    return result;
   },
 };

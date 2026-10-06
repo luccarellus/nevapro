@@ -1,5 +1,6 @@
 import { ConsentPreferences, ConsentCategory } from '../types/consent';
 import { csrfHeaders } from './apiService';
+import { mutationHeaders } from './fetchHelpers';
 
 const STORAGE_KEY = 'neva_cookie_consent';
 
@@ -97,21 +98,19 @@ export const saveConsent = async (preferences: ConsentPreferences) => {
   
   // Load scripts conditionally
   if (updatedPrefs.analytics) loadAnalyticsScripts();
-  if (updatedPrefs.marketing) loadMarketingScripts();
-
-  // Audit Log (Backend)
-  try {
-    await fetch('/api/lgpd/consent-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
-      body: JSON.stringify({ 
-        preferences: updatedPrefs,
-        userAgent: navigator.userAgent
-      })
-    });
-  } catch (e) {
-    console.error('[LGPD] Failed to log consent:', e);
-  }
+  if (updatedPrefs.marketing) loadMarketingScripts();  // Audit Log (Backend)
+    try {
+      await fetch('/api/lgpd/consent-log', {
+        method: 'POST',
+        headers: { ...csrfHeaders() },
+        body: JSON.stringify({ 
+          preferences: updatedPrefs,
+          userAgent: navigator.userAgent
+        })
+      });
+    } catch (e) {
+      console.error('[LGPD] Failed to log consent:', e);
+    }
 
   return updatedPrefs;
 };

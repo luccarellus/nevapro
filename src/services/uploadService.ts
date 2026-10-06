@@ -1,3 +1,4 @@
+import { mutationHeaders } from '../lib/fetchHelpers';
 import { csrfHeaders } from '../lib/apiService';
 
 interface UploadResponse {
@@ -8,7 +9,6 @@ const getUploadError = async (response: Response, fallbackMessage: string): Prom
   const payload = await response.json().catch(() => null);
   return new Error(payload?.error || fallbackMessage);
 };
-
 export const uploadService = {
   async uploadFile(
     file: File,
@@ -33,7 +33,6 @@ export const uploadService = {
     const response = await fetch(`/api/upload?kind=${kind}`, {
       method: 'POST',
       headers: {
-        'X-Requested-With': 'XMLHttpRequest',
         ...csrfHeaders(),
       },
       body: formData,
