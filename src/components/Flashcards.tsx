@@ -17,7 +17,6 @@ interface FlashcardItem {
 
 interface FlashcardsProps {
   user: UserProfile;
-  onEarnXp?: (amount: number, correct?: number, answered?: number, isFlash?: boolean, actionName?: string) => void;
 }
 
 const DEFAULT_CURATED_CARDS: FlashcardItem[] = [
@@ -90,11 +89,12 @@ const DEFAULT_CURATED_CARDS: FlashcardItem[] = [
 
 const STORAGE_CUSTOM_KEY = 'neva_custom_flashcards';
 
-export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
+export default function Flashcards({ user }: FlashcardsProps) {
   const [activeTab, setActiveTab] = useState<'today' | 'decks' | 'errors'>('today');
   const [selectedDeckFilter, setSelectedDeckFilter] = useState<string | null>(null);
-  const [cards, setCards] = useState<FlashcardItem[]>(DEFAULT_CURATED_CARDS);
+  const [customCards, setCustomCards] = useState<FlashcardItem[]>([]);
   const [errorCards, setErrorCards] = useState<FlashcardItem[]>([]);
+  const [isLoadingErrors, setIsLoadingErrors] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -112,67 +112,74 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
       const saved = localStorage.getItem(STORAGE_CUSTOM_KEY);
       if (saved) {
         const parsed: FlashcardItem[] = JSON.parse(saved);
-        setCards([...DEFAULT_CURATED_CARDS, ...parsed]);
+        setCustomCards(Array.isArray(parsed) ? parsed.filter((c) => c?.source === 'custom') : []);
       }
     } catch {
-      // Ignora erro
+      // Ignora erro de storage corrompido
     }
   }, []);
 
-  // Carrega erros do caderno de erros do aluno
+  // Carrega erros do caderno de erros do aluno (viram cards automaticamente)
   useEffect(() => {
+    let active = true;
     const fetchErrors = async () => {
+      setIsLoadingErrors(true);
       try {
         const res = await fetch(`/api/user/errors?email=${encodeURIComponent(user.email || '')}`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const converted: FlashcardItem[] = data.map((e: any) => ({
-              id: `error-${e.id}`,
-              deck: `${e.subject || 'Geral'} · Caderno de Erros`,
-              subject: e.subject || 'Geral',
-              front: e.text || 'Pergunta do Caderno de Erros',
-              back: (e.options && e.correctOptionIndex !== undefined ? e.options[e.correctOptionIndex] : '') || 'Resposta correta',
-              hint: e.explanation || '',
-              source: 'errors',
-            }));
+          if (active && Array.isArray(data)) {
+            const converted: FlashcardItem[] = data.map((e: any) => {
+              const correctOption = Array.isArray(e?.options) && typeof e?.correctOptionIndex === 'number'
+                ? e.options[e.correctOptionIndex]
+                : '';
+              return {
+                id: `error-${e.id}`,
+                deck: `${e.subject || 'Geral'} · Caderno de Erros`,
+                subject: e.subject || 'Geral',
+                front: e.text || 'Pergunta do Caderno de Erros',
+                back: correctOption || 'Abra a questão no Caderno de Erros para ver a resolução.',
+                hint: e.explanation || '',
+                source: 'errors' as const,
+              };
+            });
             setErrorCards(converted);
           }
         }
       } catch {
-        // Fallback silencioso
+        if (active) setErrorCards([]);
+      } finally {
+        if (active) setIsLoadingErrors(false);
       }
     };
     fetchErrors();
+    return () => { active = false; };
   }, [user.email]);
+
+  // Deck curado (conteúdo base) + cards criados pelo aluno
+  const allCards = useMemo(() => [...DEFAULT_CURATED_CARDS, ...customCards], [customCards]);
 
   // Baralho ativo de acordo com a aba e o filtro de deck
   const activeDeck = useMemo(() => {
-    let pool: FlashcardItem[] = [];
-    if (activeTab === 'errors') {
-      pool = errorCards.length > 0 ? errorCards : DEFAULT_CURATED_CARDS.slice(0, 3);
-    } else {
-      pool = [...cards, ...errorCards];
-    }
+    const pool: FlashcardItem[] = activeTab === 'errors'
+      ? errorCards
+      : [...allCards, ...errorCards];
 
     if (selectedDeckFilter) {
-      pool = pool.filter(c => c.deck.toLowerCase().includes(selectedDeckFilter.toLowerCase()));
+      return pool.filter((c) => c.deck === selectedDeckFilter);
     }
+    return pool;
+  }, [activeTab, allCards, errorCards, selectedDeckFilter]);
 
-    return pool.length > 0 ? pool : DEFAULT_CURATED_CARDS;
-  }, [activeTab, cards, errorCards, selectedDeckFilter]);
-
-  const currentCard = activeDeck[currentIndex % activeDeck.length];
+  const currentCard = activeDeck.length > 0 ? activeDeck[currentIndex % activeDeck.length] : null;
 
   const handleFlip = () => {
     setIsFlipped(prev => !prev);
   };
 
-  const handleReviewAnswer = (rating: 'errei' | 'dificil' | 'bom' | 'facil') => {
+  const handleReviewAnswer = () => {
+    if (activeDeck.length === 0) return;
     setIsFlipped(false);
-    if (rating === 'facil' || rating === 'bom') {
-      onEarnXp?.(10, 1, 1, true, 'Flashcard Revisado');
-    }
 
     if (currentIndex + 1 >= activeDeck.length) {
       confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
@@ -196,11 +203,10 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
       source: 'custom',
     };
 
-    const updated = [newCard, ...cards];
-    setCards(updated);
+    const updated = [newCard, ...customCards];
+    setCustomCards(updated);
     try {
-      const customOnly = updated.filter(c => c.source === 'custom');
-      localStorage.setItem(STORAGE_CUSTOM_KEY, JSON.stringify(customOnly));
+      localStorage.setItem(STORAGE_CUSTOM_KEY, JSON.stringify(updated));
     } catch {}
 
     setNewFront('');
@@ -209,13 +215,15 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
     setIsCreateModalOpen(false);
   };
 
-  // Contadores para o painel lateral de decks
-  const decksList = [
-    { name: 'Biologia · Citologia', count: 14 },
-    { name: 'Química · Estequiometria', count: 9 },
-    { name: 'História · Era Vargas', count: 7 },
-    { name: 'Matemática · Fórmulas', count: 11 },
-  ];
+  // Decks reais derivados dos cards (curado + criados + vindos de erros)
+  const decksList = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of [...allCards, ...errorCards]) {
+      counts.set(card.deck, (counts.get(card.deck) || 0) + 1);
+    }
+    return Array.from(counts, ([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allCards, errorCards]);
 
   return (
     <div className="max-w-6xl mx-auto pt-6 sm:pt-10 pb-20 px-4 sm:px-6">
@@ -260,7 +268,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                 : 'bg-bg-card/60 hover:bg-bg-card border border-border-color text-text-secondary hover:text-text-main'
             }`}
           >
-            Revisar hoje · 24
+            Revisar hoje · {allCards.length + errorCards.length}
           </button>
 
           <button
@@ -292,7 +300,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                 : 'bg-bg-card/60 hover:bg-bg-card border border-border-color text-text-secondary hover:text-text-main'
             }`}
           >
-            Vindos do Caderno de Erros · {errorCards.length > 0 ? errorCards.length : 6}
+            Vindos do Caderno de Erros · {errorCards.length}
           </button>
         </div>
 
@@ -300,6 +308,21 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Coluna da Esquerda: Flashcard Interativo */}
           <div className="lg:col-span-8 bg-bg-card/40 backdrop-blur-xl border border-border-color rounded-3xl p-6 sm:p-10 flex flex-col justify-between min-h-[440px] shadow-lg relative">
+            {activeDeck.length === 0 ? (
+              <div className="my-auto text-center flex flex-col items-center justify-center py-10 px-4">
+                <p className="text-sm font-bold text-text-main mb-2">
+                  {activeTab === 'errors'
+                    ? (isLoadingErrors ? 'Carregando seus erros...' : 'Nenhum erro virou card ainda')
+                    : 'Nenhum card disponível'}
+                </p>
+                <p className="text-xs font-medium text-text-secondary max-w-sm leading-relaxed">
+                  {activeTab === 'errors'
+                    ? 'Marque questões no Caderno de Erros e elas aparecerão aqui automaticamente para revisão.'
+                    : 'Crie um card novo para começar a revisar.'}
+                </p>
+              </div>
+            ) : (
+            <>
             {/* Topo do card */}
             <div className="flex items-center justify-between text-xs sm:text-sm font-medium text-text-secondary">
               <span className="truncate max-w-[200px] sm:max-w-xs">
@@ -365,7 +388,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <button
-                    onClick={() => handleReviewAnswer('errei')}
+                    onClick={handleReviewAnswer}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-red-500/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-red-400">Errei</span>
@@ -373,7 +396,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={() => handleReviewAnswer('dificil')}
+                    onClick={handleReviewAnswer}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-amber-500/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-amber-400">Difícil</span>
@@ -381,7 +404,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={() => handleReviewAnswer('bom')}
+                    onClick={handleReviewAnswer}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-brand-primary/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-brand-primary">Bom</span>
@@ -389,7 +412,7 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                   </button>
 
                   <button
-                    onClick={() => handleReviewAnswer('facil')}
+                    onClick={handleReviewAnswer}
                     className="bg-[#0a0f1d] hover:bg-[#141b2a] border border-border-color hover:border-emerald-400/50 rounded-2xl py-3 px-2 flex flex-col items-center justify-center transition-all cursor-pointer group"
                   >
                     <span className="text-sm font-bold text-text-main group-hover:text-emerald-400">Fácil</span>
@@ -398,6 +421,8 @@ export default function Flashcards({ user, onEarnXp }: FlashcardsProps) {
                 </div>
               )}
             </div>
+            </>
+            )}
           </div>
 
           {/* Coluna da Direita: Decks e Info */}

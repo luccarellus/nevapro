@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
-  Sparkles, SlidersHorizontal, RotateCcw
+  Sparkles, SlidersHorizontal, RotateCcw, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { performanceService } from '../services/performanceService';
@@ -15,135 +15,154 @@ interface CourseEntry {
   campus: string;
   university: string;
   degree: string;
-  cutoffFull: number;
-  cutoffPvp: number;
+  shift: string | null;
+  cutoff: number;
   category: string;
   year?: number;
   edition?: string;
 }
 
-const FALLBACK_CATALOG: CourseEntry[] = [
-  { course: 'Medicina', campus: 'Campus Praia Vermelha', university: 'UFRJ - Universidade Federal do Rio de Janeiro', degree: 'Bacharelado', cutoffFull: 795, cutoffPvp: 760, category: 'Saúde' },
-  { course: 'Medicina', campus: 'Campus Darcy Ribeiro', university: 'UnB - Universidade de Brasília', degree: 'Bacharelado', cutoffFull: 790, cutoffPvp: 755, category: 'Saúde' },
-  { course: 'Medicina', campus: 'Campus Saúde', university: 'UFMG - Universidade Federal de Minas Gerais', degree: 'Bacharelado', cutoffFull: 798, cutoffPvp: 762, category: 'Saúde' },
-  { course: 'Medicina', campus: 'Campus Butantã', university: 'USP - Universidade de São Paulo', degree: 'Bacharelado', cutoffFull: 812, cutoffPvp: 775, category: 'Saúde' },
-  { course: 'Medicina', campus: 'Campus Barbalha', university: 'UFCA - Universidade Federal do Cariri', degree: 'Bacharelado', cutoffFull: 778, cutoffPvp: 742, category: 'Saúde' },
+interface Scores {
+  linguagens: number;
+  humanas: number;
+  natureza: number;
+  matematica: number;
+  redacao: number;
+}
 
-  { course: 'Direito', campus: 'Faculdade de Direito', university: 'USP - Universidade de São Paulo', degree: 'Bacharelado', cutoffFull: 770, cutoffPvp: 740, category: 'Humanas' },
-  { course: 'Direito', campus: 'Faculdade Nacional de Direito', university: 'UFRJ - Universidade Federal do Rio de Janeiro', degree: 'Bacharelado', cutoffFull: 745, cutoffPvp: 710, category: 'Humanas' },
-  { course: 'Direito', campus: 'Campus Pampulha', university: 'UFMG - Universidade Federal de Minas Gerais', degree: 'Bacharelado', cutoffFull: 752, cutoffPvp: 718, category: 'Humanas' },
+const EMPTY_SCORES: Scores = {
+  linguagens: 0,
+  humanas: 0,
+  natureza: 0,
+  matematica: 0,
+  redacao: 0,
+};
 
-  { course: 'Engenharia de Computação', campus: 'Campus Barão Geraldo', university: 'UNICAMP - Universidade Estadual de Campinas', degree: 'Bacharelado', cutoffFull: 748, cutoffPvp: 712, category: 'Exatas' },
-  { course: 'Engenharia de Computação', campus: 'Campus Politécnica', university: 'USP - Universidade de São Paulo', degree: 'Bacharelado', cutoffFull: 780, cutoffPvp: 745, category: 'Exatas' },
-  { course: 'Ciência da Computação', campus: 'Campus Pampulha', university: 'UFMG - Universidade Federal de Minas Gerais', degree: 'Bacharelado', cutoffFull: 735, cutoffPvp: 700, category: 'Exatas' },
-  { course: 'Ciência da Computação', campus: 'Campus Ilha do Fundão', university: 'UFRJ - Universidade Federal do Rio de Janeiro', degree: 'Bacharelado', cutoffFull: 742, cutoffPvp: 708, category: 'Exatas' },
-
-  { course: 'Psicologia', campus: 'Campus Pampulha', university: 'UFMG - Universidade Federal de Minas Gerais', degree: 'Bacharelado', cutoffFull: 718, cutoffPvp: 685, category: 'Humanas' },
-  { course: 'Psicologia', campus: 'Campus Praia Vermelha', university: 'UFRJ - Universidade Federal do Rio de Janeiro', degree: 'Bacharelado', cutoffFull: 724, cutoffPvp: 690, category: 'Humanas' },
-
-  { course: 'Odontologia', campus: 'Campus Araçatuba', university: 'UNESP - Universidade Estadual Paulista', degree: 'Bacharelado', cutoffFull: 705, cutoffPvp: 672, category: 'Saúde' },
-  { course: 'Odontologia', campus: 'Campus Butantã', university: 'USP - Universidade de São Paulo', degree: 'Bacharelado', cutoffFull: 740, cutoffPvp: 708, category: 'Saúde' },
-
-  { course: 'Administração', campus: 'Campus Curitiba', university: 'UFPR - Universidade Federal do Paraná', degree: 'Bacharelado', cutoffFull: 660, cutoffPvp: 625, category: 'Humanas' },
-  { course: 'Enfermagem', campus: 'Campus Canela', university: 'UFBA - Universidade Federal da Bahia', degree: 'Bacharelado', cutoffFull: 668, cutoffPvp: 632, category: 'Saúde' },
-  { course: 'Arquitetura e Urbanismo', campus: 'Campus Ilha do Fundão', university: 'UFRJ - Universidade Federal do Rio de Janeiro', degree: 'Bacharelado', cutoffFull: 712, cutoffPvp: 680, category: 'Exatas' },
+// A API aceita o valor exato de `modality` gravado na base. Como o dataset
+// oficial ingerido cobre Ampla Concorrência, as demais opções retornam vazio
+// e a tela informa isso explicitamente (sem inventar corte por cota).
+const MODALITIES = [
+  { label: 'Ampla concorrência', apiValue: 'Ampla Concorrência' },
+  { label: 'Cotas - Escola Pública (L1/L5)', apiValue: 'Cotas - Escola Pública' },
+  { label: 'Cotas - PPI / Renda (L2/L6)', apiValue: 'Cotas - PPI / Renda' },
+  { label: 'Cotas - PCD', apiValue: 'Cotas - PCD' },
 ];
 
+type CatalogStatus = 'loading' | 'ready' | 'empty' | 'error';
+
 export default function SimuladorSisu({ user }: SimuladorProps) {
-  const [coursesCatalog, setCoursesCatalog] = useState<CourseEntry[]>(FALLBACK_CATALOG);
-  const [selectedCourseName, setSelectedCourseName] = useState('Medicina');
+  const [coursesCatalog, setCoursesCatalog] = useState<CourseEntry[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>('loading');
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedCourseName, setSelectedCourseName] = useState('');
   const [selectedUniversity, setSelectedUniversity] = useState('');
-  const [selectedModality, setSelectedModality] = useState('Ampla concorrência');
+  const [selectedModality, setSelectedModality] = useState(MODALITIES[0].apiValue);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Notas por área
-  const [scores, setScores] = useState({
-    linguagens: 680,
-    humanas: 710,
-    natureza: 640,
-    matematica: 610,
-    redacao: 760,
-  });
+  // Notas por área — preenchidas apenas com valores reais do TRI
+  const [scores, setScores] = useState<Scores>(EMPTY_SCORES);
+  const [baselineScores, setBaselineScores] = useState<Scores>(EMPTY_SCORES);
+  const [hasTriScores, setHasTriScores] = useState(false);
 
-  // Tenta sincronizar notas reais calculadas pelo TRI no backend caso o aluno tenha dados
+  // Sincroniza notas reais calculadas pelo TRI no backend
   useEffect(() => {
     let active = true;
     const loadRealScores = async () => {
       try {
         const triData = await performanceService.getTriScores();
-        if (active && triData?.latest_score) {
-          const s = triData.latest_score;
-          setScores(prev => ({
-            linguagens: s.languages_score ? Math.round(s.languages_score) : prev.linguagens,
-            humanas: s.humanities_score ? Math.round(s.humanities_score) : prev.humanas,
-            natureza: s.nature_score ? Math.round(s.nature_score) : prev.natureza,
-            matematica: s.math_score ? Math.round(s.math_score) : prev.matematica,
-            redacao: prev.redacao,
-          }));
+        const s = triData?.latest_score;
+        if (active && s) {
+          const loaded: Scores = {
+            linguagens: s.languages_score ? Math.round(s.languages_score) : 0,
+            humanas: s.humanities_score ? Math.round(s.humanities_score) : 0,
+            natureza: s.nature_score ? Math.round(s.nature_score) : 0,
+            matematica: s.math_score ? Math.round(s.math_score) : 0,
+            // A redação não faz parte do cálculo do TRI: fica em 0 até o aluno
+            // informar manualmente no simulador.
+            redacao: 0,
+          };
+          setScores(loaded);
+          setBaselineScores(loaded);
+          setHasTriScores(true);
         }
       } catch {
-        // Usa as notas modelo padrão
+        // Sem TRI calculado: segue com 0 e exibe o aviso
       }
     };
     loadRealScores();
     return () => { active = false; };
   }, [user.email]);
 
-  // Carrega lista oficial de notas da API se disponível
+  // Catálogo oficial de notas de corte (recarrega ao trocar a modalidade)
   useEffect(() => {
     let active = true;
     const fetchCutoffs = async () => {
+      setCatalogStatus('loading');
+      setCatalogError(null);
       try {
-        const res = await fetch('/api/sisu/cutoffs?modality=Ampla%20Concorr%C3%AAncia&limit=300');
-        if (res.ok) {
-          const data = await res.json();
-          if (active && data.cutoffs && data.cutoffs.length > 0) {
-            const mapped: CourseEntry[] = data.cutoffs.map((c: any) => ({
-              course: c.course,
-              campus: c.campus || 'Campus Principal',
-              university: c.university,
-              degree: c.degree || 'Bacharelado',
-              cutoffFull: Math.round(c.cutoff),
-              cutoffPvp: Math.round(c.cutoff * 0.955),
-              category: 'Geral',
-              year: c.year,
-              edition: c.edition,
-            }));
-            setCoursesCatalog(mapped);
-          }
+        const res = await fetch(
+          `/api/sisu/cutoffs?modality=${encodeURIComponent(selectedModality)}&limit=300`,
+          { headers: { 'X-Requested-With': 'XMLHttpRequest' } },
+        );
+        if (!res.ok) {
+          throw new Error('Não foi possível carregar as notas de corte oficiais.');
         }
-      } catch (err) {
-        // Fallback explícito para o catálogo curado (nunca silencioso)
-        console.warn('[SISU] Falha ao carregar notas de corte; usando catálogo local.', err);
-        if (active) setCoursesCatalog(FALLBACK_CATALOG);
+        const data = await res.json();
+        if (!active) return;
+
+        const cutoffRows: any[] = Array.isArray(data?.cutoffs) ? data.cutoffs : [];
+        if (cutoffRows.length === 0) {
+          setCoursesCatalog([]);
+          setCatalogStatus('empty');
+          return;
+        }
+
+        setCoursesCatalog(cutoffRows.map((c) => ({
+          course: c.course,
+          campus: c.campus || 'Campus não informado',
+          university: c.university,
+          degree: c.degree || 'Bacharelado',
+          shift: c.shift ?? null,
+          cutoff: Math.round(Number(c.cutoff)),
+          category: c.modalityCategory || 'Geral',
+          year: c.year,
+          edition: c.edition,
+        })));
+        setCatalogStatus('ready');
+      } catch (err: any) {
+        if (!active) return;
+        console.warn('[SISU] Falha ao carregar notas de corte oficiais.', err);
+        setCoursesCatalog([]);
+        setCatalogError(err?.message || 'Falha ao carregar as notas de corte oficiais.');
+        setCatalogStatus('error');
       }
     };
     fetchCutoffs();
     return () => { active = false; };
-  }, []);
+  }, [selectedModality, refreshKey]);
 
   // Cursos únicos disponíveis
   const availableCourses = useMemo(() => {
-    const list = Array.from(new Set(coursesCatalog.map(c => c.course)));
+    const list = Array.from(new Set(coursesCatalog.map((c) => c.course)));
     return list.sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog]);
 
   // Universidades disponíveis para o curso selecionado
   const availableUniversities = useMemo(() => {
     const matching = coursesCatalog.filter(
-      c => c.course.toLowerCase() === selectedCourseName.toLowerCase()
+      (c) => c.course.toLowerCase() === selectedCourseName.toLowerCase(),
     );
-    const set = new Set(matching.map(c => c.university));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(new Set(matching.map((c) => c.university))).sort((a, b) => a.localeCompare(b));
   }, [coursesCatalog, selectedCourseName]);
 
   // Entrada de curso selecionada
   const activeCourseEntry = useMemo(() => {
     if (!selectedUniversity) return null;
     return coursesCatalog.find(
-      c =>
+      (c) =>
         c.course.toLowerCase() === selectedCourseName.toLowerCase() &&
-        c.university.toLowerCase() === selectedUniversity.toLowerCase()
+        c.university.toLowerCase() === selectedUniversity.toLowerCase(),
     ) || null;
   }, [coursesCatalog, selectedCourseName, selectedUniversity]);
 
@@ -158,18 +177,14 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
     return Math.round(sum / 5);
   }, [scores]);
 
-  // Nota de corte efetiva baseada na modalidade
-  const effectiveCutoff = useMemo(() => {
-    if (!activeCourseEntry) return null;
-    if (selectedModality === 'Ampla concorrência') {
-      return activeCourseEntry.cutoffFull;
-    }
-    // Cotas (EP/PPI/Renda) historicamente têm corte um pouco mais suave
-    return activeCourseEntry.cutoffPvp;
-  }, [activeCourseEntry, selectedModality]);
+  // Nota de corte efetiva: sempre a nota oficial da modalidade selecionada
+  const effectiveCutoff = activeCourseEntry ? activeCourseEntry.cutoff : null;
 
   const diffPoints = effectiveCutoff !== null ? userAverage - effectiveCutoff : null;
   const missingPoints = diffPoints !== null ? Math.max(0, -diffPoints) : null;
+
+  const selectedModalityLabel =
+    MODALITIES.find((m) => m.apiValue === selectedModality)?.label || selectedModality;
 
   // Dica dinâmica do Professor IA baseada nas menores notas
   const aiTip = useMemo(() => {
@@ -180,25 +195,26 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
       { name: 'Humanas', score: scores.humanas },
       { name: 'Redação', score: scores.redacao },
     ];
+    if (!entries.some((e) => e.score > 0)) {
+      return 'informe suas notas no simulador para ver onde focar.';
+    }
     entries.sort((a, b) => a.score - b.score);
-    const lowestOne = entries[0].name;
-    const lowestTwo = entries[1].name;
-    return `foque em ${lowestOne} e ${lowestTwo} para encurtar a distância.`;
+    return `foque em ${entries[0].name} e ${entries[1].name} para encurtar a distância.`;
   }, [scores]);
 
-  const handleScoreChange = (area: keyof typeof scores, val: number) => {
+  const handleScoreChange = (area: keyof Scores, val: number) => {
     const clamped = Math.max(0, Math.min(1000, val));
-    setScores(prev => ({ ...prev, [area]: clamped }));
+    setScores((prev) => ({ ...prev, [area]: clamped }));
   };
 
   const handleResetScores = () => {
-    setScores({
-      linguagens: 680,
-      humanas: 710,
-      natureza: 640,
-      matematica: 610,
-      redacao: 760,
-    });
+    setScores(baselineScores);
+  };
+
+  const handleModalityChange = (value: string) => {
+    setSelectedModality(value);
+    setSelectedCourseName('');
+    setSelectedUniversity('');
   };
 
   return (
@@ -237,7 +253,8 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
                     setSelectedUniversity('');
                   }}
                   placeholder="Ex: Medicina"
-                  className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all placeholder:text-text-secondary/40"
+                  disabled={catalogStatus !== 'ready'}
+                  className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all placeholder:text-text-secondary/40 disabled:opacity-50"
                 />
                 <datalist id="courses-options">
                   {availableCourses.map((c) => (
@@ -255,7 +272,8 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
               <select
                 value={selectedUniversity}
                 onChange={(e) => setSelectedUniversity(e.target.value)}
-                className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all cursor-pointer"
+                disabled={availableUniversities.length === 0}
+                className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all cursor-pointer disabled:opacity-50"
               >
                 <option value="">[Escolha a universidade]</option>
                 {availableUniversities.map((uni) => (
@@ -273,16 +291,52 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
               </label>
               <select
                 value={selectedModality}
-                onChange={(e) => setSelectedModality(e.target.value)}
+                onChange={(e) => handleModalityChange(e.target.value)}
                 className="w-full bg-[#0a0f1d] border border-border-color rounded-xl px-4 py-3 text-text-main font-semibold text-sm focus:outline-none focus:border-brand-primary/60 transition-all cursor-pointer"
               >
-                <option value="Ampla concorrência">Ampla concorrência</option>
-                <option value="Cotas - Escola Pública">Cotas - Escola Pública (L1/L5)</option>
-                <option value="Cotas - PPI / Renda">Cotas - PPI / Renda (L2/L6)</option>
-                <option value="Cotas - PCD">Cotas - PCD</option>
+                {MODALITIES.map((m) => (
+                  <option key={m.apiValue} value={m.apiValue}>
+                    {m.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+
+          {/* Aviso de carga das notas oficiais */}
+          {catalogStatus === 'loading' && (
+            <p className="mt-4 text-xs font-semibold text-text-secondary flex items-center gap-2">
+              <RefreshCw size={13} className="animate-spin" />
+              Carregando notas de corte oficiais...
+            </p>
+          )}
+
+          {catalogStatus === 'error' && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-[#2a1e12] border border-[#a17e49]/40 px-4 py-3">
+              <p className="text-xs font-semibold text-[#f5caa1] flex items-center gap-2">
+                <AlertTriangle size={14} />
+                {catalogError || 'Falha ao carregar as notas de corte oficiais.'}
+              </p>
+              <button
+                onClick={() => setRefreshKey((k) => k + 1)}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-brand-primary text-black text-[11px] font-black"
+              >
+                Tentar de novo
+              </button>
+            </div>
+          )}
+
+          {catalogStatus === 'empty' && (
+            <div className="mt-4 rounded-xl bg-bg-main/40 border border-border-color px-4 py-3">
+              <p className="text-xs font-semibold text-text-secondary flex items-center gap-2">
+                <AlertTriangle size={14} className="text-amber-400" />
+                Sem notas de corte oficiais para “{selectedModalityLabel}”.
+              </p>
+              <p className="text-[11px] font-medium text-text-secondary/70 mt-1">
+                Os dados oficiais disponíveis hoje são de Ampla Concorrência.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Grid dos dois cards principais */}
@@ -301,15 +355,17 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
                 Nota de corte
               </p>
               <h2 className="text-4xl sm:text-5xl font-black text-text-main tracking-tight leading-none">
-                {effectiveCutoff !== null ? `${effectiveCutoff.toFixed(1)}` : '[000,0]'}
+                {effectiveCutoff !== null ? effectiveCutoff.toFixed(1) : '—'}
               </h2>
             </div>
 
             {/* Pill de status */}
             <div className="mt-8">
-              {!selectedUniversity ? (
+              {effectiveCutoff === null ? (
                 <div className="w-full py-3.5 px-4 rounded-2xl bg-text-main/5 border border-border-color text-text-secondary font-bold text-xs sm:text-sm text-center">
-                  Escolha uma universidade acima
+                  {catalogStatus === 'empty'
+                    ? 'Sem dados oficiais para esta modalidade'
+                    : 'Escolha uma universidade acima'}
                 </div>
               ) : diffPoints !== null && diffPoints < 0 ? (
                 <div className="w-full py-3.5 px-4 rounded-2xl bg-[#2a1e12] border border-[#a17e49]/40 text-[#f5caa1] font-bold text-xs sm:text-sm text-center shadow-inner">
@@ -338,6 +394,12 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
                   <span>{isSimulating ? 'Fechar simulador' : 'Simular notas'}</span>
                 </button>
               </div>
+
+              {!hasTriScores && (
+                <p className="text-[11px] font-semibold text-text-secondary/70 mb-4">
+                  Sem notas do TRI calculadas ainda — use “Simular notas” para estimar sua média.
+                </p>
+              )}
 
               {/* Lista das 5 áreas */}
               <div className="space-y-4">
@@ -368,11 +430,11 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
                       <div className="pl-36 sm:pl-44 pr-10 pt-1">
                         <input
                           type="range"
-                          min="300"
+                          min="0"
                           max="1000"
                           step="5"
                           value={item.score}
-                          onChange={(e) => handleScoreChange(item.key as keyof typeof scores, Number(e.target.value))}
+                          onChange={(e) => handleScoreChange(item.key as keyof Scores, Number(e.target.value))}
                           className="w-full accent-brand-primary h-1 bg-[#141b2a] rounded-lg cursor-pointer"
                         />
                       </div>
@@ -387,7 +449,7 @@ export default function SimuladorSisu({ user }: SimuladorProps) {
                     onClick={handleResetScores}
                     className="flex items-center gap-1 text-[11px] font-bold text-text-secondary hover:text-brand-primary transition-colors"
                   >
-                    <RotateCcw size={12} /> Restaurar notas padrão
+                    <RotateCcw size={12} /> Restaurar notas
                   </button>
                 </div>
               )}

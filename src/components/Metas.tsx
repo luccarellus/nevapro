@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import {
   X, Flame, Award, BookOpen, PenTool, Trophy, Star
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { performanceService } from '../services/performanceService';
 
 interface MetasProps {
   user: UserProfile;
@@ -19,6 +20,7 @@ interface WeeklyGoals {
 }
 
 const STORAGE_GOALS_KEY = 'neva_weekly_goals_v1';
+const WEEK_DAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 export default function Metas({ user, onTabChange }: MetasProps) {
   const [goals, setGoals] = useState<WeeklyGoals>({
@@ -29,6 +31,8 @@ export default function Metas({ user, onTabChange }: MetasProps) {
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [weeklyActivity, setWeeklyActivity] = useState<{ day: string; xp: number; fullDate: string }[]>([]);
+  const [triScore, setTriScore] = useState<number | null>(null);
 
   // Carrega metas salvas ou padrão
   useEffect(() => {
@@ -42,67 +46,85 @@ export default function Metas({ user, onTabChange }: MetasProps) {
     }
   }, []);
 
-  // Dados reais ou modelo do usuário
-  const streakDays = user.streak !== undefined && user.streak > 0 ? user.streak : 12;
-  const questionsResolved = user.answeredQuestions !== undefined && user.answeredQuestions > 0 ? user.answeredQuestions : 120;
-  const hoursStudied = Math.min(goals.hoursTarget, Math.max(1, Math.round((questionsResolved * 3.5) / 60) || 8));
-  const essaysSent = 1;
-  const cardsReviewed = 90;
+  // Atividade real da semana (XP por dia) vinda do servidor
+  useEffect(() => {
+    let active = true;
+    const loadWeeklyActivity = async () => {
+      try {
+        const res = await fetch(`/api/user/stats?email=${encodeURIComponent(user.email || '')}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && Array.isArray(data?.weekly)) {
+          setWeeklyActivity(data.weekly);
+        }
+      } catch {
+        // Sem atividade registrada: nenhum dia fica marcado
+      }
+    };
+    loadWeeklyActivity();
+    return () => { active = false; };
+  }, [user.email]);
 
-  // Dias da semana para o streak (Seg, Ter, Qua, Qui, Sex, Sáb, Dom)
-  const weekDays = [
-    { label: 'Seg', active: true },
-    { label: 'Ter', active: true },
-    { label: 'Qua', active: true },
-    { label: 'Qui', active: true },
-    { label: 'Sex', active: true },
-    { label: 'Sáb', active: false },
-    { label: 'Dom', active: false },
-  ];
+  // Nota TRI mais recente (base da conquista de nota 900)
+  useEffect(() => {
+    let active = true;
+    const loadTri = async () => {
+      try {
+        const data = await performanceService.getTriScores();
+        if (active && data?.latest_score) {
+          setTriScore(data.latest_score.estimated_score);
+        }
+      } catch {
+        // Sem TRI calculado: conquista permanece bloqueada
+      }
+    };
+    loadTri();
+    return () => { active = false; };
+  }, [user.email]);
 
-  // Nível e XP do usuário
-  const currentLevel = user.level || 7;
-  const currentXp = user.xp || 680;
-  const targetXp = user.nextLevelXp || 1000;
+  // Métricas reais do aluno (sem valores de exemplo)
+  const streakDays = user.streak ?? 0;
+  const questionsResolved = user.answeredQuestions ?? 0;
+  // Horas de estudo, redações enviadas e cards revisados ainda não são
+  // registrados pela plataforma — não inventamos progresso (ficam em 0).
+  const hoursStudied = 0;
+  const essaysSent = 0;
+  const cardsReviewed = 0;
 
-  // Lista de Conquistas (desbloqueadas e bloqueadas)
+  // Dias da semana (Seg–Dom) marcados conforme atividade real (XP do dia)
+  const weekDays = useMemo(() => {
+    const xpByDate = new Map(weeklyActivity.map((w) => [w.fullDate, w.xp]));
+    const today = new Date();
+    const offsetFromMonday = (today.getDay() + 6) % 7; // 0 = segunda
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - offsetFromMonday);
+
+    return WEEK_DAY_LABELS.map((label, index) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + index);
+      const key = date.toISOString().split('T')[0];
+      return { label, active: (xpByDate.get(key) || 0) > 0 };
+    });
+  }, [weeklyActivity]);
+
+  // Nível e XP reais do usuário
+  const currentLevel = user.level || 1;
+  const currentXp = user.xp || 0;
+  const targetXp = user.nextLevelXp || 1;
+  const levelMinXp = user.currentLevelMinXp ?? 0;
+  const levelRange = Math.max(1, targetXp - levelMinXp);
+  const xpInLevel = Math.max(0, Math.min(levelRange, currentXp - levelMinXp));
+
+  // Conquistas derivadas de dados reais
   const achievements = [
-    {
-      id: 'first_essay',
-      label: 'Primeira redação',
-      unlocked: true,
-      icon: PenTool,
-    },
-    {
-      id: 'streak_7',
-      label: '7 dias seguidos',
-      unlocked: streakDays >= 7,
-      icon: Flame,
-    },
-    {
-      id: 'questions_100',
-      label: '100 questões',
-      unlocked: questionsResolved >= 100,
-      icon: BookOpen,
-    },
-    {
-      id: 'score_900',
-      label: 'Nota 900 em simulado',
-      unlocked: false,
-      icon: Trophy,
-    },
-    {
-      id: 'streak_30',
-      label: '30 dias seguidos',
-      unlocked: streakDays >= 30,
-      icon: Award,
-    },
-    {
-      id: 'top_10',
-      label: 'Top 10 do ranking',
-      unlocked: false,
-      icon: Star,
-    },
+    { id: 'first_essay', label: 'Primeira redação', unlocked: essaysSent >= 1, icon: PenTool },
+    { id: 'streak_7', label: '7 dias seguidos', unlocked: streakDays >= 7, icon: Flame },
+    { id: 'questions_100', label: '100 questões', unlocked: questionsResolved >= 100, icon: BookOpen },
+    { id: 'score_900', label: 'Nota 900 em simulado', unlocked: (triScore ?? 0) >= 900, icon: Trophy },
+    { id: 'streak_30', label: '30 dias seguidos', unlocked: streakDays >= 30, icon: Award },
+    { id: 'top_10', label: 'Top 10 do ranking', unlocked: (user.rank ?? 0) > 0 && (user.rank ?? 0) <= 10, icon: Star },
   ];
 
   const handleSaveGoals = (e: React.FormEvent) => {
@@ -248,6 +270,12 @@ export default function Metas({ user, onTabChange }: MetasProps) {
                   />
                 </div>
               </div>
+
+              {(hoursStudied === 0 || essaysSent === 0 || cardsReviewed === 0) && (
+                <p className="text-[11px] font-medium text-text-secondary/60 leading-relaxed pt-1">
+                  Horas de estudo, redações e cards revisados aparecem zerados enquanto essas atividades não são registradas pela plataforma.
+                </p>
+              )}
             </div>
           </div>
 
@@ -260,12 +288,12 @@ export default function Metas({ user, onTabChange }: MetasProps) {
             <div className="bg-[#141b2a] h-2.5 rounded-full overflow-hidden">
               <div
                 className="bg-brand-primary h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(0,176,148,0.4)]"
-                style={{ width: `${Math.min(100, (currentXp / targetXp) * 100)}%` }}
+                style={{ width: `${Math.min(100, (xpInLevel / levelRange) * 100)}%` }}
               />
             </div>
 
             <p className="text-xs sm:text-sm font-medium text-text-secondary">
-              {currentXp} / {targetXp} XP para o nível {currentLevel + 1}
+              {xpInLevel} / {levelRange} XP para o nível {currentLevel + 1}
             </p>
           </div>
 

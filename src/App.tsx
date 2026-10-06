@@ -451,7 +451,7 @@ export default function App() {
       case 'desempenho':
         return <Performance user={user} onTabChange={handleTabChange} />;
       case 'flashcards':
-        return <Flashcards user={user} onEarnXp={handleEarnXp} />;
+        return <Flashcards user={user} />;
       case 'metas':
         return <Metas user={user} onTabChange={handleTabChange} />;
       case 'simulador_sisu':
