@@ -4,7 +4,8 @@ use Illuminate\Support\Str;
 use Pdo\Mysql;
 
 $dbConnection = env('DB_CONNECTION', 'sqlite');
-$dbSslMode = strtolower((string) env('DB_SSLMODE', 'prefer'));
+$dbSslMode = strtolower((string) env('DB_SSLMODE', 'prefer'));        // Em produção, se o banco não suportar SSL, alterar para 'prefer' ou 'allow'.
+// Ex.: DB_SSLMODE=prefer ou DB_SSLMODE=allow
 $databaseUrl = env('DB_URL');
 
 if ($dbConnection === 'pgsql') {
@@ -27,8 +28,10 @@ if ($dbConnection === 'pgsql') {
     if (in_array($dbSslMode, $insecureSslModes, true)
         || ($urlSslMode !== null && in_array($urlSslMode, $insecureSslModes, true))) {
         error_log(
-            '[database] AVISO: PostgreSQL sem SSL garantido (sslmode='.$dbSslMode.'). '
-            .'Habilite TLS no banco e use DB_SSLMODE=require em produção.'
+            '[database] AVISO: PostgreSQL sem SSL garantido (sslmode='.$dbSslMode.'). '.
+            ($dbSslMode === 'require' 
+                ? 'Use DB_SSLMODE=prefer ou allow em ambientes sem TLS, ou habilite SSL no banco para manter require.'
+                : 'Se o banco não suportar SSL, ajuste DB_SSLMODE para prefer ou allow.')
         );
     }
 }
@@ -126,7 +129,7 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => $dbSslMode,
+            'sslmode' => $dbSslMode, // Prefer: usa SSL se disponível, mas não exige. Require: exige SSL (falha se não houver). Allow: tolera SSL se disponível.
         ],
 
         'sqlsrv' => [
