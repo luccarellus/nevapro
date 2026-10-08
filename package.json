@@ -25,8 +25,7 @@
     "test:backblaze-backup": "tsx server/scripts/testBackblazeBackup.ts",
     "backup:db": "tsx server/scripts/runBackup.ts",
     "create:admin": "tsx server/scripts/createAdmin.ts",
-    "verify:connections": "tsx server/scripts/verifyConnections.ts",
-    "sisu:ingest": "tsx server/scripts/ingestSisuCutoffs.ts"
+    "verify:connections": "tsx server/scripts/verifyConnections.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1083.0",

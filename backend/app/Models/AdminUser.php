@@ -55,6 +55,23 @@ class AdminUser extends Authenticatable
         return $this->password_hash;
     }
 
+    public function getPasswordAttribute(): ?string
+    {
+        return $this->password_hash;
+    }
+
+    public function setPasswordAttribute(?string $value): void
+    {
+        if ($value === null) {
+            $this->attributes['password_hash'] = null;
+            return;
+        }
+
+        $this->attributes['password_hash'] = str_starts_with($value, '$2y$') || str_starts_with($value, '$2a$')
+            ? $value
+            : \Illuminate\Support\Facades\Hash::make($value);
+    }
+
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);

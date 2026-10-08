@@ -17,7 +17,7 @@ use App\Http\Controllers\MuralController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PerformanceController;
 use App\Http\Controllers\QuestionController;
-use App\Http\Controllers\SisuController;
+use App\Http\Controllers\RedisDiagnosticController;
 use App\Http\Controllers\StorageObjectController;
 use App\Http\Controllers\StudyPlanController;
 use App\Http\Controllers\TenantController;
@@ -146,10 +146,6 @@ Route::middleware(['auth.custom', 'tenant'])->group(function () {
     Route::get('performance/subject-mastery', [PerformanceController::class, 'subjectMastery']);
     Route::post('performance/calculate-tri', [PerformanceController::class, 'calculateTri'])
         ->middleware('throttle.custom:10,60');
-
-    // SISU — notas de corte oficiais (autenticado)
-    Route::get('sisu/cutoffs', [SisuController::class, 'cutoffs'])
-        ->middleware('throttle.custom:60,60');
 
     // Tenants (troca de instituição)
     Route::get('tenants', [TenantController::class, 'index']);

@@ -36,7 +36,6 @@ const StudyPlan = lazy(() => import('./components/StudyPlan'));
 const Performance = lazy(() => import('./components/Performance'));
 const Flashcards = lazy(() => import('./components/Flashcards'));
 const Metas = lazy(() => import('./components/Metas'));
-const SimuladorSisu = lazy(() => import('./components/SimuladorSisu'));
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'));
 const CookiePolicy = lazy(() => import('./components/CookiePolicy'));
 const ComingSoon = lazy(() => import('./components/ComingSoon'));
@@ -428,8 +427,6 @@ export default function App() {
         return <Flashcards user={user} />;
       case 'metas':
         return <Metas user={user} onTabChange={handleTabChange} />;
-      case 'simulador_sisu':
-        return <SimuladorSisu user={user} />;
       case 'ranking':
         return <Leaderboard user={user} />;
       case 'materiais':

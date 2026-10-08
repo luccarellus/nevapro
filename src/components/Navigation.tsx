@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon, Target, TrendingUp, Layers, Medal, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, Trophy, BookOpen, Calendar, ShieldCheck, User, MessageSquare, ClipboardList, FolderOpen, MoreHorizontal, X, LogOut, PenTool, Sparkles, AlertOctagon, Target, TrendingUp, Layers, Medal } from 'lucide-react';
 import Logo from './Logo';
 
 import { UserProfile } from '../types';
@@ -30,7 +30,6 @@ export default function Navigation({ activeTab, setActiveTab, isAdmin, onLogout,
     { id: 'ranking', label: 'Ranking', icon: Trophy, color: 'text-amber-400', bgColor: 'bg-amber-400/10', hex: '#d8b478' },
     { id: 'flashcards', label: 'Flashcards', icon: Layers, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
     { id: 'metas', label: 'Metas e Conquistas', icon: Medal, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
-    { id: 'simulador_sisu', label: 'Simulador SISU', icon: GraduationCap, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96', badge: 'Novo' },
     { id: 'materiais', label: 'Materiais', icon: FolderOpen, color: 'text-emerald-400', bgColor: 'bg-emerald-400/10', hex: '#4aab96' },
     { id: 'mural', label: 'Mural de recados', icon: MessageSquare, color: 'text-purple-400', bgColor: 'bg-purple-400/10', hex: '#4aab96' },
     { id: 'calendar', label: 'Calendário', icon: Calendar, color: 'text-sky-400', bgColor: 'bg-sky-400/10', hex: '#4aab96' },
