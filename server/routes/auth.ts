@@ -102,7 +102,6 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       const recaptchaData = recaptchaResult.value;
       if (recaptchaData.success === false) {
         const errorCodes = recaptchaData['error-codes'] || [];
-        log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
         const isClientOrConfigError = errorCodes.some(
           (code: string) =>
             code === 'browser-error' ||
@@ -111,6 +110,11 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
             code === 'missing-input-response' ||
             code === 'hostname-mismatch'
         );
+        if (isClientOrConfigError) {
+          log.info('[Auth] reCAPTCHA erro de ambiente/browser permitido:', errorCodes.join(', '));
+        } else {
+          log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
+        }
         if (!isClientOrConfigError && process.env.NODE_ENV === 'production') {
           res.status(403).json({ error: 'Verificação de segurança falhou. Tente novamente.' });
           return;

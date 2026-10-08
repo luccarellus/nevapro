@@ -16,13 +16,7 @@ export const TenantSwitcher: React.FC<TenantSwitcherProps> = ({
   const [isOpen, setIsOpen] = React.useState(false);
 
   if (!tenants || tenants.length <= 1) {
-    const single = tenants[0];
-    return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-300 text-xs font-medium border border-slate-700/50">
-        <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-        <span>{single ? single.name : 'NevaPro Principal'}</span>
-      </div>
-    );
+    return null;
   }
 
   const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0];

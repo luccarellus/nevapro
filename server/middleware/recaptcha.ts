@@ -85,7 +85,6 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
       if (!data.success) {
         const errorCodes = data['error-codes'] || [];
         const errorMsg = errorCodes.join(', ') || 'desconhecido';
-        log.warn(`[reCAPTCHA] Falha na verificação: ${errorMsg}`);
 
         const isClientOrConfigError = errorCodes.some(
           (code) =>
@@ -97,10 +96,11 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
         );
 
         if (isClientOrConfigError) {
-          log.warn('[reCAPTCHA] Erro de ambiente/cliente permitido para não bloquear usuários:', errorMsg);
+          log.info('[reCAPTCHA] Erro de ambiente/cliente permitido para não bloquear usuários:', errorMsg);
           return next();
         }
 
+        log.warn(`[reCAPTCHA] Falha na verificação: ${errorMsg}`);
         res.status(403).json({
           error: 'Verificação de segurança falhou. Tente novamente.',
         });

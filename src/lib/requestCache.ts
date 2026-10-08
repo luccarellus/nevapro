@@ -69,6 +69,9 @@ async function fetchAndCache<T>(url: string, cacheKey: string, ttlMs?: number): 
 
   const promise = fetch(url, { headers }).then(async (response) => {
     if (!response.ok) {
+      if (response.status === 401 && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('neva:unauthorized'));
+      }
       const error: any = new Error(`Request failed: ${response.status}`);
       error.status = response.status;
       throw error;

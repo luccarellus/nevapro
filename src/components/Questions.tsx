@@ -188,7 +188,7 @@ export default function Questions({ onEarnXp, user }: QuestionsProps) {
           <div className="bg-bg-card/40 backdrop-blur-xl rounded-3xl md:rounded-[40px] p-5 md:p-8 border border-border-color shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-[10px] font-bold text-text-secondary opacity-50">Disciplina</h3>
-              <span className="text-[8px] font-bold bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full">LIMITADO</span>
+              <span className="text-[8px] font-bold bg-brand-primary/10 text-brand-primary px-2 py-0.5 rounded-full">50 QUESTÕES</span>
             </div>
             <div className="space-y-2.5">
               {ENEM_SUBJECTS.map(subject => (

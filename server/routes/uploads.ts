@@ -16,7 +16,7 @@ import { isB2LogStorageConfigured } from '../services/b2LogStorage';
 import { hasPermission } from '../services/rbacService';
 import { PERMISSIONS } from '../lib/permissions';
 import { signObjectKey, verifyObjectSignature } from '../utils/storageUrl';
-import { fromBuffer as fileTypeFromBuffer } from 'file-type';
+import FileType from 'file-type';
 
 // Magic bytes reais por mimetype declarado — bloqueia arquivos com
 // extensão/mimetype falsificados (ex.: HTML/JS renomeado para .png).
@@ -39,7 +39,7 @@ async function magicBytesMatch(mimetype: string, buffer: Buffer): Promise<boolea
   if (checker(buffer)) return true;
   // fallback: biblioteca file-type como segunda camada
   try {
-    const type = await fileTypeFromBuffer(buffer);
+    const type = await FileType.fromBuffer(buffer);
     return type?.mime === mimetype;
   } catch {
     return false;

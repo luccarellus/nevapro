@@ -19,6 +19,7 @@ import { calculateLevelAndProgression } from './utils/xpUtils';
 import { getSession, saveSession, clearSession } from './lib/sessionStorage';
 
 import Spinner from './components/Spinner';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 // Lazy-loaded route components (code splitting)
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -133,17 +134,25 @@ export default function App() {
     if (savedUser) {
       try {
         const parsedUser = savedUser as UserProfile;
-        // Immediately show cached user data (instant UI), then verify in background
         if (parsedUser.email) {
-          setUser(prev => ({ ...prev, ...parsedUser }));
-          setIsLoggedIn(true);
-          // Verify session + prefetch critical data in parallel (non-blocking)
-          Promise.allSettled([
-            fetchUser(parsedUser.email),
-            prefetchEndpoint('/api/bootstrap'),
-            prefetchEndpoint(`/api/notifications?email=${encodeURIComponent(parsedUser.email)}`),
-          ]).finally(() => setIsRestoringSession(false));
+          setIsRestoringSession(true);
+          fetchUser(parsedUser.email)
+            .then((isValid) => {
+              if (isValid) {
+                prefetchEndpoint('/api/bootstrap');
+                prefetchEndpoint(`/api/notifications?email=${encodeURIComponent(parsedUser.email)}`);
+              } else {
+                clearLocalSession();
+              }
+            })
+            .catch(() => {
+              clearLocalSession();
+            })
+            .finally(() => {
+              setIsRestoringSession(false);
+            });
         } else {
+          clearLocalSession();
           setIsRestoringSession(false);
         }
       } catch {
@@ -153,6 +162,14 @@ export default function App() {
     } else {
       setIsRestoringSession(false);
     }
+
+    const handleUnauthorized = () => {
+      clearLocalSession();
+    };
+    window.addEventListener('neva:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('neva:unauthorized', handleUnauthorized);
+    };
   }, []);
 
   const handleSelectTenant = (tenantId: string) => {
@@ -184,7 +201,7 @@ export default function App() {
         return true;
       }
     } catch (error: any) {
-      if (error.status === 401) {
+      if (error?.status === 401 || error?.message?.includes('401')) {
         clearLocalSession();
       }
     }
@@ -540,6 +557,7 @@ export default function App() {
       </main>
       
       <CookieBanner />
+      <OfflineIndicator />
     </div>
   );
 }

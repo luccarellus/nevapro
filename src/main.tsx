@@ -5,6 +5,10 @@ import * as Sentry from '@sentry/react';
 import './sentry';
 import App from './App.tsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+// Registra o Service Worker do PWA com Workbox para caching offline e performance
+registerSW({ immediate: true });
 
 const CHUNK_RELOAD_KEY = 'nevapro_chunk_reload';
 
@@ -17,8 +21,6 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 window.setTimeout(() => sessionStorage.removeItem(CHUNK_RELOAD_KEY), 10_000);
-
-// Service Worker removido (public/sw.js não existe mais); registro legado desfeito.
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

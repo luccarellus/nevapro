@@ -25,9 +25,19 @@ function serialize(value: unknown): string {
 }
 
 function enqueue(level: LogLevel, args: unknown[]) {
+  const serialized = args.map(serialize).join(' ');
+  // Ignora erros normais de sessão não autenticada / 401 e falhas amortecidas
+  if (
+    serialized.includes('401') ||
+    serialized.includes('Request failed: 401') ||
+    serialized.includes('Falha amortecida')
+  ) {
+    return;
+  }
+
   queue.push({
     level,
-    message: args.map(serialize).join(' ').slice(0, 2_000),
+    message: serialized.slice(0, 2_000),
     page: window.location.pathname,
     timestamp: new Date().toISOString(),
   });

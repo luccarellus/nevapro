@@ -69,9 +69,25 @@ export const isAllowedOrigin = (req: Request, value?: string | string[]): boolea
   const originValue = Array.isArray(value) ? value[0] : value;
   if (!originValue) return false;
   try {
-    const parsedOrigin = new URL(originValue).origin;
+    const url = new URL(originValue);
+    const parsedOrigin = url.origin;
     const allowedOrigins = getDynamicAllowedOrigins(req);
-    return allowedOrigins.has(parsedOrigin);
+    if (allowedOrigins.has(parsedOrigin)) return true;
+
+    // Permite domínios de preview/runtime do Google AI Studio e Cloud Run
+    const host = url.hostname;
+    if (
+      host.endsWith('.run.app') ||
+      host.endsWith('.google.com') ||
+      host === 'aistudio.google.com' ||
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host.endsWith('.mo1m2d.easypanel.host')
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

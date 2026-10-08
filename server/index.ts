@@ -71,7 +71,7 @@ app.use(compression({ level: 6, threshold: 1024, filter: (req, res) => {
   // Nunca comprimir SSE/streaming
   if (res.getHeader('Content-Type')?.toString().includes('text/event-stream')) return false;
   return compression.filter(req, res);
-} }));
+} }) as any);
 
 // Agrupa os logs de cada requisição e grava assincronamente após o término da resposta.
 app.use((req, res, next) => {
@@ -157,7 +157,10 @@ app.use(
             },
           }
         : false,
+    frameguard: false, // Necessário para execução em iframe (Google AI Studio)
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
   }),
 );
 
@@ -208,15 +211,27 @@ const distPath = path.resolve('dist');
 const indexPath = path.join(distPath, 'index.html');
 
 if (fs.existsSync(indexPath)) {
-  // Assets com hash no filename: cache público imutável por 1 ano (revalidação zero)
-  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+  // Assets com hash no filename: cache público imutável por 1 ano com CORS e CORP abertos
+  app.use('/assets', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  }, express.static(path.join(distPath, 'assets'), {
     immutable: true,
     maxAge: '365d',
-    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
   }));
-  // HTML/raiz: sempre revalida (SPA updates instantâneos)
+  // HTML/raiz/manifest/SW: sempre revalida com CORS e CORP abertos
   app.use(express.static(distPath, { etag: true, lastModified: true, setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    if (filePath.endsWith('.html') || filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
   } }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();

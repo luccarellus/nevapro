@@ -67,7 +67,10 @@ export default function Dashboard({ user, onTabChange, onEarnXp }: DashboardProp
         } else {
           setLeaderboard([{ name: user.name || 'Você', city: user.city || 'Maranhão', xp: user.xp || 0, level: user.level || 1, isMe: true }]);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.status === 401 || err?.message?.includes('401')) {
+          return; // Sessão não autenticada/expirada — tratado globalmente
+        }
         console.error('Erro geral ao carregar dados do dashboard:', err);
       } finally {
       }

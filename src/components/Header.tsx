@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sun, Moon, Bell, X, BookOpen, MessageSquare, Calendar as CalendarIcon } from 'lucide-react';
 import Logo from './Logo';
 import TenantSwitcher from './TenantSwitcher';
+import { PWAInstallButton } from './PWAInstallButton';
 import { cachedFetchJson, invalidateRequestCache } from '../lib/requestCache';
 import { csrfHeaders } from '../lib/apiService';
 
@@ -53,12 +54,16 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
   };
 
   const fetchNotifications = async () => {
+    if (!userEmail) return;
     try {
-      const url = userEmail ? `/api/notifications?email=${encodeURIComponent(userEmail)}` : '/api/notifications';
+      const url = `/api/notifications?email=${encodeURIComponent(userEmail)}`;
       const data = await cachedFetchJson<any[]>(url, 25_000);
       setNotifications(data);
       setUnreadCount(data.filter((n: any) => !n.read).length);
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes('401')) {
+        return; // Sessão não autenticada — silencioso
+      }
       console.warn('Falha amortecida ao buscar notificações:', err);
     }
   };
@@ -117,8 +122,8 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
            {/* In desktop the logo is in the sidebar, so we leave space or add search */}
         </div>
         
-        <div className="flex items-center gap-2 md:gap-4">
-            {user?.tenants && user.tenants.length > 0 && (
+        <div className="flex items-center gap-2 md:gap-3.5">
+            {user?.tenants && user.tenants.length > 1 && (
               <TenantSwitcher
                 tenants={user.tenants}
                 activeTenantId={user.tenantId}
@@ -126,33 +131,43 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
               />
             )}
 
-            {/* User Avatar / Badge */}
-            {isAdmin && (
-              <>
-                <button
-                  onClick={() => onTabChange?.('profile')}
-                  className="flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-bg-card/50 hover:bg-bg-card/80 transition-all group"
-                  title="Configurações"
-                >
-                  <div className="w-7 h-7 rounded-lg overflow-hidden flex-shrink-0">
-                    {user?.avatarUrl || user?.avatar ? (
-                      <img 
-                        src={user?.avatarUrl || user?.avatar || ''} 
-                        alt="" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-brand-primary flex items-center justify-center text-white font-black text-xs">
-                        {user?.name?.charAt(0)?.toUpperCase() || 'A'}
-                      </div>
+            {/* Perfil do Aluno em Formato de Pílula */}
+            {user && (
+              <button
+                type="button"
+                onClick={() => onTabChange?.('profile')}
+                className="flex items-center gap-2 p-1 pr-3 sm:pr-3.5 rounded-full bg-bg-card/60 hover:bg-bg-card border border-border-color/30 hover:border-brand-primary/40 shadow-sm transition-all duration-200 group text-left select-none focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
+                title="Meu Perfil e Preferências"
+              >
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-border-color/40 bg-brand-primary/20">
+                  {user?.avatarUrl || user?.avatar ? (
+                    <img 
+                      src={user?.avatarUrl || user?.avatar || ''} 
+                      alt={user?.name || 'Perfil'} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-brand-primary to-teal-600 flex items-center justify-center text-white font-black text-xs">
+                      {user?.name?.charAt(0)?.toUpperCase() || 'A'}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex flex-col justify-center leading-none">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-text-main truncate max-w-[75px] sm:max-w-[120px] group-hover:text-brand-primary transition-colors">
+                      {user?.name || 'Aluno'}
+                    </span>
+                    {isAdmin && (
+                      <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded-full bg-brand-primary/15 text-brand-primary text-[8px] font-black uppercase tracking-wider leading-none">
+                        Admin
+                      </span>
                     )}
                   </div>
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[9px] font-black uppercase tracking-wider">
-                    Admin
+                  <span className="text-[10px] font-bold text-text-secondary/70 truncate mt-0.5">
+                    Nível {user?.level || 1}
                   </span>
-                </button>
-                <div className="h-8 w-px bg-transparent mx-1" />
-              </>
+                </div>
+              </button>
             )}
            
            <div className="relative">
@@ -231,6 +246,8 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
                )}
              </AnimatePresence>
            </div>
+
+           <PWAInstallButton />
 
            <button 
             onClick={toggleDarkMode}
