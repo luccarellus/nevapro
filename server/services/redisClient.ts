@@ -63,13 +63,13 @@ export function getRedisClient(): Redis | null {
   if (client) return client;
 
   const redisOptions: RedisOptions = {
-    lazyConnect: true,
+    lazyConnect: false,
     // Timeout de comando adaptativo: local é rígido (300ms); remoto é folgado
     // (2.5s ~ 8x o RTT típico de internet ~30ms) para sobreviver a jitter de rede.
     commandTimeout: isRemoteRedis() ? 2_500 : 300,
     connectTimeout: isRemoteRedis() ? 5_000 : 2_000,
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
     enableAutoPipelining: true,
     keepAlive: 5_000,
     noDelay: true,
@@ -119,18 +119,16 @@ export function getRedisClient(): Redis | null {
     log.info(`[Redis] Reconectando em ${delay}ms...`);
   });
 
-  // Conecta sem bloquear o boot do servidor; no modo remoto, aquece a conexão
-  // medindo o RTT (também cria o socket cedo para a primeira requisição não pagar o handshake).
-  void client.connect().then(async () => {
-    if (isRemoteRedis()) {
-      const t0 = Date.now();
-      await client!.ping();
-      measuredRttMs = Date.now() - t0;
-      log.info(`[Redis] RTT medido no boot: ${measuredRttMs}ms (modo remoto)`);
-    }
-  }).catch(() => {
-    // retryStrategy vai reagendar a reconexão automaticamente
-  });
+  if (isRemoteRedis()) {
+    client.once('ready', async () => {
+      try {
+        const t0 = Date.now();
+        await client!.ping();
+        measuredRttMs = Date.now() - t0;
+        log.info(`[Redis] RTT medido no boot: ${measuredRttMs}ms (modo remoto)`);
+      } catch {}
+    });
+  }
 
   return client;
 }

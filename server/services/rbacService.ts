@@ -44,7 +44,7 @@ export interface RbacContext {
   isAdmin: boolean;
 }
 
-const TENANT_CACHE_TTL_MS = 60_000;
+const TENANT_CACHE_TTL_MS = 600_000; // 10 minutos (inquilinos raramente mudam em runtime)
 const tenantCache = new Map<string, { at: number; tenant: TenantInfo | null }>();
 
 function isRoleCode(value: string): value is RoleCode {

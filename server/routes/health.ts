@@ -15,18 +15,24 @@ const router = Router();
  * uptime, modo/RTT do Redis, dependências) ficam em /details — sem autenticação,
  * essa superfície ajuda reconhecimento de infraestrutura.
  */
+let lastDbCheck = 0;
+let lastDbHealthy = true;
+
 router.get('/', async (_req, res: Response) => {
-  let dbStatus = 'connected';
-  try {
-    await query('SELECT 1');
-  } catch (err) {
-    log.error('[Health] Falha ao verificar Postgres:', err);
-    dbStatus = 'unavailable';
+  const now = Date.now();
+  if (now - lastDbCheck > 10_000) {
+    lastDbCheck = now;
+    try {
+      await query('SELECT 1');
+      lastDbHealthy = true;
+    } catch (err) {
+      log.error('[Health] Falha ao verificar Postgres:', err);
+      lastDbHealthy = false;
+    }
   }
 
-  const healthy = dbStatus === 'connected';
-  res.status(healthy ? 200 : 503).json({
-    status: healthy ? 'ok' : 'degraded',
+  res.status(lastDbHealthy ? 200 : 503).json({
+    status: lastDbHealthy ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
   });
 });

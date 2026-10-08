@@ -3,7 +3,7 @@ import fs from 'fs';
 import * as dotenv from 'dotenv';
 import { log } from '../../server/utils/logger';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const connectionString = process.env.DATABASE_URL;
 

@@ -82,7 +82,7 @@ router.get('/', requireAuth, resolveTenant, async (req: AuthenticatedRequest & {
         quizSecondsRemaining: 0,
       },
     };
-    await setUserCache(cacheKey, payload, 60);
+    await setUserCache(cacheKey, payload, 300);
     res.json({ ...payload, csrfToken });
   } catch (error) {
     log.error('[Bootstrap] Error:', error);

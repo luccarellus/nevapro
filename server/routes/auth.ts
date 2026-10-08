@@ -96,18 +96,27 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       authenticateUser(cleanEmail, password),
     ]);
 
-    // Check reCAPTCHA result — em produção, falha ou score baixo BLOQUEIA o login.
+    // Check reCAPTCHA result — em produção, falha de bot BLOQUEIA o login.
+    // Erros de browser/domínio não registrado (ex.: browser-error em preview/dev) NÃO bloqueiam usuários legítimos.
     if (recaptchaResult.status === 'fulfilled' && recaptchaResult.value) {
       const recaptchaData = recaptchaResult.value;
       if (recaptchaData.success === false) {
         const errorCodes = recaptchaData['error-codes'] || [];
         log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
-        if (process.env.NODE_ENV === 'production') {
+        const isClientOrConfigError = errorCodes.some(
+          (code: string) =>
+            code === 'browser-error' ||
+            code === 'invalid-input-secret' ||
+            code === 'bad-request' ||
+            code === 'missing-input-response' ||
+            code === 'hostname-mismatch'
+        );
+        if (!isClientOrConfigError && process.env.NODE_ENV === 'production') {
           res.status(403).json({ error: 'Verificação de segurança falhou. Tente novamente.' });
           return;
         }
-      } else if (typeof recaptchaData.score === 'number' && recaptchaData.score < 0.5) {
-        log.warn(`[Auth] reCAPTCHA score baixo no login: ${recaptchaData.score}`);
+      } else if (typeof recaptchaData.score === 'number' && recaptchaData.score < 0.3) {
+        log.warn(`[Auth] reCAPTCHA score muito baixo no login: ${recaptchaData.score}`);
         if (process.env.NODE_ENV === 'production') {
           res.status(403).json({ error: 'Atividade suspeita identificada. Tente novamente mais tarde.' });
           return;

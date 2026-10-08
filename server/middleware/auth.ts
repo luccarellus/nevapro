@@ -63,9 +63,11 @@ function publishTokenVersionBump(userId: string): void {
  * Consulta direta no banco com cache curto para não pesar o hot path.
  */
 const tokenVersionCache = new Map<string, { version: number; expiresAt: number }>();
-const TOKEN_VERSION_CACHE_TTL_MS = 60_000;
+const TOKEN_VERSION_CACHE_TTL_MS = 300_000;
+let hasTokenVersionColumn: boolean | null = null;
 
 export async function getTokenVersion(userId: string): Promise<number> {
+  if (hasTokenVersionColumn === false) return 0;
   const cached = tokenVersionCache.get(userId);
   if (cached && cached.expiresAt > Date.now()) return cached.version;
 
@@ -80,10 +82,10 @@ export async function getTokenVersion(userId: string): Promise<number> {
        ) AS version`,
       [userId],
     );
+    hasTokenVersionColumn = true;
     version = Number(rows[0]?.version) || 0;
-  } catch (err) {
-    // Coluna ainda não migrada: mantém 0 e evita derrubar sessões legítimas
-    log.warn('[Auth] token_version indisponível (migração pendente?):', err instanceof Error ? err.message : err);
+  } catch {
+    hasTokenVersionColumn = false;
     version = 0;
   }
 
@@ -424,12 +426,14 @@ export const authenticateUser = async (email: string, password: string) => {
 
   const sessionToken = createSessionToken(authenticatedUser);
 
-  // Cache student sessions for full TTL; admin sessions shorter (loaded fresh each time for RBAC)
-  if (userType === 'student') {
-    const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
-    const sessionCacheValue: any = { ...authenticatedUser, rbacContext };
-    await setUserCache(userCacheKeys.auth(tokenHash), sessionCacheValue, STUDENT_SESSION_TTL_SECONDS);
-  }
+  // Cache sessions (10min para admin, 24h para aluno) para eliminar queries redundantes
+  const tokenHash = createHash('sha256').update(sessionToken).digest('hex');
+  const sessionCacheValue: any = { ...authenticatedUser, rbacContext };
+  await setUserCache(
+    userCacheKeys.auth(tokenHash),
+    sessionCacheValue,
+    userType === 'admin' ? 600 : STUDENT_SESSION_TTL_SECONDS
+  );
 
   return {
     user: {

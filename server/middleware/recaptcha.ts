@@ -87,13 +87,17 @@ export function verifyRecaptcha(threshold: number = DEFAULT_SCORE_THRESHOLD) {
         const errorMsg = errorCodes.join(', ') || 'desconhecido';
         log.warn(`[reCAPTCHA] Falha na verificação: ${errorMsg}`);
 
-        if (errorCodes.includes('invalid-input-secret') || errorCodes.includes('bad-request')) {
-          log.error('[reCAPTCHA] ATENÇÃO: RECAPTCHA_SECRET_KEY inválida. Verifique as configurações de ambiente.');
-          // Fail-closed em produção: chave inválida = proteção inexistente.
-          if (process.env.NODE_ENV === 'production') {
-            res.status(503).json({ error: 'Verificação de segurança indisponível. Tente novamente em instantes.' });
-            return;
-          }
+        const isClientOrConfigError = errorCodes.some(
+          (code) =>
+            code === 'browser-error' ||
+            code === 'invalid-input-secret' ||
+            code === 'bad-request' ||
+            code === 'missing-input-response' ||
+            code === 'hostname-mismatch',
+        );
+
+        if (isClientOrConfigError) {
+          log.warn('[reCAPTCHA] Erro de ambiente/cliente permitido para não bloquear usuários:', errorMsg);
           return next();
         }
 

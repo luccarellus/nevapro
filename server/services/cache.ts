@@ -21,10 +21,10 @@ interface MemoryCacheEntry {
   expiresAt: number;
 }
 
-// Modo remoto (Redis via internet, ~30ms de RTT por comando): compensamos com uma
+// Modo remoto (Redis via internet): compensamos com uma
 // camada L1 muito mais agressiva — cada hit no L1 é um RTT evitado.
-const L1_CACHE_MAX_ITEMS = isRemoteRedis() ? 20_000 : 2_000;
-const L1_DEFAULT_TTL_MS = isRemoteRedis() ? 60_000 : 5_000; // 60s remoto | 5s local
+const L1_CACHE_MAX_ITEMS = isRemoteRedis() ? 50_000 : 5_000;
+const L1_DEFAULT_TTL_MS = isRemoteRedis() ? 180_000 : 15_000; // 3 min remoto | 15s local
 const l1Cache = new Map<string, MemoryCacheEntry>();
 
 function setL1(key: string, data: unknown, ttlMs = L1_DEFAULT_TTL_MS): void {
@@ -77,7 +77,7 @@ export const isRedisConfigured = (): boolean => {
  * a requisição do usuário nunca fica presa a um RTT de internet;
  * o commandTimeout (2.5s) cobre apenas falhas duras de conexão.
  */
-const REMOTE_COMMAND_CAP_MS = 150;
+const REMOTE_COMMAND_CAP_MS = 1200;
 
 function withRemoteCap<T>(promise: Promise<T>): Promise<T | null> {
   if (!isRemoteRedis()) return promise;
