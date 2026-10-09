@@ -13,7 +13,7 @@ x-laravel-environment: &laravel-environment
   QUEUE_CONNECTION: redis
   REDIS_CLIENT: predis
   REDIS_URL: ""
-  REDIS_HOST: redis
+  REDIS_HOST: nevapro_neva-redis
   REDIS_PORT: "6379"
   REDIS_PASSWORD: ""
   REDIS_QUEUE_RETRY_AFTER: "3600"
@@ -21,15 +21,17 @@ x-laravel-environment: &laravel-environment
 
 services:
   # Cache compartilhado, sessões Laravel e filas.
-  redis:
+  nevapro_neva-redis:
     image: redis:7-alpine
-    container_name: neva_redis
+    container_name: nevapro_neva-redis
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -96,7 +98,9 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      redis:
+      nevapro_neva-redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
@@ -119,7 +123,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      redis:
+      nevapro_neva-redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
@@ -142,7 +148,9 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      redis:
+      nevapro_neva-redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     volumes:
       - laravel_storage:/var/www/html/storage
@@ -152,6 +160,34 @@ networks:
   neva_network:
     driver: bridge
 
+services:
+  # PostgreSQL (dominio + dados da aplicacao)
+  nevapro_neva-sql:
+    image: postgres:16-alpine
+    container_name: nevapro_neva-sql
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: s6gkwkyytppebze8cjhu
+      POSTGRES_DB: nevapro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - neva_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nevapro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+networks:
+  neva_network:
+    driver: bridge
+
 volumes:
   laravel_storage:
   redis_data:
+  pg_data:

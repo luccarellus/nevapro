@@ -40,7 +40,7 @@ function isPrivateHost(host: string): boolean {
   if (!host) return false;
   const h = host.toLowerCase();
   if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') return true;
-  if (h === 'redis' || h === 'nevapro_redis' || h.endsWith('.local')) return true; // docker-compose / mDNS
+  if (h === 'redis' || h === 'nevapro_redis' || h === 'nevapro_neva-redis' || h.endsWith('.local')) return true; // docker-compose / mDNS
   // RFC1918 + CGNAT (rede privada => latência ~sub-ms)
   if (/^10\./.test(h)) return true;
   if (/^192\.168\./.test(h)) return true;

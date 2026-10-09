@@ -74,8 +74,8 @@ router.get('/redis', async (_req: Request, res: Response) => {
       verified: true,
       error: null,
       server_info: {
-        host: process.env.REDIS_HOST || '163.176.185.168',
-        port: Number(process.env.REDIS_PORT) || 6380,
+        host: process.env.REDIS_HOST || 'nevapro_neva-redis',
+        port: Number(process.env.REDIS_PORT) || 6379,
         version,
         uptime_seconds: uptimeSeconds,
       },
