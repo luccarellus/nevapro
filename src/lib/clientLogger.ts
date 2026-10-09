@@ -10,9 +10,16 @@ interface ClientLogEntry {
 }
 
 const MAX_QUEUE = 100;
+// Telemetria é best-effort: em falhas 5xx/rede, re-tenta com backoff
+// exponencial e descarta a fila após N falhas consecutivas. O loop antigo
+// re-tentava a cada 1s para sempre, inundando o console e um servidor caído.
+const RETRY_BASE_DELAY_MS = 1_000;
+const RETRY_MAX_DELAY_MS = 60_000;
+const MAX_CONSECUTIVE_FAILURES = 8;
 const queue: ClientLogEntry[] = [];
 let flushTimer: number | undefined;
 let flushing = false;
+let consecutiveFailures = 0;
 
 function serialize(value: unknown): string {
   if (value instanceof Error) return `${value.name}: ${value.message}\n${value.stack || ''}`;
@@ -45,12 +52,12 @@ function enqueue(level: LogLevel, args: unknown[]) {
   scheduleFlush();
 }
 
-function scheduleFlush() {
+function scheduleFlush(delayMs = RETRY_BASE_DELAY_MS) {
   if (flushTimer !== undefined) return;
   flushTimer = window.setTimeout(() => {
     flushTimer = undefined;
     void flushClientLogs();
-  }, 1_000);
+  }, delayMs);
 }
 
 export async function flushClientLogs() {
@@ -58,28 +65,48 @@ export async function flushClientLogs() {
   flushing = true;
   const entries = queue.splice(0, 20);
 
-    try {
-     const response = await fetch('/api/client-logs', {
-       method: 'POST',
-       credentials: 'include',
-       keepalive: true,
-       headers: {
-         'Content-Type': 'application/json',
-         'X-Requested-With': 'XMLHttpRequest',
-         ...csrfHeaders(),
-       },
-       body: JSON.stringify({ entries }),
-     });
-     if (!response.ok) {
-       if (response.status >= 400 && response.status < 500) return;
-       queue.unshift(...entries);
-     }
-   } catch {
-     queue.unshift(...entries);
-   } finally {
-     flushing = false;
-     if (queue.length > 0) scheduleFlush();
-   }
+  let failed = false;
+  try {
+    const response = await fetch('/api/client-logs', {
+      method: 'POST',
+      credentials: 'include',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...csrfHeaders(),
+      },
+      body: JSON.stringify({ entries }),
+    });
+    // 4xx (validação/rate limit): descarta sem retry.
+    if (!response.ok && response.status >= 500) failed = true;
+  } catch {
+    failed = true;
+  } finally {
+    flushing = false;
+  }
+
+  if (!failed) {
+    consecutiveFailures = 0;
+  } else {
+    consecutiveFailures += 1;
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      // Servidor inalcançável por tempo prolongado — descarta a telemetria
+      // em vez de martelar o endpoint em loop.
+      queue.length = 0;
+      consecutiveFailures = 0;
+      return;
+    }
+    queue.unshift(...entries);
+  }
+
+  if (queue.length > 0) {
+    scheduleFlush(
+      failed
+        ? Math.min(RETRY_BASE_DELAY_MS * 2 ** (consecutiveFailures - 1), RETRY_MAX_DELAY_MS)
+        : RETRY_BASE_DELAY_MS,
+    );
+  }
 }
 
 export function installClientLogger() {
