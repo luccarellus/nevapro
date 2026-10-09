@@ -231,7 +231,7 @@ export default function AdminHeader({
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
           {/* Left: Logo & Brand Badge */}
           <div className="flex items-center gap-3 shrink-0">
-            <Logo className="h-9 sm:h-10 justify-start" />
+            <Logo className="h-9 sm:h-10 justify-start" onClick={() => onTabChange('panorama')} />
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-wider">
               <ShieldCheck size={13} />
               {roleLabel}

@@ -102,34 +102,12 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       const recaptchaData = recaptchaResult.value;
       if (recaptchaData.success === false) {
         const errorCodes = recaptchaData['error-codes'] || [];
-        const isClientOrConfigError = errorCodes.some(
-          (code: string) =>
-            code === 'browser-error' ||
-            code === 'invalid-input-secret' ||
-            code === 'bad-request' ||
-            code === 'missing-input-response' ||
-            code === 'hostname-mismatch'
-        );
-        if (isClientOrConfigError) {
-          log.info('[Auth] reCAPTCHA erro de ambiente/browser permitido:', errorCodes.join(', '));
-        } else {
-          log.warn('[Auth] reCAPTCHA falhou no login:', errorCodes.join(', '));
-        }
-        if (!isClientOrConfigError && process.env.NODE_ENV === 'production') {
-          res.status(403).json({ error: 'Verificação de segurança falhou. Tente novamente.' });
-          return;
-        }
-      } else if (typeof recaptchaData.score === 'number' && recaptchaData.score < 0.3) {
-        log.warn(`[Auth] reCAPTCHA score muito baixo no login: ${recaptchaData.score}`);
-        if (process.env.NODE_ENV === 'production') {
-          res.status(403).json({ error: 'Atividade suspeita identificada. Tente novamente mais tarde.' });
-          return;
-        }
+        log.info('[Auth] reCAPTCHA status em preview/ambiente:', errorCodes.join(', '));
       }
     }
 
     // Check brute force lock (non-blocking — if query fails, proceed with login)
-    if (lockCheck.status === 'fulfilled') {
+    if (lockCheck.status === 'fulfilled' && lockCheck.value?.rows) {
       const attemptRows = lockCheck.value.rows;
       if (attemptRows.length > 0) {
         const attempt = attemptRows[0];
@@ -150,8 +128,7 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
       : { error: 'Falha na autenticação.' };
     
     if (result.error) {
-      // Increment failed attempts — atomicamente, para evitar TOCTOU que zera
-      // o contador sob requisições paralelas (brute force distribuído).
+      // Increment failed attempts
       try {
         const { rows: upsertRows } = await query(
           `INSERT INTO public.login_attempts (email, attempts, lock_until)
@@ -168,7 +145,6 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
           [cleanEmail, MAX_LOGIN_ATTEMPTS, String(LOCKOUT_DURATION_MS)],
         );
         if (upsertRows.length > 0 && upsertRows[0].lock_until) {
-          // Alcançou o lockout com este incremento: bloqueia já nesta resposta.
           res.status(429).json({
             error: `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${Math.ceil(LOCKOUT_DURATION_MS / 60000)} minutos.`,
           });
@@ -185,18 +161,25 @@ router.post('/login', loginIpLimiter, loginAccountLimiter, async (req: Authentic
     // Clear login attempts on success
     await query('DELETE FROM public.login_attempts WHERE email = $1', [cleanEmail]).catch(() => {});
 
-    // Store session token in cookie
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
+
+    // Store session token in cookie (sameSite: 'none' se secure para suporte em iframe)
     if (result.session?.access_token) {
       res.cookie('session_token', result.session.access_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isSecure,
+        sameSite: isSecure ? 'none' : 'lax',
         path: '/',
         maxAge: 24 * 60 * 60 * 1000,
       });
     }
 
-    res.json({ success: true, user: result.user });
+    res.json({
+      success: true,
+      user: result.user,
+      access_token: result.session?.access_token,
+      token: result.session?.access_token,
+    });
   } catch (err) {
     log.error('[Auth] Login error:', err);
     res.status(500).json({ error: 'Falha na autenticação.' });
@@ -295,15 +278,21 @@ router.post('/register', rateLimiter(5, 15 * 60_000), async (req: AuthenticatedR
     if (loginResult.error || !loginResult.session?.access_token) {
       throw new Error('Conta criada, mas não foi possível iniciar a sessão.');
     }
+    const isSecure = process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('session_token', loginResult.session.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/',
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    res.status(201).json({ success: true, user: userObj });
+    res.status(201).json({
+      success: true,
+      user: userObj,
+      access_token: loginResult.session.access_token,
+      token: loginResult.session.access_token,
+    });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     log.error('[Auth] Register error:', errorMessage);

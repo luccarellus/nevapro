@@ -244,6 +244,14 @@ if (fs.existsSync(indexPath)) {
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     },
   }));
+
+  // Se o asset não foi encontrado em /assets, retorna 404 explícito em vez de cair na SPA
+  app.use('/assets', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.status(404).type('text/plain').send('Asset not found');
+  });
+
   // HTML/raiz/manifest/SW: sempre revalida com CORS e CORP abertos
   app.use(express.static(distPath, { etag: true, lastModified: true, setHeaders: (res, filePath) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -252,8 +260,12 @@ if (fs.existsSync(indexPath)) {
       res.setHeader('Cache-Control', 'no-cache');
     }
   } }));
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    if (path.extname(req.path)) {
+      return res.status(404).type('text/plain').send('File not found');
+    }
     res.sendFile(indexPath);
   });
   log.info(`[Server] Serving static frontend from ${distPath}`);

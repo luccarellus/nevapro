@@ -59,16 +59,24 @@ export default function ErrorsBook({ user, onEarnXp }: ErrorsBookProps) {
   }, [user.email]);
 
   const fetchErrors = async () => {
+    if (!user.email || user.id === 'loading') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`/api/user/errors?email=${encodeURIComponent(user.email || '')}`);
       if (!res.ok) {
+        if (res.status === 401) {
+          // Sessão não autenticada ainda — silencioso
+          return;
+        }
         throw new Error('Falha ao carregar os dados.');
       }
       const data = await res.json();
       setErrors(data);
     } catch (err) {
-      console.error(err);
+      console.warn('Falha amortecida ao carregar caderno de erros:', err);
     } finally {
       setLoading(false);
     }

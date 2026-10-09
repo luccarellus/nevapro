@@ -116,7 +116,7 @@ export default function Header({ isDarkMode, toggleDarkMode, isAdmin, onTabChang
     <header className="fixed top-0 left-0 right-0 z-40 bg-bg-main/80 backdrop-blur-xl pt-[env(safe-area-inset-top)] transition-colors duration-300 border-b border-border-color/20">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <div className="lg:hidden">
-          <Logo className="h-14" />
+          <Logo className="h-14" onClick={() => onTabChange?.('dashboard')} />
         </div>
         <div className="flex-1 lg:flex justify-end hidden">
            {/* In desktop the logo is in the sidebar, so we leave space or add search */}

@@ -60,9 +60,13 @@ export async function cachedFetchJson<T>(url: string, ttlMs?: number): Promise<T
 
 async function fetchAndCache<T>(url: string, cacheKey: string, ttlMs?: number): Promise<T> {
   const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('neva_active_tenant') : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('neva_access_token') : null;
   const headers: Record<string, string> = {};
   if (activeTenant) {
     headers['X-Tenant-ID'] = activeTenant;
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const effectiveTtl = ttlMs || getEndpointTtl(url);

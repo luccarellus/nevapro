@@ -30,13 +30,31 @@ export function getCsrfToken(): string | null {
   return csrfToken;
 }
 
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('neva_access_token');
+}
+
+export function setAuthToken(token: string | null | undefined): void {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    localStorage.setItem('neva_access_token', token);
+  } else {
+    localStorage.removeItem('neva_access_token');
+  }
+}
+
 /**
  * Headers de segurança para requisições mutantes feitas via `fetch`
  * direto (fora de `request`). Sem cookie de sessão o servidor dispensa
  * o token; com sessão ativa o header é obrigatório (403 sem ele).
  */
 export function csrfHeaders(): Record<string, string> {
-  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+  const headers: Record<string, string> = {};
+  if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+  const token = getAuthToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
 }
 
 async function request<T>(endpoint: string, config: RequestConfig = { method: 'GET' }): Promise<T> {
@@ -44,6 +62,7 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   if (method === 'GET') return cachedFetchJson<T>(endpoint);
 
   const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('neva_active_tenant') : null;
+  const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -54,6 +73,9 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   }
   if (csrfToken) {
     headers['X-CSRF-Token'] = csrfToken;
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const options: RequestInit = {

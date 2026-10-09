@@ -1,5 +1,5 @@
 import { invalidateRequestCache, cachedFetchJson } from '../lib/requestCache';
-import { request } from '../lib/apiService';
+import { request, setAuthToken } from '../lib/apiService';
 import { postJson } from '../lib/fetchHelpers';
 import { csrfHeaders } from '../lib/apiService';
 import { UserProfile } from '../types';
@@ -39,16 +39,24 @@ export const userService = {
     return result;
   },
 
-  async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile }> {
+  async login(credentials: { email: string; password?: string }): Promise<{ success: boolean; user: UserProfile; access_token?: string }> {
     const recaptcha_token = await executeRecaptcha('login').catch(() => '');
-    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/login', { ...credentials, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
+    const result = await postJson<{ success: boolean; user: UserProfile; access_token?: string; token?: string }>('/api/auth/login', { ...credentials, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
+    const token = result.access_token || result.token;
+    if (token) {
+      setAuthToken(token);
+    }
     invalidateRequestCache();
     return result;
   },
 
-  async register(userData: any): Promise<{ success: boolean; user: UserProfile }> {
+  async register(userData: any): Promise<{ success: boolean; user: UserProfile; access_token?: string }> {
     const recaptcha_token = await executeRecaptcha('register').catch(() => '');
-    const result = await postJson<{ success: boolean; user: UserProfile }>('/api/auth/register', { ...userData, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
+    const result = await postJson<{ success: boolean; user: UserProfile; access_token?: string; token?: string }>('/api/auth/register', { ...userData, recaptcha_token }, { 'X-Requested-With': 'XMLHttpRequest' });
+    const token = result.access_token || result.token;
+    if (token) {
+      setAuthToken(token);
+    }
     invalidateRequestCache();
     return result;
   },

@@ -20,6 +20,7 @@ import { getSession, saveSession, clearSession } from './lib/sessionStorage';
 
 import Spinner from './components/Spinner';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import ErrorsBook from './components/ErrorsBook';
 
 // Lazy-loaded route components (code splitting)
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -32,7 +33,6 @@ const Simulados = lazy(() => import('./components/Simulados'));
 const Materiais = lazy(() => import('./components/Materiais'));
 const Mural = lazy(() => import('./components/Mural'));
 const Settings = lazy(() => import('./components/Settings'));
-const ErrorsBook = lazy(() => import('./components/ErrorsBook'));
 const StudyPlan = lazy(() => import('./components/StudyPlan'));
 const Performance = lazy(() => import('./components/Performance'));
 const Flashcards = lazy(() => import('./components/Flashcards'));
@@ -74,6 +74,7 @@ export default function App() {
 
   const clearLocalSession = () => {
     clearSession();
+    localStorage.removeItem('neva_access_token');
     invalidateRequestCache();
     setIsLoggedIn(false);
     setActiveTab('dashboard');

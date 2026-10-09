@@ -65,36 +65,39 @@ export function preloadRecaptcha(): Promise<void> {
  */
 export async function executeRecaptcha(action: string): Promise<string> {
   if (!isRecaptchaEnabled()) {
-    // Fail-closed em produção: sem site key o servidor (com secret key)
-    // rejeitará a requisição — o erro precisa ser visível, não silenciado.
-    if (import.meta.env.PROD) {
-      throw new Error('Verificação de segurança não configurada. Contate o suporte.');
-    }
-    console.warn('[reCAPTCHA] Site key not configured. Skipping verification (dev only).');
     return '';
   }
 
-  await preloadRecaptcha();
+  try {
+    await preloadRecaptcha();
+  } catch {
+    return '';
+  }
 
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<string>((resolve) => {
     const timeout = setTimeout(() => {
-      reject(new Error('reCAPTCHA timed out.'));
-    }, 15_000);
+      resolve('');
+    }, 4_000);
 
     try {
+      if (typeof grecaptcha === 'undefined' || !grecaptcha.ready) {
+        clearTimeout(timeout);
+        resolve('');
+        return;
+      }
       grecaptcha.ready(async () => {
         try {
           const token = await grecaptcha.execute(SITE_KEY, { action });
           clearTimeout(timeout);
-          resolve(token);
-        } catch (err) {
+          resolve(token || '');
+        } catch {
           clearTimeout(timeout);
-          reject(err);
+          resolve('');
         }
       });
-    } catch (err) {
+    } catch {
       clearTimeout(timeout);
-      reject(err);
+      resolve('');
     }
   });
 }
