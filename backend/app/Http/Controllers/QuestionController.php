@@ -106,6 +106,12 @@ class QuestionController extends Controller
         } catch (\Throwable $exception) {
             report($exception);
 
+            // Rede/timeout do provider: serve as questões já persistidas localmente.
+            $fallback = $this->fallbackFromDatabase($year, $limit, $offset);
+            if ($fallback !== null) {
+                return response()->json(['questions' => $fallback, 'source' => 'database']);
+            }
+
             return response()->json(['error' => 'Não foi possível validar o gabarito das questões ENEM.'], 502);
         }
 
@@ -113,6 +119,14 @@ class QuestionController extends Controller
             $status = $payload['_status'];
             unset($payload['_status']);
             $this->cache->invalidate($cacheKey);
+
+            // Provider degradado (5xx): tenta servir do banco local antes de repassar o erro.
+            if ($status >= 500) {
+                $fallback = $this->fallbackFromDatabase($year, $limit, $offset);
+                if ($fallback !== null) {
+                    return response()->json(['questions' => $fallback, 'source' => 'database']);
+                }
+            }
 
             return response()->json($payload, $status);
         }
@@ -208,6 +222,12 @@ class QuestionController extends Controller
         } catch (\Throwable $exception) {
             report($exception);
 
+            // Rede/timeout do provider: serve as questões já persistidas localmente.
+            $fallback = $this->fallbackHubFromDatabase($year, $limit, $page);
+            if ($fallback !== null) {
+                return response()->json(['questions' => $fallback, 'source' => 'database']);
+            }
+
             return response()->json(['error' => 'Não foi possível validar o gabarito da EnemHub.'], 502);
         }
 
@@ -215,6 +235,14 @@ class QuestionController extends Controller
             $status = $payload['_status'];
             unset($payload['_status']);
             $this->cache->invalidate($cacheKey);
+
+            // Provider degradado (5xx): tenta servir do banco local antes de repassar o erro.
+            if ($status >= 500) {
+                $fallback = $this->fallbackHubFromDatabase($year, $limit, $page);
+                if ($fallback !== null) {
+                    return response()->json(['questions' => $fallback, 'source' => 'database']);
+                }
+            }
 
             return response()->json($payload, $status);
         }
@@ -503,6 +531,111 @@ class QuestionController extends Controller
                 }
             }
         });
+    }
+
+    /**
+     * Fallback local (provider ENEM fora do ar).
+     *
+     * Serve as questões já persistidas no banco por um cache miss anterior,
+     * reconstruindo o MESMO payload do provider (index/discipline/context/
+     * alternatives) — o frontend continua funcionando sem mudanças e o
+     * gabarito segue escondido (só text/letter saem na resposta).
+     *
+     * Retorna null quando não há nada persistido para o ano (caller repassa o 5xx).
+     */
+    private function fallbackFromDatabase(int $year, int $limit, int $offset): ?array
+    {
+        try {
+            $rows = Question::query()
+                ->where('year', $year)
+                ->whereNull('tenant_id')
+                ->where('id', 'like', "{$year}-%")
+                ->whereNotNull('index')
+                ->orderBy('index')
+                ->skip(max(0, $offset))
+                ->take(max(1, $limit))
+                ->get();
+
+            if ($rows->isEmpty()) {
+                return null;
+            }
+
+            $options = QuestionOption::whereIn('question_id', $rows->pluck('id'))
+                ->orderBy('letter')
+                ->get()
+                ->groupBy('question_id');
+
+            return $rows->map(fn (Question $question) => [
+                'index' => (int) $question->index,
+                'discipline' => $question->subject,
+                'context' => $question->text,
+                'alternativesIntroduction' => '',
+                'files' => $question->image_url !== null ? [$question->image_url] : [],
+                'alternatives' => ($options->get($question->id) ?? collect())
+                    ->map(fn (QuestionOption $option) => [
+                        'letter' => $option->letter,
+                        'text' => $option->text,
+                        'file' => $option->image_url,
+                    ])->values()->all(),
+            ])->values()->all();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+    }
+
+    /**
+     * Fallback local (EnemHub fora do ar) — mesmo princípio do ENEM, mas no
+     * formato do provider EnemHub (id/externalId/statement/subject.name).
+     */
+    private function fallbackHubFromDatabase(int $year, int $limit, int $page): ?array
+    {
+        try {
+            $prefix = "ehub-{$year}-";
+            $rows = Question::query()
+                ->where('year', $year)
+                ->whereNull('tenant_id')
+                ->where('id', 'like', "{$prefix}%")
+                ->orderBy('id')
+                ->skip(max(0, ($page - 1) * $limit))
+                ->take(max(1, $limit))
+                ->get();
+
+            if ($rows->isEmpty()) {
+                return null;
+            }
+
+            $options = QuestionOption::whereIn('question_id', $rows->pluck('id'))
+                ->orderBy('letter')
+                ->get()
+                ->groupBy('question_id');
+
+            return $rows->map(fn (Question $question) => [
+                'id' => $question->id,
+                'externalId' => substr($question->id, strlen($prefix)),
+                'year' => (int) $question->year,
+                'difficulty' => $question->difficulty,
+                'statement' => $question->text,
+                'exam' => 'ENEM',
+                'subject' => [
+                    'id' => '',
+                    'name' => $question->subject,
+                    'area' => $question->subject,
+                ],
+                'alternatives' => ($options->get($question->id) ?? collect())
+                    ->map(fn (QuestionOption $option) => [
+                        'id' => $option->id,
+                        'letter' => $option->letter,
+                        'text' => $option->text,
+                        'image' => $option->image_url,
+                    ])->values()->all(),
+            ])->values()->all();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
     }
 
     private function hideAnswerKey(array $question): array

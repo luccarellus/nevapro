@@ -31,15 +31,39 @@ services:
       timeout: 3s
       retries: 10
     ports:
-      - "6379:6379"
+      # Só localhost: Redis não tem senha — expor na VPS permitiria acesso anônimo.
+      - "127.0.0.1:6381:6379"
     volumes:
       - redis_data:/data
     networks:
       - neva_network
     restart: always
 
+  # PostgreSQL (dominio + dados da aplicacao)
+  postgres:
+    image: postgres:16-alpine
+    container_name: nevapro_neva-sql
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      # Segredo vem do .env (não versionar credencial em texto plano).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatoria no .env}
+      POSTGRES_DB: nevapro
+    ports:
+      # Só localhost: backup/acesso via túnel, sem expor o banco na internet.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - neva_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nevapro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   # Reverse Proxy, static frontend e FastCGI para a API Laravel.
-  # No EasyPanel o TLS é terminado no proxy do painel: exponha apenas a 80.
   nginx:
     build:
       context: .
@@ -47,7 +71,6 @@ services:
       target: web
       args:
         VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
-        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
     image: neva-web:latest
     container_name: neva_nginx
@@ -56,8 +79,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./certbot/conf:/etc/letsencrypt:ro # Certificados emitidos pelo container certbot
-      - ./certbot/www:/var/www/certbot:ro # Webroot para validação ACME
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
     networks:
       - neva_network
     depends_on:
@@ -65,8 +88,7 @@ services:
         condition: service_healthy
     restart: always
 
-  # Certbot (Let's Encrypt) — emite e renova os certificados SSL.
-  # Executado sob demanda: docker compose run --rm certbot certonly|renew
+  # Certbot (Let's Encrypt)
   certbot:
     image: certbot/certbot:latest
     container_name: neva_certbot
@@ -106,7 +128,7 @@ services:
       - laravel_storage:/var/www/html/storage
     restart: always
 
-  # Laravel scheduler replaces the former HTTP-calling cron container.
+  # Laravel scheduler
   scheduler:
     image: neva-laravel-api:latest
     build:
@@ -131,7 +153,7 @@ services:
       - laravel_storage:/var/www/html/storage
     restart: always
 
-  # Executes Laravel queued emails, notifications and database backups.
+  # Laravel queue worker
   worker:
     image: neva-laravel-api:latest
     build:
@@ -155,33 +177,6 @@ services:
     volumes:
       - laravel_storage:/var/www/html/storage
     restart: always
-
-networks:
-  neva_network:
-    driver: bridge
-
-services:
-  # PostgreSQL (dominio + dados da aplicacao)
-  nevapro_neva-sql:
-    image: postgres:16-alpine
-    container_name: nevapro_neva-sql
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: s6gkwkyytppebze8cjhu
-      POSTGRES_DB: nevapro
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    networks:
-      - neva_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d nevapro"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
 
 networks:
   neva_network:

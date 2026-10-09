@@ -15,7 +15,7 @@
 #   restart  — reinicia os serviços
 #   status   — status dos containers
 #   logs     — logs da API (Ctrl+C para sair). Uso: ./deploy.sh logs [serviço]
-#   backup   — backup manual do banco para o Backblaze B2
+#   backup   — backup manual do banco (requer storage remoto configurado no .env)
 #   health   — verifica o endpoint /api/health
 #   renew    — renovação manual do certificado SSL (renovar também via crontab do host)
 # =============================================================================
@@ -217,6 +217,9 @@ cmd_backup() {
   check_docker
   require_env
   info "Executando backup manual pelo job Laravel..."
+  if ! grep -qE '^B2_KEY_ID=.+' .env 2>/dev/null; then
+    warn "Storage remoto não configurado no .env — o job apenas registrará um aviso."
+  fi
   $COMPOSE exec api php artisan backup:run
 }
 

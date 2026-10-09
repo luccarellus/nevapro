@@ -8,7 +8,7 @@
 #   make update   — git pull + rebuild + restart
 #   make logs     — logs da API em tempo real
 #   make status   — status dos containers
-#   make backup   — backup manual do banco (Backblaze B2)
+#   make backup   — backup manual do banco (requer storage remoto no .env)
 #   make health   — checa /api/health
 #   make test     — roda a suíte de testes (vitest)
 # =============================================================================

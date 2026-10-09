@@ -1,8 +1,6 @@
 import './lib/clientLogger';
-import {StrictMode} from 'react';
+import {Component, ErrorInfo, ReactNode, StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import * as Sentry from '@sentry/react';
-import './sentry';
 import App from './App.tsx';
 import './index.css';
 
@@ -18,10 +16,30 @@ window.addEventListener('vite:preloadError', (event) => {
 
 window.setTimeout(() => sessionStorage.removeItem(CHUNK_RELOAD_KEY), 10_000);
 
+/** Contém erros de render sem derrubar a página inteira. */
+class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
+  state = {hasError: false};
+
+  static getDerivedStateFromError() {
+    return {hasError: true};
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <p>Ocorreu um erro inesperado. Atualize a página e tente novamente.</p>;
+    }
+    return this.props.children;
+  }
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Sentry.ErrorBoundary fallback={<p>Ocorreu um erro inesperado. Atualize a página e tente novamente.</p>}>
+    <ErrorBoundary>
       <App />
-    </Sentry.ErrorBoundary>
+    </ErrorBoundary>
   </StrictMode>,
 );

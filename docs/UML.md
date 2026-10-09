@@ -157,8 +157,8 @@ graph TD
     end
 
     subgraph External_Services["Serviços Externos"]
-        S3["Backblaze B2 / AWS S3 (Storage)"]
-        Sentry["Sentry Error Tracking"]
+        S3["Storage S3-compatível (arquivos)"]
+        Logs["Logs estruturados (stderr)"]
         Gemini["Google Gemini AI (Gerador/Explicador)"]
     end
 
@@ -173,7 +173,7 @@ graph TD
     RLS --> Tables
     AuthMW -.-> AuthSupabase
     Routes -.-> S3
-    Routes -.-> Sentry
+    Routes -.-> Logs
     Routes -.-> Gemini
     Routes -.-> RBAC_Tables["roles / permissions / user_tenant_roles"]
 ```

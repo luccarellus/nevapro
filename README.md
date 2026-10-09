@@ -27,7 +27,7 @@ A **Neva Pro** é uma plataforma web full-stack voltada para a preparação de e
 ```
 nevapro/
 ├── backend/             # API Laravel (runtime de produção)
-├── server.ts            # API Express (compatibilidade/desenvolvimento)
+├── server.ts            # Dev server Node (Vite + proxy /api → Laravel)
 ├── src/
 │   ├── App.tsx          # Componente raiz do React
 │   ├── components/      # Componentes React da interface
@@ -62,12 +62,9 @@ nevapro/
 
 **Backend**
 
-- **Laravel 13** com PHP 8.4.1+ para produção
-- **Express.js** com TypeScript para desenvolvimento e compatibilidade
+- **Laravel 13** com PHP 8.4.1+ para a API (runtime de produção)
+- **Express.js** apenas como dev server Node (serve o frontend via Vite e faz proxy de `/api` para o Laravel)
 - **PostgreSQL** como banco de dados principal
-- **bcryptjs** para hash de senhas
-- **Helmet** para segurança HTTP
-- **Multer** para upload de arquivos
 
 **Infraestrutura**
 
@@ -83,7 +80,7 @@ nevapro/
 
 A Neva Pro implementa um conjunto robusto de proteções de segurança:
 
-- **Autenticação por Cookie HttpOnly** — tokens de acesso Laravel Sanctum no runtime de produção; a API Express legada usa sessões HMAC-SHA256
+- **Autenticação por Cookie HttpOnly** — token de sessão Laravel Sanctum (`session_token`) validado pelo middleware `auth.custom`, com CSRF assinado (header `X-CSRF-Token`)
 - **Proteção contra Força Bruta** — bloqueio de conta após 5 tentativas falhas (15 min)
 - **Rate Limiter** — limites por IP/conta usando o cache configurado (Redis no Docker Compose)
 - **Tokens Revogados** — logout revoga a sessão atual e alterações de senha invalidam tokens anteriores
@@ -160,11 +157,11 @@ cd ..
 npm ci
 ```
 
-### Configuração legada (Express/Supabase — não usar no runtime Laravel)
+### Configuração legada (não usar no runtime Laravel)
 
 Para o runtime Laravel, configure `backend/.env` a partir de
-`backend/.env.example`; as variáveis abaixo pertencem apenas ao backend Express
-legado.
+`backend/.env.example`; as variáveis abaixo pertencem apenas ao antigo backend
+Express/Supabase (removido — a API de produção é o `backend/` Laravel).
 
 ```bash
 cp .env.example .env
@@ -203,9 +200,10 @@ ALLOWED_IMAGE_HOSTS="s3.amazonaws.com"
 
 ### Runtime local Laravel
 
-Inicie a API Laravel em `http://127.0.0.1:8000` e o frontend com
-`npm run dev:frontend` em dois terminais. O Vite encaminha `/api` para Laravel;
-`npm run dev` permanece apenas para desenvolvimento/compatibilidade Express.
+Inicie a API Laravel em `http://127.0.0.1:8000` (`cd backend && php artisan serve`)
+e o frontend com `npm run dev:frontend` em dois terminais. O Vite encaminha `/api`
+para o Laravel; alternativamente, `npm run dev` sobe um único processo que serve o
+frontend e faz o mesmo proxy (aponte com `LARAVEL_URL` se a API estiver noutra porta).
 
 ### Deploy no EasyPanel com Dockerfile (Laravel)
 
@@ -216,12 +214,12 @@ implantado como um serviço Dockerfile no EasyPanel sem Docker Compose.
 1. Configure o serviço para construir usando o `Dockerfile` da raiz e publicar a
    porta **80**. Não sobrescreva o comando de inicialização.
 2. Cadastre no painel as variáveis de produção do `.env.example`, incluindo
-   `APP_KEY`, `APP_URL`, `DATABASE_URL`, `DB_SSLMODE` e as configurações de B2,
+   `APP_KEY`, `APP_URL`, `DATABASE_URL`, `DB_SSLMODE` e as configurações de
    e-mail e integrações usadas pela aplicação. O container converte
    `DATABASE_URL` para `DB_URL` automaticamente.
-3. Defina `VITE_RECAPTCHA_SITE_KEY`, `VITE_SENTRY_DSN` e
-   `VITE_MAINTENANCE_MODE` como build arguments caso sejam usados; esses valores
-   são compilados no frontend durante o build.
+3. Defina `VITE_RECAPTCHA_SITE_KEY` e `VITE_MAINTENANCE_MODE` como build
+   arguments caso sejam usados; esses valores são compilados no frontend
+   durante o build.
 4. Faça backup e valide o schema do banco antes de executar
    `php artisan migrate --force` pelo terminal do serviço. Migrations não são
    executadas automaticamente na inicialização.
@@ -251,30 +249,13 @@ mais de um scheduler simultaneamente.
 
 > O scheduler Laravel executa a limpeza às 03:00 UTC e os backups às 04:00 UTC.
 
-### Deploy na Vercel (opcional / staging)
-
-Configure estas variáveis no painel da Vercel:
-
-```env
-APP_URL="https://seu-dominio.vercel.app"
-FRONTEND_URL="https://seu-dominio.vercel.app"
-DATABASE_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres:[SENHA]@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
-DISABLE_DB_SSL="false"
-SUPABASE_URL="https://[PROJECT_REF].supabase.co"
-SUPABASE_ANON_KEY="[anon key]"
-SUPABASE_SERVICE_ROLE_KEY="[service role key]"
-JWT_SECRET="[seu-secret]"
-```
-
 > O deploy Docker Compose conecta a API Laravel ao Redis pela rede privada do Compose
 > (`CACHE_STORE=redis`, `REDIS_HOST=redis`), compartilhando cache, sessões e filas sem
 > tráfego pela internet. O target standalone/EasyPanel também usa Redis como cache
 > padrão: forneça um Redis privado/acessível pelo serviço e configure
 > `REDIS_CLIENT=predis` e `REDIS_HOST`/`REDIS_PORT` ou `REDIS_URL`. Sem endereço Redis,
 > o container falha no boot em vez de recorrer silenciosamente à tabela `cache` do PostgreSQL.
-> A API Express legada também aceita `REDIS_PASSWORD`/`REDIS_USERNAME` junto com uma
-> `REDIS_URL` sem credenciais. O backend inclui Predis e não depende da extensão PHP `phpredis`.
+> O backend inclui Predis e não depende da extensão PHP `phpredis`.
 
 ### 4. Configure o banco de dados
 
@@ -292,7 +273,7 @@ npm run dev
 
 O servidor ficará disponível em `http://localhost:3000`.
 
-> **Nota:** `npm run dev` continua iniciando o Express para compatibilidade local; a API implantada pelo Compose é Laravel.
+> **Nota:** `npm run dev` sobe o dev server Node em `http://localhost:3000` (frontend + proxy de `/api` para o Laravel em `http://127.0.0.1:8000`; ajuste com `LARAVEL_URL`). A API implantada pelo Compose continua sendo o Laravel.
 
 ---
 
@@ -325,12 +306,15 @@ docker image prune -f
 
 | Comando | Descrição |
 |---|---|
-| `npm run dev` | Inicia o servidor em modo desenvolvimento com hot-reload |
+| `npm run dev` | Dev server Node: frontend + proxy `/api` para o Laravel |
+| `npm run dev:frontend` | Só o Vite (HMR), com proxy `/api` para o Laravel |
 | `npm run build:frontend` | Compila o frontend Vite para servir pelo Nginx |
-| `npm run build` | Compila o frontend e a API Express de compatibilidade |
-| `npm start` | Inicia o servidor em modo produção (`dist/server.cjs`) |
+| `npm run build` | Compila o frontend e o dev server Node (`dist/server.cjs`) |
+| `npm start` | Inicia o dev server Node em modo produção (`dist/server.cjs`) |
+| `npm test` | Testes do frontend (Vitest) |
 | `npm run lint` | Verifica tipos TypeScript sem emitir arquivos |
 | `npm run clean` | Remove a pasta `dist/` |
+| `cd backend && php vendor/bin/phpunit` | Testes do backend Laravel |
 
 ---
 
@@ -357,7 +341,8 @@ A Neva Pro utiliza um sistema de XP (pontos de experiência) para engajar os est
 | `POST` | `/api/auth/register` | Cadastro de novo estudante |
 | `POST` | `/api/auth/logout` | Logout (revoga token no banco) |
 | `POST` | `/api/auth/change-password` | Alteração de senha |
-| `POST` | `/api/auth/delete-user` | Exclusão de conta |
+| `POST` | `/api/auth/forgot-password` | Envia link de redefinição de senha |
+| `POST` | `/api/auth/reset-password` | Redefine a senha pelo token recebido |
 
 ### Usuário
 
@@ -365,6 +350,7 @@ A Neva Pro utiliza um sistema de XP (pontos de experiência) para engajar os est
 |---|---|---|
 | `GET` | `/api/user/profile` | Buscar perfil |
 | `POST` | `/api/user/profile` | Atualizar perfil e XP |
+| `DELETE` | `/api/user/profile` | Exclusão de conta (com reautenticação) |
 
 ### Multi-Tenancy & RBAC
 
@@ -400,9 +386,8 @@ A plataforma implementa:
 | Ferramenta | Uso |
 |---|---|
 | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Monitoramento de uptime |
-| [Sentry](https://sentry.io) | Captura de erros em tempo real |
 | [Prometheus + Grafana](https://prometheus.io/) | Métricas de CPU/RAM dos containers |
-| Winston + ELK Stack | Logging centralizado |
+| Laravel logging (stderr) + ELK/Loki | Logging centralizado |
 
 ---
 

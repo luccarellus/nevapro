@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Client Logs — espelha routes/clientLogs.ts da API Express:
- * recebe erros/telemetria do frontend (Sentry fallback) e grava no log.
+ * recebe erros/telemetria do frontend e grava no log.
  */
 class ClientLogController extends Controller
 {

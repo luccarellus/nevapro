@@ -5,8 +5,9 @@ namespace App\Services;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Storage Backblaze B2 via filesystem S3 do Laravel.
+ * Storage S3-compatível (filesystem S3 do Laravel).
  * Mesma semântica da API Express: upload, remoção e resolução de URL pública.
+ * Sem credenciais no .env, isConfigured() é false e uploads retornam 503.
  */
 class B2StorageService
 {

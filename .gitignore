@@ -13,6 +13,14 @@ crop.ps1
 certbot/
 public/icon-512.png.bak
 
+# Lock files alternativos (o projeto usa npm)
+bun.lock
+bun.lockb
+
+# SQLite WAL files (gerados em runtime)
+*.sqlite-wal
+*.sqlite-shm
+
 # Logs de desenvolvimento
 *.log
 !/.gitkeep
@@ -20,6 +28,3 @@ public/icon-512.png.bak
 # Scripts temporários de migração/refatoração
 /scripts/
 
-# Build da Vercel (gerado por esbuild)
-/api/index.js
-/api/index.js.map

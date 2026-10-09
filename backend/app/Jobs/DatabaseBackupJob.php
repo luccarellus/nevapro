@@ -13,9 +13,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 /**
- * Backup do PostgreSQL enviado ao Backblaze B2.
- * Usa pg_dump no container; o dump customizado é enviado ao B2.
+ * Backup do PostgreSQL enviado ao storage remoto S3-compatível.
+ * Usa pg_dump no container; o dump customizado é enviado ao storage.
  * Agendado diariamente via routes/console.php (schedule).
+ * Sem storage configurado, o job apenas registra um aviso e não falha.
  */
 class DatabaseBackupJob implements ShouldQueue
 {
@@ -23,6 +24,12 @@ class DatabaseBackupJob implements ShouldQueue
 
     public function handle(): void
     {
+        if (! B2StorageService::isConfigured()) {
+            Log::warning('[Backup] Storage remoto não configurado — backup ignorado.');
+
+            return;
+        }
+
         $connection = DB::connection()->getConfig();
         $database = $connection['database'];
         $host = $connection['host'];
@@ -55,7 +62,7 @@ class DatabaseBackupJob implements ShouldQueue
 
         try {
             if (! app(B2StorageService::class)->putFile('backups/db/'.basename($file), $file)) {
-                throw new \RuntimeException('Não foi possível enviar o backup para o Backblaze B2.');
+                throw new \RuntimeException('Não foi possível enviar o backup para o storage remoto.');
             }
         } finally {
             if (is_file($file) && ! unlink($file)) {
@@ -63,6 +70,6 @@ class DatabaseBackupJob implements ShouldQueue
             }
         }
 
-        Log::info('[Backup] Banco enviado ao B2: '.basename($file));
+        Log::info('[Backup] Banco enviado ao storage remoto: '.basename($file));
     }
 }

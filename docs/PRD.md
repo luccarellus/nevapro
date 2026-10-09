@@ -120,5 +120,5 @@ Esta versão 2.0 estende a plataforma para suportar **Multi-Tenancy** (multiarre
 
 - **Frontend:** React 19, TypeScript, Vite, TailwindCSS v4, Framer Motion, Lucide React, Recharts.
 - **Backend:** Node.js, Express, TypeScript, Middleware Pipeline (Auth, Tenant, RBAC, CSRF, Rate Limit).
-- **Banco de Dados & Storage:** PostgreSQL + Supabase (RLS, Triggers, Indexes), Backblaze B2 / Amazon S3 para arquivos.
-- **Observabilidade & Monitoramento:** Sentry (Node e React), Winston / Custom Logger, Backups automáticos de DB.
+- **Banco de Dados & Storage:** PostgreSQL + Supabase (RLS, Triggers, Indexes), storage S3-compatível para arquivos.
+- **Observabilidade & Monitoramento:** Logs estruturados (stderr), Winston / Custom Logger, Backups automáticos de DB.

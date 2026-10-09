@@ -8,7 +8,7 @@ use App\Services\B2StorageService;
 
 /**
  * Materials — espelha routes/materials.ts da API Express.
- * Ao deletar, remove também o arquivo do Backblaze B2.
+ * Ao deletar, remove também o arquivo do storage remoto.
  */
 class MaterialController extends CrudController
 {

@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Schedule;
 |--------------------------------------------------------------------------
 | Agendamentos equivalentes ao container cron da stack Express:
 |  - 03:00 UTC: limpeza de logs/tokens expirados
-|  - 04:00 UTC: backup do banco no Backblaze B2
+|  - 04:00 UTC: backup do banco (pulado automaticamente enquanto o
+|    storage remoto S3 não estiver configurado no .env)
 */
 
 Schedule::call(fn () => app(CronService::class)->cleanup())
@@ -21,4 +22,4 @@ Schedule::job(new DatabaseBackupJob)->dailyAt('04:00')->timezone('UTC')->name('b
 
 Artisan::command('backup:run', function (): void {
     app(DatabaseBackupJob::class)->handle();
-})->purpose('Gera e envia um backup do banco de dados para o Backblaze B2');
+})->purpose('Gera um backup do banco de dados e o envia ao storage remoto (quando configurado)');

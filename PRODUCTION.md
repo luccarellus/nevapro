@@ -60,7 +60,7 @@ No dia-a-dia:
 ```bash
 ./deploy.sh update    # git pull + rebuild + restart (novo deploy)
 ./deploy.sh logs      # logs da API em tempo real
-./deploy.sh backup    # backup manual do banco no Backblaze B2
+./deploy.sh backup    # backup manual do banco (requer storage remoto no .env)
 ./deploy.sh status    # status dos containers
 ./deploy.sh renew     # renovação manual do SSL
 ./deploy.sh down      # para tudo
@@ -143,7 +143,7 @@ APP_KEY="base64:[chave gerada pelo setup]"
 CRON_SECRET="[segredo aleatório]"
 EVENTEASE_WEBHOOK_SECRET="[segredo do webhook]"
 
-# Backblaze B2, EnemHub, Resend, Sentry e reCAPTCHA — conforme .env.example
+# EnemHub, Resend e reCAPTCHA — conforme .env.example
 ```
 
 > **PostgreSQL:** `DB_SSLMODE` usa `prefer` por padrão (usa TLS se o banco
@@ -227,7 +227,7 @@ docker compose run --rm certbot renew --dry-run
 | Horário (UTC) | Endpoint | Função |
 |---|---|---|
 | 03:00 | Laravel `CronService::cleanup()` | Limpeza de logs/tokens expirados |
-| 04:00 | Laravel `DatabaseBackupJob` | Backup PostgreSQL no Backblaze B2 |
+| 04:00 | Laravel `DatabaseBackupJob` | Backup PostgreSQL no storage remoto (pulado sem credenciais) |
 
 O serviço `scheduler` do Compose já executa `php artisan schedule:work`;
 não é necessário configurar um container cron, chamadas HTTP periódicas
@@ -287,15 +287,16 @@ Não são executáveis a partir do repositório — requerem acesso à VPS ou ao
 painel do provedor:
 
 1. **Backup offsite (rclone + age):** instalar rclone na VPS
-   (`curl https://rclone.org/install.sh | sudo bash`), criar o remote do
-   Backblaze B2 ou S3 (`rclone config`) e uma chave age (`age-keygen`).
+   (`curl https://rclone.org/install.sh | sudo bash`), criar o remote S3 de
+   destino (`rclone config`) e uma chave age (`age-keygen`).
    Sincronizar `backups/` diariamente com criptografia client-side.
 2. **Monitoramento externo:** registrar um probe em UptimeRobot, Pingdom ou
    Better Stack apontado para `https://<domínio>/api/health/readiness`
    (intervalo de 5 min; alertas por e-mail/Slack). O endpoint responde
    200 quando o banco atende e 503 caso contrário.
-3. **Bucket de armazenamento:** criar o bucket do Backblaze B2/S3 usado pelo
+3. **Bucket de armazenamento:** criar o bucket S3 usado pelo
    `DatabaseBackupJob` e pelo rclone (chaves no `.env` — veja `.env.example`).
+   Sem essas credenciais, o agendamento diário é ignorado com aviso no log.
 
 ## 🔋 Banco de dados
 
@@ -337,11 +338,12 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
 - Mantenha o Redis na mesma rede privada da aplicação sempre que possível: Redis
   remoto adiciona a latência de rede a cada cache miss e operação de sessão/fila.
   `REDIS_PASSWORD` e `REDIS_USERNAME` podem complementar uma `REDIS_URL` sem
-  credenciais na API Express legada; credenciais já embutidas na URL prevalecem.
-- Execute `npm run verify:connections` no ambiente da aplicação para verificar
-  autenticação, leitura/escrita e latência PING do Redis usado pela API Express.
-- A API Express legada usa o mesmo Redis para cache compartilhado e rate limit
-  distribuído quando configurada; sem ele, mantém o fallback local.
+  credenciais; credenciais já embutidas na URL prevalecem.
+- Verifique o Redis com `docker compose exec nevapro_neva-redis redis-cli ping`
+  (esperado: `PONG`) antes de apontar a aplicação para ele.
+- O Laravel usa o Redis para cache, sessões, filas e rate limit distribuído;
+  sem ele, troque explicitamente `CACHE_STORE`/`SESSION_DRIVER`/`QUEUE_CONNECTION`
+  (não há fallback silencioso em produção).
 - O serviço `worker` processa e-mails, notificações e backups.
 - O serviço `scheduler` executa a limpeza diária às 03:00 UTC e o backup às 04:00 UTC.
 - As migrations são executadas pelo `./deploy.sh up`; tabelas existentes são preservadas.
@@ -353,27 +355,30 @@ tabela e emite um token Sanctum no cookie HttpOnly `session_token`.
    público `/api/health/readiness`, ou [Uptime Kuma](https://github.com/louislam/uptime-kuma)
    (auto-hospedado na própria VPS). O endpoint faz `SELECT 1` no banco e
    retorna 503 se ele não responder.
-3. **Observabilidade:** [Sentry.io](https://sentry.io) para captura de erros em tempo real.
+3. **Observabilidade:** captura de erros em tempo real via logs estruturados do
+   Laravel (stderr) — sem serviço externo no momento.
 4. **Performance:** [Prometheus](https://prometheus.io/) + [Grafana] para métricas de CPU/RAM dos containers.
 
-## 💾 Estratégia de Backup (Backblaze B2)
+## 💾 Estratégia de Backup (storage remoto S3)
 
 - O scheduler envia diariamente às 04:00 UTC um dump customizado do `pg_dump`
-  para `backups/db/nevapro_YYYY-MM-DD_HHmmss.dump` no B2.
+  para `backups/db/nevapro_YYYY-MM-DD_HHmmss.dump` no storage remoto.
+- Sem credenciais S3 no `.env`, o job é ignorado com aviso no log (nenhuma falha).
 - Para executar manualmente: `docker compose exec api php artisan backup:run`.
 - O dump customizado não é `.sql.gz`; não o descomprima com `gzip`.
 
 ### 🔄 Como Restaurar um Backup
 
-1. Baixe o arquivo `.dump` do Backblaze B2.
+1. Baixe o arquivo `.dump` do storage remoto.
 2. Restaure em um banco PostgreSQL de destino vazio:
 
    ```bash
    pg_restore --no-owner --no-privileges --dbname="$DATABASE_URL" nevapro_....dump
    ```
 
-## ☁️ Runtime Node legado
+## ☁️ Dev server Node
 
-O deploy de produção documentado aqui usa Laravel em Docker. Os artefatos
-Express/Vercel restantes são compatibilidade legada e não devem ser usados para
-um novo deploy sem uma validação de paridade e configuração independentes.
+O deploy de produção usa Laravel em Docker (Nginx + PHP-FPM). O `server.ts` da
+raiz é apenas o dev server local (frontend + proxy de `/api` para o Laravel);
+os artefatos da antiga API Express/Vercel foram removidos na migração para
+Laravel.

@@ -1,2 +1,0 @@
-// Script desativado
-export {};

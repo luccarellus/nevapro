@@ -10,11 +10,9 @@ FROM ${NODE_IMAGE} AS frontend
 WORKDIR /app
 
 ARG VITE_RECAPTCHA_SITE_KEY=""
-ARG VITE_SENTRY_DSN=""
 ARG VITE_MAINTENANCE_MODE="false"
 
 ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY \
-    VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_MAINTENANCE_MODE=$VITE_MAINTENANCE_MODE
 
 COPY package*.json ./
@@ -45,7 +43,8 @@ RUN set -eux; \
     echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
     echo "opcache.jit=tracing" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
     echo "opcache.jit_buffer_size=64M" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
-    echo "opcache.file_cache_consistency_checks=1" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini
+    echo "opcache.file_cache_consistency_checks=1" >> /usr/local/etc/php/conf.d/zz-neva-opcache.ini; \
+    echo "expose_php = Off" > /usr/local/etc/php/conf.d/zz-neva-hardening.ini
 
 # Estágio vendor: usa a base PHP limpa e copia apenas o binário do Composer (elimina CVEs de imagem externa de build)
 FROM base AS vendor
@@ -66,7 +65,7 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs storage/app/backups bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwX storage bootstrap/cache \
-    && printf '\nclear_env = no\n' >> /usr/local/etc/php-fpm.d/www.conf
+    && printf '\nclear_env = no\nhide_server_tokens = On\n' >> /usr/local/etc/php-fpm.d/www.conf
 
 EXPOSE 9000
 
