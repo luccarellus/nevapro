@@ -56,15 +56,20 @@ const ssl = getSslConfig();
 const pool = new Pool({
   connectionString,
   ssl,
-  max: 30,                       // mais conexões simultâneas (rede interna, sem pgbouncer)
-  min: 5,                        // pool pré-aquecido: zero handshakes em cold start
-  idleTimeoutMillis: 60_000,     // conexões vivas mais tempo (evita reconnect em rajadas)
-  connectionTimeoutMillis: 3_000,
+  max: 20,
+  min: 0,                        // Não força conexões ociosas no boot (evita timeout se banco estiver despertando)
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 10_000, // 10s para acomodar cold start/TLS em redes remotas
   statement_timeout: 10_000,
   query_timeout: 10_000,
-  keepAlive: true,               // TCP keepalive evita resets de conexões idle
+  keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
   application_name: 'nevapro-server',
+});
+
+// Impede que erros em conexões ociosas emitam 'unhandled error' no processo
+pool.on('error', (err) => {
+  log.warn('[DB Pool] Conexão ociosa encerrada pelo servidor (descartada do pool):', err?.message || err);
 });
 
 export const query = async (text: string, params?: any[]) => {

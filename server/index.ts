@@ -211,10 +211,29 @@ const distPath = path.resolve('dist');
 const indexPath = path.join(distPath, 'index.html');
 
 if (fs.existsSync(indexPath)) {
-  // Assets com hash no filename: cache público imutável por 1 ano com CORS e CORP abertos
+  // Assets com hash no filename: cache público com CORS e CORP abertos
   app.use('/assets', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+    // Suporte resiliente a chunks com hash desatualizado (evita 404 em PWA/cache de cliente antigo)
+    const requestedFile = req.path.replace(/^\//, '');
+    const directPath = path.join(distPath, 'assets', requestedFile);
+    if (!fs.existsSync(directPath) && requestedFile.endsWith('.js')) {
+      const baseName = requestedFile.replace(/-[A-Za-z0-9_-]+\.js$/, '');
+      if (baseName && baseName !== requestedFile) {
+        try {
+          const files = fs.readdirSync(path.join(distPath, 'assets'));
+          const currentMatch = files.find(f => f.startsWith(`${baseName}-`) && f.endsWith('.js'));
+          if (currentMatch) {
+            res.setHeader('Content-Type', 'application/javascript; charset=UTF-8');
+            return res.sendFile(path.join(distPath, 'assets', currentMatch));
+          }
+        } catch {
+          // segue para static
+        }
+      }
+    }
     next();
   }, express.static(path.join(distPath, 'assets'), {
     immutable: true,

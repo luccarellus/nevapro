@@ -72,8 +72,8 @@ export async function ensurePlatformTenant(): Promise<void> {
     if (rows.length > 0) {
       log.info('[RBAC] Tenant da plataforma garantido.');
     }
-  } catch (err) {
-    log.error('[RBAC] Falha ao garantir tenant da plataforma:', err);
+  } catch (err: any) {
+    log.warn('[RBAC] Falha ao garantir tenant da plataforma (non-fatal, banco indisponível ou reconectando):', err?.message || err);
   }
 }
 
