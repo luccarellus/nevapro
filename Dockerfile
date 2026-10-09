@@ -65,7 +65,7 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs storage/app/backups bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R ug+rwX storage bootstrap/cache \
-    && printf '\nclear_env = no\nhide_server_tokens = On\n' >> /usr/local/etc/php-fpm.d/www.conf
+    && printf '\nclear_env = no\n' >> /usr/local/etc/php-fpm.d/www.conf
 
 EXPOSE 9000
 
