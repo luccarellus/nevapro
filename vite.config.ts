@@ -9,6 +9,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Chaves de IA devem ser usadas apenas no backend (process.env no server/).
 export default defineConfig(() => {
   return {
+    base: '/',
     plugins: [react(), tailwindcss(), VitePWA({ registerType: 'autoUpdate' })],
     build: {
       chunkSizeWarningLimit: 800,
