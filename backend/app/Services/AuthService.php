@@ -92,18 +92,30 @@ class AuthService
             }
 
             $cached = [
-                'token_id' => $accessToken->id,
-                'token_name' => $accessToken->name,
-                'expires_at' => $accessToken->expires_at?->toIso8601String(),
-                'type' => $type,
-                'tokenable_id' => (string) $accessToken->tokenable_id,
+                'token_id'       => $accessToken->id,
+                'token_name'     => $accessToken->name,
+                'expires_at'     => $accessToken->expires_at?->toIso8601String(),
+                'type'           => $type,
+                'tokenable_id'   => (string) $accessToken->tokenable_id,
                 'tokenable_type' => $type === 'admin' ? AdminUser::class : StudentUser::class,
+                'token_version'  => (int) ($user->token_version ?? 0),
             ];
             Cache::put($cacheKey, $cached, now()->addSeconds(self::TOKEN_CACHE_TTL));
         }
 
         $accessToken = $this->reconstructAccessToken($cached);
         if (! $accessToken) {
+            Cache::forget($cacheKey);
+
+            return null;
+        }
+
+        // Verificação rápida de token_version via cache (evita query ao banco na maioria dos requests).
+        // Se a versão mudou (senha trocada), o cache é invalidado e o DB é consultado.
+        $cachedTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $cached['token_name'], $matches)
+            ? (int) $matches[1]
+            : 0;
+        if (isset($cached['token_version']) && (int) $cached['token_version'] > $cachedTv) {
             Cache::forget($cacheKey);
 
             return null;
@@ -119,13 +131,18 @@ class AuthService
             return null;
         }
 
-        // Revogação por versão (senha trocada → todas as sessões anteriores caem)
+        // Confirma versão ao vivo — detecta revogação mesmo que o cache ainda esteja quente
         $tokenVersion = (int) ($user->token_version ?? 0);
-        $tokenTv = preg_match('/(?:^|:)tv(\d+)$/', (string) $cached['token_name'], $matches)
-            ? (int) $matches[1]
-            : 0;
-        if ($tokenVersion > $tokenTv) {
+        if ($tokenVersion > $cachedTv) {
+            Cache::forget($cacheKey);
+
             return null;
+        }
+
+        // Atualiza token_version no cache se diferiu (ex.: próxima request pós-renovação)
+        if (($cached['token_version'] ?? -1) !== $tokenVersion) {
+            $cached['token_version'] = $tokenVersion;
+            Cache::put($cacheKey, $cached, now()->addSeconds(self::TOKEN_CACHE_TTL));
         }
 
         return ['user' => $user, 'type' => $cached['type'], 'accessToken' => $accessToken];

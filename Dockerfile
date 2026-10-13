@@ -55,6 +55,9 @@ WORKDIR /app
 COPY backend/ ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --classmap-authoritative
 
+# Pool PHP-FPM de produção (copiado ao vendor para ser herdado pelo estágio api)
+COPY docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zz-neva-pool.conf
+
 FROM base AS api
 
 WORKDIR /var/www/html
@@ -90,9 +93,9 @@ ENV APP_ENV=production \
     DB_CONNECTION=pgsql \
     DB_SSLMODE=prefer \
     CACHE_STORE=redis \
-    SESSION_DRIVER=array \
+    SESSION_DRIVER=redis \
     SESSION_SECURE_COOKIE=true \
-    QUEUE_CONNECTION=database \
+    QUEUE_CONNECTION=redis \
     DB_QUEUE_RETRY_AFTER=3600 \
     LOG_CHANNEL=stderr
 
@@ -104,6 +107,8 @@ COPY docker/entrypoint.sh /usr/local/bin/neva-entrypoint
 RUN chmod +x /usr/local/bin/neva-entrypoint \
     && mkdir -p /run/nginx /var/log/supervisor \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+COPY docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zz-neva-pool.conf
 
 EXPOSE 80
 

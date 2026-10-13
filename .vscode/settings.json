@@ -4,6 +4,7 @@
   "less.validate": false,
   "html.validate.styles": false,
   "css-compatibility.enable": false,
+  "html-compatibility.enable": false,
   "docker.scout.enable": false,
   "docker.languageserver.diagnostics.deprecatedMaintainer": "ignore",
   "docker.languageserver.diagnostics.emptyContinuationLine": "ignore",

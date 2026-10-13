@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Answer;
 use App\Models\Question;
 use App\Models\QuestionOption;
+use App\Services\ApiCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
  */
 class AnswerController extends Controller
 {
+    public function __construct(private readonly ApiCache $cache) {}
     public function store(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
@@ -56,12 +58,23 @@ class AnswerController extends Controller
             ]);
         });
 
+        $this->invalidatePerformanceCache($data['userId']);
+
         return response()->json([
             'success' => true,
             'isCorrect' => $isCorrect,
             'correctOptionIndex' => $question->correct_option_index,
             'explanation' => $question->explanation,
         ]);
+    }
+
+    /** Invalida os caches de performance do usuário após registrar respostas. */
+    private function invalidatePerformanceCache(string $userId): void
+    {
+        $this->cache->invalidate(
+            "performance:summary:{$userId}",
+            "performance:mastery:{$userId}",
+        );
     }
 
     public function batch(Request $request): JsonResponse
@@ -136,6 +149,8 @@ class AnswerController extends Controller
         });
 
         return response()->json(['success' => true, 'count' => count($answers), 'results' => $results]);
+
+        $this->invalidatePerformanceCache($userId);
     }
 
 }

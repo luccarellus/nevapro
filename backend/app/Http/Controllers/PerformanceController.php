@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TriScore;
+use App\Services\ApiCache;
 use App\Services\TriCalculator;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -16,125 +17,138 @@ use Illuminate\Support\Str;
  */
 class PerformanceController extends Controller
 {
+    /** TTL do cache de performance (2 min) — cobre rajadas de navegação sem dados obsoletos. */
+    private const CACHE_TTL = 120;
+
+    public function __construct(private readonly ApiCache $cache) {}
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
 
-        $scores = TriScore::where('user_id', $user->id)
-            ->orderByDesc('calculated_at')
-            ->limit(10)
-            ->get();
+        $data = $this->cache->remember("performance:summary:{$user->id}", self::CACHE_TTL, function () use ($user): array {
+            $scores = TriScore::where('user_id', $user->id)
+                ->orderByDesc('calculated_at')
+                ->limit(10)
+                ->get();
 
-        $latest = $scores->first();
+            $latest = $scores->first();
 
-        // Taxa de acerto real: última resposta por questão (DISTINCT ON)
-        $stats = DB::selectOne(
-            'WITH latest_answers AS (
-               SELECT DISTINCT ON (question_id) question_id, is_correct
-               FROM answers
-               WHERE user_id = ?
-               ORDER BY question_id, created_at DESC
-             )
-             SELECT COUNT(*) AS answered,
-                    COALESCE(SUM(CASE WHEN is_correct THEN 1 ELSE 0 END), 0) AS correct
-             FROM latest_answers',
-            [$user->id],
-        );
+            // Taxa de acerto real: última resposta por questão (DISTINCT ON)
+            $stats = DB::selectOne(
+                'WITH latest_answers AS (
+                   SELECT DISTINCT ON (question_id) question_id, is_correct
+                   FROM answers
+                   WHERE user_id = ?
+                   ORDER BY question_id, created_at DESC
+                 )
+                 SELECT COUNT(*) AS answered,
+                        COALESCE(SUM(CASE WHEN is_correct THEN 1 ELSE 0 END), 0) AS correct
+                 FROM latest_answers',
+                [$user->id],
+            );
 
-        $answered = (int) ($stats->answered ?? 0) ?: ($user->answered_questions ?? 0);
-        $correct = (int) ($stats->correct ?? 0) ?: ($user->correct_answers ?? 0);
-        $hitRate = $answered > 0 ? (int) round(($correct / $answered) * 100) : 0;
+            $answered = (int) ($stats->answered ?? 0) ?: ($user->answered_questions ?? 0);
+            $correct = (int) ($stats->correct ?? 0) ?: ($user->correct_answers ?? 0);
+            $hitRate = $answered > 0 ? (int) round(($correct / $answered) * 100) : 0;
 
-        return response()->json([
-            'latest_score' => $latest ? [
-                'id' => $latest->id,
-                'estimated_score' => $latest->estimated_score,
-                'math_score' => $latest->math_score,
-                'nature_score' => $latest->nature_score,
-                'humanities_score' => $latest->humanities_score,
-                'languages_score' => $latest->languages_score,
-                'calculated_at' => $latest->calculated_at?->toISOString(),
-            ] : null,
-            'history' => $scores->map(fn ($s) => [
-                'id' => $s->id,
-                'estimated_score' => $s->estimated_score,
-                'calculated_at' => $s->calculated_at?->toISOString(),
-            ]),
-            'tri_target' => $user->tri_target_score ?? 750,
-            'stats' => [
-                'hit_rate' => $hitRate,
-                'answered' => $answered,
-                'correct' => $correct,
-                'xp' => $user->xp ?? 0,
-            ],
-        ]);
+            return [
+                'latest_score' => $latest ? [
+                    'id' => $latest->id,
+                    'estimated_score' => $latest->estimated_score,
+                    'math_score' => $latest->math_score,
+                    'nature_score' => $latest->nature_score,
+                    'humanities_score' => $latest->humanities_score,
+                    'languages_score' => $latest->languages_score,
+                    'calculated_at' => $latest->calculated_at?->toISOString(),
+                ] : null,
+                'history' => $scores->map(fn ($s) => [
+                    'id' => $s->id,
+                    'estimated_score' => $s->estimated_score,
+                    'calculated_at' => $s->calculated_at?->toISOString(),
+                ])->values()->all(),
+                'tri_target' => $user->tri_target_score ?? 750,
+                'stats' => [
+                    'hit_rate' => $hitRate,
+                    'answered' => $answered,
+                    'correct' => $correct,
+                    'xp' => $user->xp ?? 0,
+                ],
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function subjectMastery(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
 
-        $rows = DB::select(
-            'WITH latest_answers AS (
-               SELECT DISTINCT ON (a.question_id) a.question_id, a.is_correct, q.subject
-               FROM answers a
-               JOIN questions q ON q.id = a.question_id
-               WHERE a.user_id = ?
-               ORDER BY a.question_id, a.created_at DESC
-             )
-             SELECT subject,
-                    COUNT(*) AS total,
-                    SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
-             FROM latest_answers
-             GROUP BY subject
-             ORDER BY total DESC',
-            [$user->id],
-        );
+        $data = $this->cache->remember("performance:mastery:{$user->id}", self::CACHE_TTL, function () use ($user): array {
+            $rows = DB::select(
+                'WITH latest_answers AS (
+                   SELECT DISTINCT ON (a.question_id) a.question_id, a.is_correct, q.subject
+                   FROM answers a
+                   JOIN questions q ON q.id = a.question_id
+                   WHERE a.user_id = ?
+                   ORDER BY a.question_id, a.created_at DESC
+                 )
+                 SELECT subject,
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
+                 FROM latest_answers
+                 GROUP BY subject
+                 ORDER BY total DESC',
+                [$user->id],
+            );
 
-        $subjects = collect($rows)->map(function ($row) {
-            $percentage = $row->total > 0 ? (int) round(($row->correct / $row->total) * 100) : 0;
+            $subjects = collect($rows)->map(function ($row) {
+                $percentage = $row->total > 0 ? (int) round(($row->correct / $row->total) * 100) : 0;
 
-            return [
-                'name' => $row->subject ?? 'Geral',
-                'category' => $this->subjectCategory((string) ($row->subject ?? '')),
-                'percentage' => $percentage,
-                'level' => $percentage >= 70 ? 'high' : ($percentage >= 50 ? 'medium' : 'critical'),
-                'total' => (int) $row->total,
-                'correct' => (int) $row->correct,
-            ];
-        })->values();
+                return [
+                    'name' => $row->subject ?? 'Geral',
+                    'category' => $this->subjectCategory((string) ($row->subject ?? '')),
+                    'percentage' => $percentage,
+                    'level' => $percentage >= 70 ? 'high' : ($percentage >= 50 ? 'medium' : 'critical'),
+                    'total' => (int) $row->total,
+                    'correct' => (int) $row->correct,
+                ];
+            })->values();
 
-        $evolutionRows = DB::select(
-            'WITH latest_answers AS (
-               SELECT DISTINCT ON (question_id) question_id, is_correct, created_at
-               FROM answers
-               WHERE user_id = ? AND created_at >= NOW() - INTERVAL \'30 days\'
-               ORDER BY question_id, created_at DESC
-             ),
-             day_stats AS (
-               SELECT DATE(created_at) AS day,
-                      COUNT(*) AS total,
-                      SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
-               FROM latest_answers
-               GROUP BY DATE(created_at)
-             )
-             SELECT day,
-                    ROUND((SUM(correct) OVER (ORDER BY day)::numeric
-                        / NULLIF(SUM(total) OVER (ORDER BY day), 0)) * 100, 1) AS running_accuracy
-             FROM day_stats
-             ORDER BY day',
-            [$user->id],
-        );
-        $lastIndex = count($evolutionRows) - 1;
-        $evolution = collect($evolutionRows)->values()->map(fn ($row, $index) => [
-            'label' => $index === $lastIndex
-                ? 'Hoje'
-                : Carbon::parse($row->day)->locale('pt_BR')->translatedFormat('d M'),
-            'precision' => (int) round($row->running_accuracy),
-            'day' => (string) $row->day,
-        ]);
+            $evolutionRows = DB::select(
+                'WITH latest_answers AS (
+                   SELECT DISTINCT ON (question_id) question_id, is_correct, created_at
+                   FROM answers
+                   WHERE user_id = ? AND created_at >= NOW() - INTERVAL \'30 days\'
+                   ORDER BY question_id, created_at DESC
+                 ),
+                 day_stats AS (
+                   SELECT DATE(created_at) AS day,
+                          COUNT(*) AS total,
+                          SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
+                   FROM latest_answers
+                   GROUP BY DATE(created_at)
+                 )
+                 SELECT day,
+                        ROUND((SUM(correct) OVER (ORDER BY day)::numeric
+                            / NULLIF(SUM(total) OVER (ORDER BY day), 0)) * 100, 1) AS running_accuracy
+                 FROM day_stats
+                 ORDER BY day',
+                [$user->id],
+            );
+            $lastIndex = count($evolutionRows) - 1;
+            $evolution = collect($evolutionRows)->values()->map(fn ($row, $index) => [
+                'label' => $index === $lastIndex
+                    ? 'Hoje'
+                    : Carbon::parse($row->day)->locale('pt_BR')->translatedFormat('d M'),
+                'precision' => (int) round($row->running_accuracy),
+                'day' => (string) $row->day,
+            ]);
 
-        return response()->json(['subjects' => $subjects, 'evolution' => $evolution]);
+            return ['subjects' => $subjects, 'evolution' => $evolution];
+        });
+
+        return response()->json($data);
     }
 
     public function calculateTri(Request $request): JsonResponse
@@ -176,6 +190,9 @@ class PerformanceController extends Controller
             'languages_score' => $bySubject['languages']['estimated_score'] ?? null,
             'calculated_at' => now(),
         ]);
+
+        // Invalida o cache de summary após novo cálculo TRI
+        $this->cache->invalidate("performance:summary:{$user->id}");
 
         return response()->json([
             'calculated' => true,
