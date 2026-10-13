@@ -9,7 +9,11 @@ interface LogoProps {
  * Logo oficial do sistema (public/logo.png).
  * showText mantém compatibilidade com usos antigos, mas a imagem já contém
  * o texto da marca — nesse caso o flag é ignorado para não duplicar.
- * Quando `onClick` é passado, torna o elemento clicável e acessível.
+ *
+ * Evolução: removemos todos os efeitos visuais de interação para que a logo nunca
+ * exiba borda, anel ou sombreamento — especialmente ao clicar/focar.
+ * Quando `onClick` é passado, torna o elemento clicável, mas sem feedback visual (sem
+ * hover, active, focus ring ou animação de clique).
  */
 export default function Logo({ className = "h-10", onClick, title }: LogoProps) {
   const content = (
@@ -29,12 +33,15 @@ export default function Logo({ className = "h-10", onClick, title }: LogoProps) 
         type="button"
         onClick={onClick}
         title={title || "Ir para a página inicial"}
-        className={`flex items-center select-none cursor-pointer hover:opacity-85 active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-brand-primary/30 rounded-xl ${className}`}
+        className={`flex items-center select-none cursor-pointer transition-opacity focus:outline-none ${className}`}
       >
         {content}
       </button>
     );
   }
+  // Nota de design: removemos hover:opacity-85, active:scale-[0.98] e o focus ring
+  // do button para evitar qualquer feedback visual (mudança de cor/borda/brilho) ao
+  // clicar ou focar na logo. O botão continua funcional (onClick), mas não altera visualmente.
 
   return (
     <div className={`flex items-center select-none ${className}`}>

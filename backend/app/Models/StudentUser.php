@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\B2StorageService;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Services\ApiCache;
 
 /**
  * Alunos — mapeia public.users (schema existente).
@@ -78,6 +79,56 @@ class StudentUser extends Authenticatable
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Reconstrói uma instância do StudentUser a partir de um array RAW (snapshot
+     * cacheado no AuthService). Usado pelo AuthService para reutilizar o snapshot
+     * sem fazer uma nova query ao banco.
+     *
+     * Atenção: o retorno é somente leitura para fins de autenticação (o AuthService
+     * compara apenas o token_version).
+     *
+     * @phpstan-static-call false
+     */
+    public static function createFromArray(array $attributes): ?self
+    {
+        if (! isset($attributes['id'], $attributes['email'])) {
+            return null;
+        }
+
+        $attrs = $attributes;
+        foreach (['created_at', 'updated_at'] as $field) {
+            if (isset($attrs[$field]) && is_string($attrs[$field])) {
+                $attrs[$field] = \Illuminate\Support\Carbon::parse($attrs[$field]);
+            }
+        }
+
+        $model = new static();
+        $model->exists = false;
+        $model->setRawAttributes($attrs, true);
+
+        return $model;
+    }
+
+    /**
+     * Retorno rápido a partir de um array RAW (caminho alternativo ao
+     * createFromArray, utilizado pelo AuthService).
+     *
+     * @phpstan-static-call false
+     */
+    public static function makeFromRaw(array $attributes): self
+    {
+        return static::createFromArray($attributes) ?? new static();
+    }
+
+    /** Força invalidação do cache de snapshot do usuário e seus tokens relacionados. */
+    public function invalidateUserSnapshot(ApiCache $cache, ?int $tenantId = null): void
+    {
+        $cache->invalidateUserSnapshot($this->id, $this instanceof AdminUser ? 'admin' : 'student', $tenantId);
+
+        // Invalida também o cache de resolução de todos os tokens do usuário.
+        $cache->forgetUserTokenRelation($this->id, $this instanceof AdminUser ? 'admin' : 'student', $tenantId);
     }
 
     public function answers()

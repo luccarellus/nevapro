@@ -73,6 +73,7 @@ class PerformanceController extends Controller
                     'answered' => $answered,
                     'correct' => $correct,
                     'xp' => $user->xp ?? 0,
+                    'performance_snapshot_mtime' => now()->toIso8601String(),
                 ],
             ];
         });

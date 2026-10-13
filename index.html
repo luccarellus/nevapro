@@ -6,10 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description"
     content="Uma plataforma web inovadora que transforma a preparação para o ENEM em uma experiência dinâmica e gamificada." />
-  <meta name="theme-color" content="#060a12" id="theme-color-meta" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="icon" type="image/png" href="/favicon.png" />
-  <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+  <link rel="icon" href="/favicon.ico?v=5" sizes="16x16 24x24 32x32 48x48 64x64" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png?v=5" />
+  <link rel="shortcut icon" type="image/png" href="/favicon.png?v=5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -19,7 +19,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Neva Pro" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5" sizes="512x512" />
   <title>Neva Pro</title>
   <script>
     (function () {
@@ -52,14 +52,9 @@
         'retro': isDarkMode ? '#0c0805' : '#f4ecd8'
       };
 
-      var themeMeta = document.getElementById('theme-color-meta');
-      if (!themeMeta) {
-        themeMeta = document.createElement('meta');
-        themeMeta.name = 'theme-color';
-        themeMeta.id = 'theme-color-meta';
-        document.head.appendChild(themeMeta);
-      }
-      themeMeta.setAttribute('content', bgColors[activeTheme] || '#060a12');
+      // meta[name=theme-color] não é suportado pelo Firefox (MDN).
+      // Removemos o uso estático dela e não criamos nenhuma no runtime
+      // para evitar pseudocódigo/marcações não reconhecidas em alguns browsers.
     })();
   </script>
   <script type="text/javascript">

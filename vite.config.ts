@@ -10,7 +10,39 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(() => {
   return {
     base: '/',
-    plugins: [react(), tailwindcss(), VitePWA({ registerType: 'autoUpdate' })],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        // Sempre mais seguro do que o default: precacheia o index.html mas
+        // NÃO intercepta requests de favicon (que não estão no precache).
+        workbox: {
+          navigateFallback: 'index.html',
+          // Nunca interceptar arquivos de ícone/manifest — o navegador pede
+          // eles fora do ciclo de navegação e o SW podia devolver o fallback
+          // HTML para /favicon.ico (quebrando a aba).
+          ignoreURLParametersMatching: [/^v$/],
+        },
+        manifest: {
+          name: 'Neva Pro',
+          short_name: 'NevaPro',
+          description:
+            'Uma plataforma web inovadora que transforma a preparação para o ENEM em uma experiência dinâmica e gamificada.',
+          start_url: '/',
+          scope: '/',
+          display: 'standalone',
+          background_color: '#060a12',
+          theme_color: '#060a12',
+          lang: 'pt-BR',
+          icons: [
+            { src: '/favicon.ico', sizes: '16x16 24x24 32x32 48x48 64x64', type: 'image/x-icon' },
+            { src: '/favicon.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/apple-touch-icon.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+      }),
+    ],
     build: {
       chunkSizeWarningLimit: 800,
       rollupOptions: {

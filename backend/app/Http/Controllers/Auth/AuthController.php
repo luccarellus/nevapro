@@ -191,6 +191,15 @@ class AuthController extends Controller
                 PersonalAccessToken::whereKey($resolved['accessToken']->id)->delete();
             }
             $this->auth->forgetTokenCacheBySecret($token);
+
+            // Invalida o cache de snapshot do usuário e a relação de tokens agrupados por usuário.
+            $auth_user = $resolved['user'];
+            $auth_type = $resolved['type'];
+            $tenant_id = $resolved['user']->tenant_id ?? null;
+            $this->cache->invalidate(
+                ApiCache::userCacheKey($auth_user->id, $auth_type, $tenant_id),
+            );
+            $this->cache->forgetUserTokenRelation($auth_user->id, $auth_type, $tenant_id);
         }
 
         return response()->json(['success' => true])
@@ -290,11 +299,12 @@ class AuthController extends Controller
             return response()->json(['error' => 'Senha atual incorreta.'], 401);
         }
 
-        $user->password_hash = Hash::make($data['newPassword']);
-        $user->token_version = ($user->token_version ?? 0) + 1;
-        $user->save();
+        $user->password_hash = Hash::make($data['newPassword']);            $user->token_version = ($user->token_version ?? 0) + 1;
+            $user->save();            // Invalida o cache de snapshot do usuário para que próximas requisições
+            // resolvam o usuário ao vivo (incluindo o novo token_version).
+            $this->invalidateUserCache($user->id, $type, $user->tenant_id);
 
-        return response()->json(['success' => true, 'message' => 'Senha atualizada com sucesso.']);
+            return response()->json(['success' => true, 'message' => 'Senha atualizada com sucesso.']);
     }
 
     // ===== Helpers de brute force (espelham a política do Express) =====
