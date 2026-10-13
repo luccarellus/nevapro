@@ -208,8 +208,16 @@ class UserController extends Controller
         $answered = (int) ($stats->answered ?? 0);
         $correct = (int) ($stats->correct ?? 0);
         $incorrect = max($answered - $correct, 0);
+        // XP base das respostas + bônus persistidos (flash quiz etc.) — a
+        // computação anterior sobrescrita xp e apagava o bônus (auditado).
+        $statsBonus = DB::selectOne(
+            'SELECT COALESCE(SUM(amount), 0) AS amount FROM xp_logs WHERE user_id = ?',
+            [$authUser->id],
+        );
+        $bonusXp = (int) ($statsBonus->amount ?? 0);
         $xp = $correct * XpService::XP_PER_CORRECT_ANSWER
-            + $incorrect * XpService::XP_PER_INCORRECT_ANSWER;
+            + $incorrect * XpService::XP_PER_INCORRECT_ANSWER
+            + $bonusXp;
         $level = XpService::levelFromXp($xp);
 
         StudentUser::whereKey($authUser->id)->update([

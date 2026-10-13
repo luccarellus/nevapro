@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 /**
  * Respostas — registra apenas respostas de questões e gabaritos já persistidos
  * pelo servidor; suporta lotes de até 200 respostas.
+ * Correção da auditoria: o questionId é escopado ao tenant resolvido;
+ * questões globais (ENEM, tenant_id NULL) permanecem acessíveis a todos.
  */
 class AnswerController extends Controller
 {
@@ -21,6 +23,7 @@ class AnswerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
+        $tenantId = $request->attributes->get('tenant_id');
         $data = $request->validate([
             'userId' => ['required', 'string'],
             'questionId' => ['required', 'string', 'max:64'],
@@ -32,7 +35,9 @@ class AnswerController extends Controller
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
 
-        $question = Question::whereKey($data['questionId'])->first(['id', 'correct_option_index', 'explanation']);
+        $question = Question::whereKey($data['questionId'])
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
+            ->first(['id', 'correct_option_index', 'explanation', 'tenant_id']);
         if (! $question) {
             return response()->json(['error' => 'Questão indisponível para correção.'], 422);
         }
@@ -97,8 +102,10 @@ class AnswerController extends Controller
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
 
+        $tenantId = $request->attributes->get('tenant_id');
         $questionIds = collect($answers)->pluck('questionId')->unique()->values();
         $questionData = Question::whereIn('id', $questionIds)
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->get(['id', 'correct_option_index', 'explanation'])
             ->keyBy('id');
         $questionIndexes = $questionData->map(fn ($question) => $question->correct_option_index);
@@ -108,6 +115,7 @@ class AnswerController extends Controller
         }
 
         $options = QuestionOption::whereIn('question_id', $questionIds)
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('question_id', $tenantId))
             ->get(['question_id', 'letter'])
             ->groupBy('question_id')
             ->map(fn ($options) => $options->pluck('letter')->all());
@@ -118,11 +126,11 @@ class AnswerController extends Controller
             }
         }
         $correctOptions = QuestionOption::whereIn('question_id', $questionIds)
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('question_id', $tenantId))
             ->where('is_correct', true)
             ->get(['question_id', 'letter'])
             ->groupBy('question_id')
             ->map(fn ($options) => $options->pluck('letter')->all());
-        $tenantId = $request->attributes->get('tenant_id');
         $results = [];
 
         DB::transaction(function () use ($answers, $tenantId, $correctOptions, $questionIndexes, &$results) {
@@ -148,9 +156,9 @@ class AnswerController extends Controller
             }
         });
 
-        return response()->json(['success' => true, 'count' => count($answers), 'results' => $results]);
-
         $this->invalidatePerformanceCache($userId);
+
+        return response()->json(['success' => true, 'count' => count($answers), 'results' => $results]);
     }
 
 }

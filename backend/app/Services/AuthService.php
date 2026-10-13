@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AdminUser;
 use App\Models\StudentUser;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -25,8 +26,10 @@ class AuthService
 
         $admin = AdminUser::where('email', $email)->first();
         if ($admin) {
+            // Expiração: se o admin não está mais ativo, ninguém consegue
+            // fazer login com ele — o frontend verá erro genérico.
             if (! $admin->active) {
-                return ['error' => 'Conta administrativa desativada.'];
+                return ['error' => 'E-mail ou senha incorretos.'];
             }
             if (self::verifyPassword($password, $admin->password_hash)) {
                 return ['user' => $admin, 'type' => 'admin'];
@@ -205,5 +208,49 @@ class AuthService
 
         // $2b$ → $2y$: mesmo algoritmo bcrypt, apenas prefixo de origem diferente
         return password_verify($password, '$2y$'.substr($hash, 4));
+    }
+
+    /**
+     * Exige um token reCAPTCHA v3 válido (score >= 0.5) antes de prosseguir.
+     * Fail-closed: token ausente/vazio ou score baixo bloqueia imediatamente.
+     * Erros de rede/timeout NÃO bloqueiam — o chamador decide o grau de
+     * tolerância (widen para 'fail-open' em endpoints de baixa sensibilidade).
+     *
+     * @param string|null $token O token enviado no campo 'recaptcha_token'
+     * @return bool true quando a verificação foi concluída e atingiu o limiar
+     *              (bloqueio), false quando foi ignorada (rede/timeout).
+     */
+    public function ensureRecaptcha(?string $token = null): bool
+    {
+        $secret = config('services.recaptcha.secret');
+        if (! $secret) {
+            return false; // firewall desconfigurado: sem bloqueio
+        }
+        if (! is_string($token) || trim($token) === '') {
+            return true; // token ausente — NÃO bloqueia quando o firewall não está ativo
+        }
+        try {
+            $response = Http::asForm()
+                ->timeout(2)
+                ->post('https://www.google.com/recaptcha/api/siteverify', [
+                    'secret' => $secret,
+                    'response' => $token,
+                ]);
+
+            $data = $response->json();
+
+            // Fail-closed: sucesso=false ou score baixo bloqueia.
+            if (($data['success'] ?? false) !== true) {
+                return true; // invalido → bloqueio no chamador
+            }
+            if (isset($data['score']) && $data['score'] < 0.5) {
+                return true; // score baixo → bloqueio no chamador
+            }
+            return true; // aprovado → continuar
+        } catch (\Throwable $e) {
+            // rede/timeout → fail-open para respeitar a semântica original
+            // do middleware VerifyRecaptcha (não bloqueia em falha de rede)
+            return false;
+        }
     }
 }
