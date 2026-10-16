@@ -144,38 +144,6 @@ class AuthController extends Controller
 
         return response()->json(['success' => true, 'user' => $user->toProfileArray()], 201)
             ->withCookie($cookie);
-
-        $user = StudentUser::create([
-            'id' => (string) Str::uuid(),
-            'email' => $email,
-            'name' => $data['name'] ?? explode('@', $email)[0],
-            'password_hash' => Hash::make($data['password']),
-            'role' => 'student',
-            'tenant_id' => Tenant::PLATFORM_ID,
-            'city' => $data['city'] ?? null,
-            'school' => $data['school'] ?? null,
-            'gremio' => $data['gremio'] ?? null,
-            'xp' => 0,
-            'level' => 1,
-        ]);
-
-        // Vínculo RBAC: papel student no tenant da plataforma
-        DB::statement(
-            'INSERT INTO user_tenant_roles (user_id, tenant_id, role_id)
-             SELECT ?, ?, id FROM roles WHERE code = ? AND tenant_id IS NULL
-             ON CONFLICT (user_id, tenant_id, role_id) DO NOTHING',
-            [$user->id, Tenant::PLATFORM_ID, 'student'],
-        );
-
-        $this->email->sendWelcomeAsync($user->email, $user->name ?? '');
-
-        $token = $this->auth->issueToken($user, 'student');
-        $this->storeTokenVersion($user, $token, 'student');
-
-        $cookie = cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax');
-
-        return response()->json(['success' => true, 'user' => $user->toProfileArray()], 201)
-            ->withCookie($cookie);
     }
 
     public function logout(Request $request): JsonResponse
@@ -185,21 +153,15 @@ class AuthController extends Controller
         // porque o accessToken pode ter sido reconstruído a partir do cache
         // (modelo não persistido — delete() em memória seria no-op).
         $token = $request->cookie('session_token');
-        if ($token) {
+        if (is_string($token) && $token !== '') {
             $resolved = $this->auth->resolveFromToken($token);
             if ($resolved && ! empty($resolved['accessToken']->id)) {
                 PersonalAccessToken::whereKey($resolved['accessToken']->id)->delete();
             }
-            $this->auth->forgetTokenCacheBySecret($token);
 
-            // Invalida o cache de snapshot do usuário e a relação de tokens agrupados por usuário.
-            $auth_user = $resolved['user'];
-            $auth_type = $resolved['type'];
-            $tenant_id = $resolved['user']->tenant_id ?? null;
-            $this->cache->invalidate(
-                ApiCache::userCacheKey($auth_user->id, $auth_type, $tenant_id),
-            );
-            $this->cache->forgetUserTokenRelation($auth_user->id, $auth_type, $tenant_id);
+            // Limpa a resolução em cache: sem isso o token revogado continuaria
+            // autenticando até o snapshot expirar (TTL curto).
+            $this->auth->forgetTokenCacheBySecret($token);
         }
 
         return response()->json(['success' => true])
@@ -295,16 +257,40 @@ class AuthController extends Controller
             return response()->json(['error' => 'Acesso negado: você só pode alterar a própria senha.'], 403);
         }
 
-        if (! Hash::check($data['currentPassword'], $user->password_hash)) {
+        // O snapshot que autentica a request não carrega password_hash (é $hidden),
+        // então a conferência da senha atual precisa do registro do banco.
+        $model = $type === 'admin' ? AdminUser::class : StudentUser::class;
+        $liveUser = $model::whereKey($user->id)->first();
+        if (! $liveUser) {
+            return response()->json(['error' => 'Usuário não encontrado.'], 404);
+        }
+
+        if (! Hash::check($data['currentPassword'], $liveUser->password_hash)) {
             return response()->json(['error' => 'Senha atual incorreta.'], 401);
         }
 
-        $user->password_hash = Hash::make($data['newPassword']);            $user->token_version = ($user->token_version ?? 0) + 1;
-            $user->save();            // Invalida o cache de snapshot do usuário para que próximas requisições
-            // resolvam o usuário ao vivo (incluindo o novo token_version).
-            $this->invalidateUserCache($user->id, $type, $user->tenant_id);
+        // O usuário do request vem do snapshot do AuthService (model não
+        // persistido), então a escrita vai por query builder: save() faria INSERT.
+        // O token_version é incrementado no banco para revogar as outras sessões.
+        $table = $type === 'admin' ? 'admin_users' : 'users';
+        DB::table($table)
+            ->where('id', $liveUser->id)
+            ->update([
+                'password_hash' => Hash::make($data['newPassword']),
+                'token_version' => DB::raw('COALESCE(token_version, 0) + 1'),
+                'updated_at' => now(),
+            ]);
 
-            return response()->json(['success' => true, 'message' => 'Senha atualizada com sucesso.']);
+        $newVersion = (int) DB::table($table)->where('id', $liveUser->id)->value('token_version');
+
+        // A sessão atual continua válida: o token em uso é remarcado com a nova
+        // versão. As demais caem ao expirar o snapshot (ou antes, no cache miss).
+        $token = $request->cookie('session_token');
+        if (is_string($token) && $token !== '') {
+            $this->storeTokenVersion($user, $token, $type, $newVersion);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Senha atualizada com sucesso.']);
     }
 
     // ===== Helpers de brute force (espelham a política do Express) =====
@@ -331,15 +317,16 @@ class AuthController extends Controller
     }
 
     /** Guarda a versão do token no name do access token p/ checagem de revogação. */
-    private function storeTokenVersion($user, string $plainToken, string $type): void
+    private function storeTokenVersion($user, string $plainToken, string $type, ?int $tokenVersion = null): void
     {
         try {
             $tokenId = strstr($plainToken, '|', true);
             if ($tokenId === false || $tokenId === '') {
                 return;
             }
+            $version = $tokenVersion ?? (int) ($user->token_version ?? 0);
             $model = PersonalAccessToken::find($tokenId);
-            $model?->update(['name' => "auth:{$type}:tv".($user->token_version ?? 0)]);
+            $model?->update(['name' => "auth:{$type}:tv".$version]);
         } catch (\Throwable $e) {
             Log::warning('[Auth] Falha ao marcar tv no token: '.$e->getMessage());
         }
