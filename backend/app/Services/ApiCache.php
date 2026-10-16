@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Cache;    /**
      *
      * @phpstan-require-extends false
      */
-    class ApiCache
-    {
+class ApiCache
+{
     public const MATERIALS = 'materials';
 
     public const EVENTS = 'events';
@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Cache;    /**
 
     /** Chaves estáveis usadas pelo AuthService para o cache de snapshot do usuário. */
     public const USER_TOKEN_KEY_PREFIX = 'auth:user';
+
     public const USER_TOKEN_KEY_TTL_SECONDS = 10;
 
     public function remember(string $key, int $ttlSeconds, Closure $callback): mixed
@@ -52,7 +53,7 @@ use Illuminate\Support\Facades\Cache;    /**
     public function invalidateUserSnapshot(string $userId, string $type, ?int $tenantId = null): void
     {
         $this->invalidate(self::userCacheKey($userId, $type, $tenantId));
-        $this->invalidate(self::tokenCacheKey("") . ':*');
+        $this->invalidate(self::tokenCacheKey('').':*');
     }
 
     /** Retorna a lista de chaves do token cacheadas para um usuário específico, sem expurgar. */
@@ -64,7 +65,7 @@ use Illuminate\Support\Facades\Cache;    /**
     }
 
     /** Salva no cache a relação entre o usuario e os tokens de cache cacheados para ele. */
-    public function stampUserTokenCacheKey(string $userId, string $type, ?int $tenantId = null, string $tokenCacheKey): void
+    public function stampUserTokenCacheKey(string $userId, string $type, ?int $tenantId, string $tokenCacheKey): void
     {
         $this->remember(self::userCacheKey($userId, $type, $tenantId), self::USER_TOKEN_KEY_TTL_SECONDS, function () use ($tokenCacheKey) {
             $p = self::tokenCacheKey('');

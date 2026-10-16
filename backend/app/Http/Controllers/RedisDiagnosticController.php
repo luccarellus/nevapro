@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
 /**
@@ -13,10 +14,13 @@ use Illuminate\Support\Facades\Redis;
  *   - status: "ok" | "error"
  *   - latencyMs: tempo do ciclo set→get→delete
  *   - message: mensagem legível (vazia quando tudo funciona)
+ *
+ * Rota restrita a admin autenticado (ver routes/api.php).
  */
 class RedisDiagnosticController extends Controller
 {
     private const DUMMY_KEY = 'diagnostic:test-ping';
+
     private const DUMMY_VALUE = 'ok';
 
     public function diagnose(): JsonResponse
@@ -33,7 +37,12 @@ class RedisDiagnosticController extends Controller
                 $error = 'Redis respondeu, mas o valor lido não confere com o valor escrito.';
             }
         } catch (\Throwable $e) {
-            $error = $e->getMessage();
+            // A mensagem crua do driver expõe host/porta/configuração interna:
+            // fica no log do servidor, nunca na resposta HTTP.
+            Log::error('[Redis] Falha no diagnóstico', [
+                'exception' => $e->getMessage(),
+            ]);
+            $error = 'Falha ao conectar no Redis. Consulte os logs do servidor.';
         }
 
         $latencyMs = round((microtime(true) - $start) * 1000, 2);

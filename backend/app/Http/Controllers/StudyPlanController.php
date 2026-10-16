@@ -65,8 +65,9 @@ class StudyPlanController extends Controller
         $user = $request->attributes->get('auth_user');
 
         $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'estimated_time' => ['nullable', 'string', 'max:50'],
+            // Título/estimativa são texto puro (sem mark-up).
+            'title' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'estimated_time' => ['nullable', 'string', 'max:50', 'not_regex:/[<>]/'],
             'target_tab' => ['nullable', 'string', 'max:50'],
             'date' => ['nullable', 'date'],
             'task_date' => ['nullable', 'date'],
@@ -94,8 +95,8 @@ class StudyPlanController extends Controller
         $task = StudyTask::where('user_id', $user->id)->findOrFail($id);
         $data = $request->validate([
             'done' => ['sometimes', 'boolean'],
-            'title' => ['sometimes', 'string', 'max:255'],
-            'estimated_time' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'title' => ['sometimes', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'estimated_time' => ['sometimes', 'nullable', 'string', 'max:50', 'not_regex:/[<>]/'],
             'target_tab' => ['sometimes', 'nullable', 'string', 'max:50'],
         ]);
 

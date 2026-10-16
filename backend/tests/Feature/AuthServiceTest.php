@@ -108,7 +108,7 @@ class AuthServiceTest extends TestCase
         // Payload no formato antigo (sem token_name_tv e sem token_version no raw):
         // pode estar quente no Redis no momento do deploy e não pode derrubar
         // sessões válidas até expirar.
-        Cache::put('auth:token:' . hash('sha256', $token), [
+        Cache::put('auth:token:'.hash('sha256', $token), [
             'token_id' => $tokenId,
             'token_name' => 'auth:student:tv2',
             'expires_at' => now()->addDay()->toIso8601String(),

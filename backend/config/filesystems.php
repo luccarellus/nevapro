@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // 'serve' => true registrava uma rota /storage/{path} que servia os
+            // arquivos privados (backups, exports) sem qualquer autorização.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

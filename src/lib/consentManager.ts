@@ -115,15 +115,39 @@ export const saveConsent = async (preferences: ConsentPreferences) => {
   return updatedPrefs;
 };
 
+const CLARITY_PROJECT_ID = 'wxb24lvio4';
+
+/**
+ * Microsoft Clarity (heatmaps/gravação de sessão) — carregado SOMENTE após
+ * consentimento de analytics. Antes o script vinha fixo no <head> do
+ * index.html para todo visitante: dado pessoal coletado sem base legal e sem
+ * forma de revogar (art. 7º/8º da LGPD).
+ */
 const loadAnalyticsScripts = () => {
-  console.log('[LGPD] Loading Analytics scripts...');
-  // Example: Insert GA4 script
-  /*
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (document.getElementById('clarity-script')) return;
+
+  type ClarityQueue = ((...args: unknown[]) => void) & { q?: unknown[][] };
+  const win = window as unknown as { clarity?: ClarityQueue };
+  if (!win.clarity) {
+    const clarity = ((...args: unknown[]) => {
+      (clarity.q = clarity.q || []).push(args);
+    }) as ClarityQueue;
+    win.clarity = clarity;
+  }
+
   const script = document.createElement('script');
-  script.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX';
+  script.id = 'clarity-script';
   script.async = true;
+  script.src = `https://www.clarity.ms/tag/${CLARITY_PROJECT_ID}`;
   document.head.appendChild(script);
-  */
+
+  console.log('[LGPD] Clarity carregado após consentimento de analytics');
+};
+
+/** Carrega analytics já consentidos (chamado no boot do app). */
+export const initAnalytics = () => {
+  if (hasConsent('analytics')) loadAnalyticsScripts();
 };
 
 const loadMarketingScripts = () => {

@@ -34,15 +34,20 @@ class AuthController extends Controller
     {
         try {
             $data = $request->validate([
-                'email' => ['required', 'email'],
-                'password' => ['required', 'string'],
+                // email estrito (RFC): rejeita formatos aceitos por engano
+                // (sem TLD, com espaços/controles) e limita o tamanho.
+                'email' => ['required', 'string', 'email:rfc,strict', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                'password' => ['required', 'string', 'max:200'],
             ]);
 
             $email = $this->auth->normalizeEmail($data['email']);
 
             // Rate limit por conta (brute force) — mesma política do Express
             if ($lock = $this->checkLock($email)) {
-                return response()->json(['error' => $lock], 429);
+                // Retry-After informa a janela do lockout (5 tentativas / 15 min):
+                // sem ele, clientes e proxies ficam martelando o endpoint.
+                return response()->json(['error' => $lock], 429)
+                    ->header('Retry-After', '900');
             }
 
             $result = $this->auth->attempt($email, $data['password']);
@@ -83,19 +88,22 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:6'],
-            'name' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'school' => ['nullable', 'string', 'max:255'],
-            'gremio' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email:rfc,strict', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+            // max:72 = limite do bcrypt (acima disso o hash truncaria a senha).
+            'password' => ['required', 'string', 'min:6', 'max:72'],
+            // Campos de texto puro: sem mark-up (nada aqui deve ser interpretado como HTML).
+            'name' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'city' => ['nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'school' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'gremio' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
         ]);
 
         $email = $this->auth->normalizeEmail($data['email']);
 
         // Rate limit por conta (anti-abuse de cadastro) — mesma política do login
         if ($lock = $this->checkLock($email)) {
-            return response()->json(['error' => $lock], 429);
+            return response()->json(['error' => $lock], 429)
+                ->header('Retry-After', '900');
         }
 
         // Resposta 201 uniforme (anti-enumeração de contas) — não revela se o e-mail existe.
@@ -185,7 +193,9 @@ class AuthController extends Controller
 
     public function forgotPassword(Request $request): JsonResponse
     {
-        $data = $request->validate(['email' => ['required', 'email']]);
+        $data = $request->validate([
+            'email' => ['required', 'string', 'email:rfc,strict', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+        ]);
 
         $email = $this->auth->normalizeEmail($data['email']);
         $frontendUrl = rtrim(config('app.frontend_url') ?: config('app.url'), '/');
@@ -224,9 +234,9 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'password' => ['required', 'string', 'min:6'],
-            'token' => ['required', 'string'],
-            'email' => ['nullable', 'email'],
+            'password' => ['required', 'string', 'min:6', 'max:72'],
+            'token' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'string', 'email:rfc,strict', 'max:255'],
         ]);
 
         $record = PasswordResetToken::where('token', hash('sha256', $data['token']))->first();
@@ -262,9 +272,9 @@ class AuthController extends Controller
         }
 
         $data = $request->validate([
-            'email' => ['required', 'email'],
-            'currentPassword' => ['required', 'string'],
-            'newPassword' => ['required', 'string', 'min:6'],
+            'email' => ['required', 'string', 'email:rfc,strict', 'max:255'],
+            'currentPassword' => ['required', 'string', 'max:200'],
+            'newPassword' => ['required', 'string', 'min:6', 'max:72'],
         ]);
 
         $email = $this->auth->normalizeEmail($data['email']);

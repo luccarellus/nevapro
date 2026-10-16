@@ -50,7 +50,7 @@ class EventController extends CrudController
     protected function validationRules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
             'description' => ['nullable', 'string', 'max:4000'],
             'date' => ['required', 'date'],
             'time' => ['nullable', 'string', 'max:8'],

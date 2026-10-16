@@ -15,6 +15,10 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        // 'script' injeta o registro do service worker em arquivo externo
+        // (/registerSW.js) em vez de inline — requisito para a CSP sem
+        // 'unsafe-inline' em script-src (ver nginx/*.conf).
+        injectRegister: 'script',
         // Sempre mais seguro do que o default: precacheia o index.html mas
         // NÃO intercepta requests de favicon (que não estão no precache).
         workbox: {

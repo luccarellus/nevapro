@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AdminUser;
 use App\Models\StudentUser;
-use Carbon\Carbon;
 use App\Services\ApiCache;
 use App\Services\B2StorageService;
 use App\Services\XpService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,10 +58,12 @@ class UserController extends Controller
         $type = $request->attributes->get('auth_type');
 
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'school' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'gremio' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // Campos de texto puro (renderizados como texto no frontend):
+            // sem mark-up, para não persistir HTML em colunas que não o esperam.
+            'name' => ['sometimes', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'school' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'gremio' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
             'showInLeaderboard' => ['sometimes', 'boolean'],
             'languagePreference' => ['sometimes', 'string', 'max:20'],
             'avatarUrl' => [
@@ -84,8 +86,8 @@ class UserController extends Controller
         // atualizados via API pública (o frontend não deve enviar isso, mas
         // protegemos de qualquer maneira).
         foreach (['role', 'xp', 'level', 'streak', 'answeredQuestions',
-                  'correctAnswers', 'flashQuizCompleted', 'token_version',
-                  'password_hash', 'tenant_id'] as $forbidden) {
+            'correctAnswers', 'flashQuizCompleted', 'token_version',
+            'password_hash', 'tenant_id'] as $forbidden) {
             unset($data[$forbidden]);
         }
 

@@ -28,6 +28,7 @@ class B2StorageService
         if (! $this->isAllowedKey($key)) {
             throw new \InvalidArgumentException('Caminho de upload não permitido: '.$key);
         }
+
         return Storage::disk(self::DISK)->put($key, $contents);
     }
 
@@ -44,12 +45,17 @@ class B2StorageService
         $detectedMime = finfo_file($realMime, $path);
         finfo_close($realMime);
 
+        // Mesma allowlist da validação do UploadController (materiais aceitam
+        // vídeo): sem os MIMEs de vídeo aqui, um mp4/webm válido passava na
+        // validação da rota e estourava 500 no putFile.
         $allowedMimes = [
             'image/jpeg',
             'image/png',
             'image/gif',
             'image/webp',
             'application/pdf',
+            'video/mp4',
+            'video/webm',
         ];
 
         if (! in_array($detectedMime, $allowedMimes, true)) {
@@ -76,6 +82,7 @@ class B2StorageService
         if (! $this->isAllowedKey($key)) {
             throw new \InvalidArgumentException('Caminho de delete não permitido: '.$key);
         }
+
         return Storage::disk(self::DISK)->delete($key);
     }
 
@@ -112,6 +119,14 @@ class B2StorageService
     public static function signObjectKey(string $key): string
     {
         $secret = (string) config('services.jwt_secret');
+
+        // Fail-closed: com segredo vazio/curto o HMAC seria reproduzível por
+        // qualquer um (a assinatura não autenticaria nada). Sem segredo válido
+        // devolvemos string vazia e verifyObjectSignature() nega o acesso.
+        if (strlen($secret) < 16) {
+            return '';
+        }
+
         $raw = hash_hmac('sha256', 'storage:'.$key, $secret, true);
         $base64Url = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
 
@@ -128,6 +143,10 @@ class B2StorageService
         }
 
         $expected = self::signObjectKey($key);
+
+        if ($expected === '') {
+            return false;
+        }
 
         return hash_equals($expected, $signature);
     }
@@ -201,6 +220,7 @@ class B2StorageService
             if (str_starts_with($key, $prefix)) {
                 // Garantir que não há path traversal (../)
                 $normalized = str_replace(['../', './', '//'], '', $key);
+
                 return str_starts_with($normalized, $prefix);
             }
         }

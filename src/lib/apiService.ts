@@ -30,18 +30,19 @@ export function getCsrfToken(): string | null {
   return csrfToken;
 }
 
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('neva_access_token');
+/**
+ * A sessão vive SÓ no cookie HttpOnly emitido pelo servidor: nenhum token é
+ * persistido em JavaScript (um XSS não consegue exfiltrar a sessão). As duas
+ * funções continuam existindo como no-op para não quebrar as chamadas atuais;
+ * `setAuthToken` ainda remove o token legado gravado por versões anteriores.
+ */
+export function getAuthToken(): null {
+  return null;
 }
 
-export function setAuthToken(token: string | null | undefined): void {
+export function setAuthToken(_token?: string | null): void {
   if (typeof window === 'undefined') return;
-  if (token) {
-    localStorage.setItem('neva_access_token', token);
-  } else {
-    localStorage.removeItem('neva_access_token');
-  }
+  localStorage.removeItem('neva_access_token');
 }
 
 /**
@@ -52,8 +53,6 @@ export function setAuthToken(token: string | null | undefined): void {
 export function csrfHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
-  const token = getAuthToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
   return headers;
 }
 
@@ -62,7 +61,6 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   if (method === 'GET') return cachedFetchJson<T>(endpoint);
 
   const activeTenant = typeof window !== 'undefined' ? localStorage.getItem('neva_active_tenant') : null;
-  const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
@@ -73,9 +71,6 @@ async function request<T>(endpoint: string, config: RequestConfig = { method: 'G
   }
   if (csrfToken) {
     headers['X-CSRF-Token'] = csrfToken;
-  }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const options: RequestInit = {

@@ -5,6 +5,10 @@ x-laravel-environment: &laravel-environment
   APP_DEBUG: "false"
   APP_KEY: ${APP_KEY:?APP_KEY obrigatoria}
   APP_URL: ${APP_URL:?APP_URL obrigatoria}
+  # Assina os tokens anti-CSRF (double-submit HMAC) e as URLs de
+  # /api/storage/object. Sem ela o storage falha fechado (403/503) e o app
+  # registra erro crítico no boot — por isso a obrigatoriedade aqui é explícita.
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET obrigatoria no .env (>= 16 caracteres)}
   DB_CONNECTION: pgsql
   DB_URL: ${DATABASE_URL:?DATABASE_URL obrigatoria}
   DB_SSLMODE: ${DB_SSLMODE:-prefer}
@@ -24,9 +28,16 @@ services:
   nevapro_neva-redis:
     image: redis:7-alpine
     container_name: nevapro_neva-redis
-    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    environment:
+      # Senha opcional: definida REDIS_PASSWORD no .env, o Redis passa a exigir
+      # AUTH (o app manda a mesma variável). Sem ela, o comportamento continua
+      # exatamente o de antes — porta publicada só em 127.0.0.1 e rede interna.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: ["sh", "-c", "if [ -n \"$$REDIS_PASSWORD\" ]; then exec redis-server --appendonly yes --appendfsync everysec --requirepass \"$$REDIS_PASSWORD\"; else exec redis-server --appendonly yes --appendfsync everysec; fi"]
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping; else redis-cli ping; fi | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -43,6 +54,16 @@ services:
     restart: always
 
   # PostgreSQL (dominio + dados da aplicacao)
+  # Least privilege (passo de operação, exige ação no banco): o app conecta hoje
+  # como superusuário 'postgres' via DATABASE_URL. Para reduzir o impacto de um
+  # SQL injection/vazamento de credencial, crie um papel só da aplicação:
+  #   CREATE ROLE nevapro_app LOGIN PASSWORD '<senha forte>';
+  #   GRANT CONNECT ON DATABASE nevapro TO nevapro_app;
+  #   GRANT USAGE ON SCHEMA public TO nevapro_app;
+  #   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO nevapro_app;
+  #   GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO nevapro_app;
+  # e depois troque o usuário no DATABASE_URL. (Necessário para migrations DDL:
+  # rodar `php artisan migrate` como o dono do schema.)
   postgres:
     image: postgres:16-alpine
     container_name: nevapro_neva-sql
@@ -89,6 +110,8 @@ services:
       - ./certbot/www:/var/www/certbot:ro
     networks:
       - neva_network
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       api:
         condition: service_healthy
@@ -119,6 +142,8 @@ services:
       SESSION_SECURE_COOKIE: "true"
     networks:
       - neva_network
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "php", "-r", "$$s=@fsockopen('127.0.0.1',9000);exit($s?0:1);"]
       interval: 10s
@@ -148,6 +173,8 @@ services:
     command: ["php", "artisan", "schedule:work"]
     networks:
       - neva_network
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       api:
         condition: service_healthy
@@ -173,6 +200,8 @@ services:
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=3500"]
     networks:
       - neva_network
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       api:
         condition: service_healthy

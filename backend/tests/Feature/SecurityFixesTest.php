@@ -28,9 +28,9 @@ use App\Services\CsrfService;
 use App\Services\EmailService;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Exceptions\HttpException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Log\LogManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -411,7 +411,7 @@ class SecurityFixesTest extends TestCase
             'name' => 'Leaver',
             'role' => 'student',
             'tenant_id' => $tenantId,
-            'avatar_url' => '/api/storage/object?file='.rawurlencode("avatars/".(string) Str::uuid()."/p.png")
+            'avatar_url' => '/api/storage/object?file='.rawurlencode('avatars/'.(string) Str::uuid().'/p.png')
                 .'&s='.rawurlencode('assinatura'),
         ]);
         // Corrige para o próprio diretório (o que o upload real produz)
@@ -594,7 +594,8 @@ class SecurityFixesTest extends TestCase
         file_put_contents($path, 'this is not an image');
 
         // A extensão declarada é jpg, mas o conteúdo não é uma imagem.
-        $file = new class($path, 'avatar.jpg', 'image/jpeg', null, true) extends UploadedFile {
+        $file = new class($path, 'avatar.jpg', 'image/jpeg', null, true) extends UploadedFile
+        {
             public function guessExtension(): ?string
             {
                 return 'jpg';
@@ -610,7 +611,8 @@ class SecurityFixesTest extends TestCase
         file_put_contents($path, 'not really a pdf');
 
         // A extensão declarada é pdf, mas o cabeçalho %PDF- está ausente.
-        $file = new class($path, 'material.pdf', 'application/pdf', null, true) extends UploadedFile {
+        $file = new class($path, 'material.pdf', 'application/pdf', null, true) extends UploadedFile
+        {
             public function guessExtension(): ?string
             {
                 return 'pdf';
@@ -627,7 +629,7 @@ class SecurityFixesTest extends TestCase
 
         $file = new UploadedFile($path, 'material.pdf', 'application/pdf', null, true);
 
-        $controller = new UploadController();
+        $controller = new UploadController;
         $method = new \ReflectionMethod(UploadController::class, 'assertSafeContent');
         $method->setAccessible(true);
 
@@ -638,7 +640,7 @@ class SecurityFixesTest extends TestCase
 
     private function assertContentRejected(UploadedFile $file): void
     {
-        $controller = new UploadController();
+        $controller = new UploadController;
         $method = new \ReflectionMethod(UploadController::class, 'assertSafeContent');
         $method->setAccessible(true);
 
@@ -660,7 +662,7 @@ class SecurityFixesTest extends TestCase
                 && ! str_contains((string) $message, "\r")
                 && ($context['context']['injected'] ?? null) === 'safe value';
         });
-        $manager = Mockery::mock(\Illuminate\Log\LogManager::class);
+        $manager = Mockery::mock(LogManager::class);
         $manager->shouldReceive('channel')->with('daily')->andReturn($logger);
         Log::swap($manager);
 
@@ -686,7 +688,7 @@ class SecurityFixesTest extends TestCase
             return $message === '[Client] alerta'
                 && ($context['context']['timestamp'] ?? null) === '2026-10-05T17:00:00.000Z';
         });
-        $manager = Mockery::mock(\Illuminate\Log\LogManager::class);
+        $manager = Mockery::mock(LogManager::class);
         $manager->shouldReceive('channel')->with('daily')->twice()->andReturn($logger);
         Log::swap($manager);
 
@@ -720,7 +722,7 @@ class SecurityFixesTest extends TestCase
         $request = Request::create('/api/security-fixes-rate-limit', 'POST', [
             'email' => 'security-fixes-rate-limit@test.local',
         ]);
-        $middleware = new RateLimitByKey();
+        $middleware = new RateLimitByKey;
 
         $first = $middleware->handle($request, fn () => response()->noContent(), 1, 60);
         self::assertSame(204, $first->getStatusCode());
@@ -832,6 +834,30 @@ class SecurityFixesTest extends TestCase
         $response = (new VerifyCronSecret)->handle($request, fn () => response()->noContent());
 
         self::assertSame(401, $response->getStatusCode());
+    }
+
+    // ===== Correção da auditoria: /api/redis/diagnose deixou de ser público =====
+
+    public function test_redis_diagnostic_endpoint_requires_authentication(): void
+    {
+        $this->seed();
+
+        // Antes era público e devolvia a mensagem crua da exceção do driver
+        // (host/porta/config interna do cache).
+        $this->getJson('/api/redis/diagnose')->assertUnauthorized();
+    }
+
+    // ===== Correção da auditoria: liveness responde JSON, sem fingerprint =====
+
+    public function test_liveness_endpoint_answers_json(): void
+    {
+        $response = $this->get('/up');
+
+        $response->assertOk()->assertJson(['status' => 'ok']);
+        self::assertStringContainsString(
+            'application/json',
+            (string) $response->headers->get('Content-Type'),
+        );
     }
 
     // ===== Helpers =====

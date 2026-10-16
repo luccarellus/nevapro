@@ -21,21 +21,18 @@ class AuthCacheService
     /**
      * Recobre a chave de cache da resolução de token de um usuário.
      *
-     * @param int|string|null $tenantId
-     * @return string
+     * @param  int|string|null  $tenantId
      */
     public static function userCacheKey($tenantId, string $type): string
     {
-        return "auth:user-cache-key-{$type}" . ($tenantId !== null && $tenantId !== '' ? ':' . $tenantId : '');
+        return "auth:user-cache-key-{$type}".($tenantId !== null && $tenantId !== '' ? ':'.$tenantId : '');
     }
 
     /**
      * Guarda no cache a relação entre um usuário e um token cacheado.
      * A expiração global é de 10s, alinhada com o TTL do snapshot do usuário.
      *
-     * @param string $cacheKey
-     * @param array  $payload
-     * @param int|string|null $tenantId
+     * @param  int|string|null  $tenantId
      */
     public static function storeCachedTokenForUser(string $cacheKey, array $payload, $tenantId, string $type): void
     {
@@ -51,7 +48,7 @@ class AuthCacheService
     /**
      * Invalida a resolução em cache de todos os tokens de um determinado usuário.
      *
-     * @param int|string|null $tenantId
+     * @param  int|string|null  $tenantId
      */
     public static function invalidateCachedTokensForUser($tenantId, string $type): void
     {
@@ -61,9 +58,7 @@ class AuthCacheService
     /**
      * Retorna o token de acesso em cache do usuário autenticado.
      *
-     * @param string $cacheKey
-     * @param int|string|null $tenantId
-     * @return array|null
+     * @param  int|string|null  $tenantId
      */
     public static function getCachedTokenForUser(string $cacheKey, $tenantId, string $type): ?array
     {

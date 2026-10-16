@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\MaterialController;
 use App\Http\Middleware\ResolveTenant;
+use App\Models\AdminUser;
 use App\Models\Material;
 use App\Models\StudentUser;
 use App\Services\ApiCache;
@@ -104,7 +105,7 @@ class TenantIsolationTest extends TestCase
 
     public function test_legacy_admin_role_is_not_a_global_super_admin_role(): void
     {
-        $admin = new \App\Models\AdminUser;
+        $admin = new AdminUser;
         $admin->role = 'admin';
 
         self::assertFalse(TenantAccess::isSuperAdmin($admin, 'admin'));

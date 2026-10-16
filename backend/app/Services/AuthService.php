@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AdminUser;
 use App\Models\StudentUser;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -78,7 +79,7 @@ class AuthService
             }
 
             $raw = array_map(
-                static fn ($v) => $v instanceof \Carbon\Carbon ? $v->toIso8601String() : $v,
+                static fn ($v) => $v instanceof Carbon ? $v->toIso8601String() : $v,
                 $user->toArray(),
             );
 
@@ -145,7 +146,7 @@ class AuthService
     private function reconstructAccessToken(array $cached): ?PersonalAccessToken
     {
         $expiresAt = isset($cached['expires_at']) && is_string($cached['expires_at'])
-            ? \Carbon\Carbon::parse($cached['expires_at'])
+            ? Carbon::parse($cached['expires_at'])
             : null;
         if ($expiresAt && $expiresAt->isPast()) {
             return null;

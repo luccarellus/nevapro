@@ -47,18 +47,33 @@ class UploadController extends Controller
         $prefix = $isMaterial ? 'materials' : "avatars/{$user->id}";
         $key = $prefix.'/'.Str::uuid().'.'.$file->guessExtension();
 
-        app(B2StorageService::class)->putFile($key, $file->getRealPath(), $file->getMimeType());
+        // Assinatura do objeto: sem JWT_SECRET não há como assinar a URL de
+        // leitura — falha explícita em vez de devolver URL inutilizável.
+        $signature = B2StorageService::signObjectKey($key);
+        if ($signature === '') {
+            return response()->json(['error' => 'Armazenamento de arquivos indisponível.'], 503);
+        }
 
-        $url = '/api/storage/object?file='.rawurlencode($key).'&s='.rawurlencode(B2StorageService::signObjectKey($key));
+        try {
+            app(B2StorageService::class)->putFile($key, $file->getRealPath(), $file->getMimeType());
+        } catch (\InvalidArgumentException $e) {
+            // Conteúdo real rejeitado pela allowlist do storage (magic bytes):
+            // erro do cliente, não 500.
+            report($e);
+
+            return response()->json(['error' => 'Tipo de arquivo não permitido.'], 422);
+        }
+
+        $url = '/api/storage/object?file='.rawurlencode($key).'&s='.rawurlencode($signature);
 
         return response()->json(['url' => $url]);
     }
 
     /**
-     * Valida o conteúdo real (magic bytes): a extensão declarada
-     * não prova o tipo do arquivo, e um formato inesperado pode
-     * explorar parsers downstream. Vídeos (mp4/webm) não têm
-     * assinatura textual confiável — ficam por conta de mimes+max.
+     * Valida o conteúdo real (magic bytes): a extensão declarada e o
+     * Content-Type do multipart vêm do cliente e não provam nada — um
+     * arquivo com conteúdo inesperado pode explorar parsers downstream.
+     * Imagens, PDF e vídeos (mp4/webm) têm assinatura verificável.
      */
     private function assertSafeContent(UploadedFile $file): void
     {
@@ -75,6 +90,20 @@ class UploadController extends Controller
 
         if ($extension === 'pdf' && file_get_contents($path, false, null, 0, 5) !== '%PDF-') {
             abort(422, 'Conteúdo do PDF inválido.');
+        }
+
+        if ($extension === 'mp4') {
+            // ISO-BMFF: box "ftyp" nos bytes 4-8.
+            if (substr((string) file_get_contents($path, false, null, 4, 4), 0, 4) !== 'ftyp') {
+                abort(422, 'Conteúdo do vídeo inválido.');
+            }
+        }
+
+        if ($extension === 'webm') {
+            // Matroska/WebM: EBML header 0x1A45DFA3.
+            if (bin2hex((string) file_get_contents($path, false, null, 0, 4)) !== '1a45dfa3') {
+                abort(422, 'Conteúdo do vídeo inválido.');
+            }
         }
     }
 }

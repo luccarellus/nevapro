@@ -48,11 +48,20 @@ class NotificationController extends Controller
         $user = $request->attributes->get('auth_user');
 
         $data = $request->validate([
-            'ids' => ['required', 'array'],
-            'ids.*' => ['string'],
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['string', 'max:64'],
         ]);
 
-        foreach ($data['ids'] as $notificationId) {
+        // Só marca notificações que o usuário realmente enxerga (globais ou
+        // próprias, do tenant dele): sem isto o cliente gravava linhas
+        // arbitrárias em notification_reads (array sem limite).
+        $ids = Notification::query()
+            ->whereIn('id', $data['ids'])
+            ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $user->id))
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $user->tenant_id))
+            ->pluck('id');
+
+        foreach ($ids as $notificationId) {
             NotificationRead::firstOrCreate(
                 ['user_id' => $user->id, 'notification_id' => $notificationId],
                 ['id' => (string) Str::uuid(), 'read_at' => now()],
@@ -89,6 +98,9 @@ class NotificationController extends Controller
 
         $ids = Notification::query()
             ->where(fn ($q) => $q->whereNull('user_id')->orWhere('user_id', $user->id))
+            // Mesmo escopo do index(): sem o filtro de tenant, "marcar todas"
+            // gravava leitura de notificações de outros tenants.
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $user->tenant_id))
             ->pluck('id');
 
         foreach ($ids as $notificationId) {

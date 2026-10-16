@@ -12,7 +12,7 @@ import Maintenance from './components/Maintenance';
 import { UserProfile } from './types';
 import { PenTool, Sparkles } from 'lucide-react';
 import { userService } from './services/userService';
-import { initConsentMode } from './lib/consentManager';
+import { initAnalytics, initConsentMode } from './lib/consentManager';
 import { invalidateRequestCache, prefetchEndpoint } from './lib/requestCache';
 import { csrfHeaders, request } from './lib/apiService';
 import { calculateLevelAndProgression } from './utils/xpUtils';
@@ -120,6 +120,8 @@ export default function App() {
     }
 
     initConsentMode();
+    // Analytics (Clarity) só carrega com consentimento registrado.
+    initAnalytics();
 
     // Check if user is returning from password reset email (via query params)
     const params = new URLSearchParams(window.location.search);

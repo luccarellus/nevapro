@@ -14,6 +14,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -21,7 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
-        health: '/up',
+        // O endpoint de health nativo do framework (health: '/up') responde HTML
+        // identificável como Laravel. Registramos o nosso: JSON mínimo de
+        // liveness, sem fingerprint. Readiness continua em /api/health.
+        then: function (): void {
+            Route::get('/up', fn () => response()->json(['status' => 'ok']));
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Aliases de middleware — espelham os do Express

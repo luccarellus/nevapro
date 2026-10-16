@@ -75,11 +75,12 @@ class AdminController extends Controller
     public function createUser(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:6'],
-            'name' => ['required', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'school' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email:rfc,strict', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+            // max:72 = limite do bcrypt.
+            'password' => ['required', 'string', 'min:6', 'max:72'],
+            'name' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'city' => ['nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'school' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
         ]);
 
         $email = strtolower(trim($data['email']));
@@ -113,9 +114,9 @@ class AdminController extends Controller
             ->findOrFail($id);
 
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
-            'school' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'name' => ['sometimes', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'school' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
             'showInLeaderboard' => ['sometimes', 'boolean'],
             'xp' => ['sometimes', 'integer', 'min:0'],
             'answeredQuestions' => ['sometimes', 'integer', 'min:0'],

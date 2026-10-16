@@ -5,13 +5,12 @@ export async function postJson<T>(
   body: unknown,
   extraHeaders: Record<string, string> = {},
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('neva_access_token') : null;
+  // Autenticação via cookie HttpOnly da sessão (sem token em localStorage).
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...extraHeaders,
     },
     body: JSON.stringify(body),

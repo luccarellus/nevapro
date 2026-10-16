@@ -41,8 +41,8 @@ class MaterialController extends CrudController
     protected function validationRules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
-            'subject' => ['nullable', 'string', 'max:120'],
+            'title' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'subject' => ['nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
             'foco' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
             'type' => ['nullable', 'string', 'max:40'],

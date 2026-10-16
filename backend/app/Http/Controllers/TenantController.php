@@ -78,8 +78,9 @@ class TenantController extends Controller
         }
 
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'slug' => ['sometimes', 'string', 'max:120'],
+            // Nome/slug aparecem em URLs e em telas de administração: texto puro.
+            'name' => ['sometimes', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'slug' => ['sometimes', 'string', 'max:120', 'not_regex:/[<>]/'],
             'domain' => ['sometimes', 'nullable', 'string', 'max:255'],
             'plan' => ['sometimes', 'string', 'max:50'],
             'active' => ['sometimes', 'boolean'],

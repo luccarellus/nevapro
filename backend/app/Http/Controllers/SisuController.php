@@ -3,6 +3,4 @@
 namespace App\Http\Controllers;
 
 // Feature desativada
-class SisuController extends Controller
-{
-}
+class SisuController extends Controller {}

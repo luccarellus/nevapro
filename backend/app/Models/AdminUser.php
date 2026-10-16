@@ -2,12 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\ApiCache;
 use App\Services\B2StorageService;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
-use App\Services\ApiCache;
 
 /**
  * Admins — mapeia public.admin_users (schema existente).
@@ -67,12 +67,13 @@ class AdminUser extends Authenticatable
     {
         if ($value === null) {
             $this->attributes['password_hash'] = null;
+
             return;
         }
 
         $this->attributes['password_hash'] = str_starts_with($value, '$2y$') || str_starts_with($value, '$2a$')
             ? $value
-            : \Illuminate\Support\Facades\Hash::make($value);
+            : Hash::make($value);
     }
 
     public function tenant()
@@ -108,7 +109,7 @@ class AdminUser extends Authenticatable
 
         // Não escrevemos o refresh, porque o AuthService somente consulta o
         // snapshot. O modelo é instanciado somente para verificação de token_version.
-        $model = new static();
+        $model = new static;
         $model->exists = false;
         $model->setRawAttributes($attrs, true);
 
@@ -123,7 +124,7 @@ class AdminUser extends Authenticatable
      */
     public static function makeFromRaw(array $attributes): self
     {
-        return static::createFromArray($attributes) ?? new static();
+        return static::createFromArray($attributes) ?? new static;
     }
 
     /** Força invalidação do cache de snapshot do usuário e seus tokens relacionados. */

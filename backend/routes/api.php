@@ -38,7 +38,10 @@ use Illuminate\Support\Facades\Route;
 
 // ===== Health (público, igual ao Express) =====
 Route::get('/health', [HealthController::class, 'index']);
-Route::get('redis/diagnose', [RedisDiagnosticController::class, 'diagnose']);
+// Diagnóstico de Redis: era público e devolvia a mensagem crua da exceção
+// (host/porta/config interna). Agora exige admin autenticado e tem rate limit.
+Route::get('redis/diagnose', [RedisDiagnosticController::class, 'diagnose'])
+    ->middleware(['auth.custom', 'role:admin', 'throttle.custom:10,60']);
 // Alias para probes de disponibilidade externos (UptimeRobot, Pingdom, ...).
 // Mesmo comportamento de /health: 200 quando o banco responde, 503 caso contrário.
 Route::get('/health/readiness', [HealthController::class, 'index']);

@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 class AnswerController extends Controller
 {
     public function __construct(private readonly ApiCache $cache) {}
+
     public function store(Request $request): JsonResponse
     {
         $user = $request->attributes->get('auth_user');
@@ -53,6 +54,13 @@ class AnswerController extends Controller
 
         $tenantId = $request->attributes->get('tenant_id');
         DB::transaction(function () use ($data, $tenantId, $isCorrect) {
+            // Uma resposta por (usuário, questão): sem isto, responder à mesma
+            // questão repetidamente cresce a tabela sem limite — e todos os
+            // consumidores (performance, errors-book, stats) já usam a última.
+            Answer::where('user_id', $data['userId'])
+                ->where('question_id', $data['questionId'])
+                ->delete();
+
             Answer::create([
                 'id' => (string) Str::uuid(),
                 'user_id' => $data['userId'],
@@ -114,29 +122,38 @@ class AnswerController extends Controller
             return response()->json(['error' => 'Uma ou mais questões estão indisponíveis para correção.'], 422);
         }
 
-        $options = QuestionOption::whereIn('question_id', $questionIds)
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('question_id', $tenantId))
-            ->get(['question_id', 'letter'])
-            ->groupBy('question_id')
-            ->map(fn ($options) => $options->pluck('letter')->all());
+        $options = QuestionOption::query()
+            // question_options não tem tenant_id: o escopo vive em questions.
+            // Filtrar question_options.tenant_id comparava a coluna errada
+            // (inexistente em Postgres → 500; em SQLite, comparava com o id da questão).
+            ->join('questions as q', 'q.id', '=', 'question_options.question_id')
+            ->whereIn('question_options.question_id', $questionIds)
+            ->where(fn ($query) => $query->whereNull('q.tenant_id')->orWhere('q.tenant_id', $tenantId))
+            ->get(['question_options.question_id', 'question_options.letter', 'question_options.is_correct'])
+            ->groupBy('question_id');
+
+        $letters = $options->map(fn ($rows) => $rows->pluck('letter')->all());
         foreach ($answers as $answer) {
             $letter = chr(65 + $answer['selectedOption']);
-            if (! in_array($letter, $options->get($answer['questionId'], []), true)) {
+            if (! in_array($letter, $letters->get($answer['questionId'], []), true)) {
                 return response()->json(['error' => 'Uma ou mais alternativas não existem para as questões informadas.'], 422);
             }
         }
-        $correctOptions = QuestionOption::whereIn('question_id', $questionIds)
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('question_id', $tenantId))
-            ->where('is_correct', true)
-            ->get(['question_id', 'letter'])
-            ->groupBy('question_id')
-            ->map(fn ($options) => $options->pluck('letter')->all());
+
+        $correctOptions = $options->map(
+            fn ($rows) => $rows->where('is_correct', true)->pluck('letter')->all(),
+        );
         $results = [];
 
         DB::transaction(function () use ($answers, $tenantId, $correctOptions, $questionIndexes, $questionData, &$results) {
             foreach ($answers as $answer) {
                 $letter = chr(65 + $answer['selectedOption']);
                 $isCorrect = in_array($letter, $correctOptions->get($answer['questionId'], []), true);
+
+                // Uma resposta por (usuário, questão) — ver store().
+                Answer::where('user_id', $answer['userId'])
+                    ->where('question_id', $answer['questionId'])
+                    ->delete();
 
                 Answer::create([
                     'id' => (string) Str::uuid(),
@@ -160,5 +177,4 @@ class AnswerController extends Controller
 
         return response()->json(['success' => true, 'count' => count($answers), 'results' => $results]);
     }
-
 }

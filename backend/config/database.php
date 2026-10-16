@@ -29,7 +29,7 @@ if ($dbConnection === 'pgsql') {
         || ($urlSslMode !== null && in_array($urlSslMode, $insecureSslModes, true))) {
         error_log(
             '[database] AVISO: PostgreSQL sem SSL garantido (sslmode='.$dbSslMode.'). '.
-            ($dbSslMode === 'require' 
+            ($dbSslMode === 'require'
                 ? 'Use DB_SSLMODE=prefer ou allow em ambientes sem TLS, ou habilite SSL no banco para manter require.'
                 : 'Se o banco não suportar SSL, ajuste DB_SSLMODE para prefer ou allow.')
         );
