@@ -12,10 +12,10 @@ x-laravel-environment: &laravel-environment
   SESSION_DRIVER: redis
   QUEUE_CONNECTION: redis
   REDIS_CLIENT: predis
-  REDIS_URL: ""
-  REDIS_HOST: nevapro_neva-redis
-  REDIS_PORT: "6379"
-  REDIS_PASSWORD: ""
+  REDIS_URL: ${REDIS_URL:-}
+  REDIS_HOST: ${REDIS_HOST:-nevapro_redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
   REDIS_QUEUE_RETRY_AFTER: "3600"
   LOG_CHANNEL: stderr
 
@@ -36,7 +36,10 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - neva_network
+      neva_network:
+        aliases:
+          - nevapro_redis
+          - nevapro_neva-redis
     restart: always
 
   # PostgreSQL (dominio + dados da aplicacao)
@@ -55,7 +58,10 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     networks:
-      - neva_network
+      neva_network:
+        aliases:
+          - nevapro_postgresql
+          - nevapro_neva-sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d nevapro"]
       interval: 5s

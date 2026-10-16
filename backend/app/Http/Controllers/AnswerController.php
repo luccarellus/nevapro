@@ -133,7 +133,7 @@ class AnswerController extends Controller
             ->map(fn ($options) => $options->pluck('letter')->all());
         $results = [];
 
-        DB::transaction(function () use ($answers, $tenantId, $correctOptions, $questionIndexes, &$results) {
+        DB::transaction(function () use ($answers, $tenantId, $correctOptions, $questionIndexes, $questionData, &$results) {
             foreach ($answers as $answer) {
                 $letter = chr(65 + $answer['selectedOption']);
                 $isCorrect = in_array($letter, $correctOptions->get($answer['questionId'], []), true);
