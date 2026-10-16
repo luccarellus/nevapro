@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminUser;
 use App\Models\StudentUser;
+use App\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -73,6 +75,55 @@ class AuthSessionFlowTest extends TestCase
 
         $profile = $this->getWithSession('/api/user/profile?email=estudante%40neva.pro', $token);
         self::assertSame(200, $profile->getStatusCode(), $profile->getContent());
+    }
+
+    public function test_register_with_an_existing_email_and_wrong_password_grants_no_session(): void
+    {
+        $this->seed();
+        $user = $this->createStudent('vitima@neva.pro', tokenVersion: 2);
+
+        $register = $this->postJson('/api/auth/register', [
+            'email' => 'vitima@neva.pro',
+            'password' => 'senha-errada-de-atacante',
+            'name' => 'Atacante',
+        ]);
+
+        // Antes da correção isto devolvia 201 + cookie de sessão da vítima
+        // (takeover de qualquer conta, inclusive super admin) — a senha nunca
+        // era conferida no fluxo de cadastro de e-mail existente.
+        self::assertSame(201, $register->getStatusCode());
+        self::assertNull($register->getCookie('session_token', false), 'Cadastro de e-mail existente não pode emitir sessão sem a senha correta');
+        self::assertNull($register->json('user'), 'A resposta não pode vazar o perfil da conta existente');
+        self::assertSame(0, PersonalAccessToken::query()->count(), 'Nenhum token pode ser criado');
+        self::assertSame(2, (int) $user->fresh()->token_version, 'O cadastro não pode alterar a conta existente');
+
+        $this->withCredentials()->getJson('/api/user/profile')->assertUnauthorized();
+    }
+
+    public function test_register_with_an_existing_super_admin_email_and_wrong_password_grants_no_session(): void
+    {
+        $this->seed();
+        $admin = AdminUser::create([
+            'id' => (string) Str::uuid(),
+            'email' => 'chefe@neva.pro',
+            'password_hash' => Hash::make('senha-real-do-admin'),
+            'name' => 'Chefe',
+            'role' => 'super',
+            'tenant_id' => Tenant::PLATFORM_ID,
+            'active' => true,
+            'token_version' => 0,
+        ]);
+
+        $register = $this->postJson('/api/auth/register', [
+            'email' => 'chefe@neva.pro',
+            'password' => 'senha-errada-de-atacante',
+            'name' => 'Atacante',
+        ]);
+
+        self::assertSame(201, $register->getStatusCode());
+        self::assertNull($register->getCookie('session_token', false));
+        self::assertSame(0, PersonalAccessToken::query()->count());
+        self::assertSame('super', $admin->fresh()->role);
     }
 
     public function test_logout_revokes_the_session(): void

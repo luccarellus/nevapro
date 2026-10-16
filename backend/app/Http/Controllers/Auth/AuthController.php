@@ -99,15 +99,30 @@ class AuthController extends Controller
         }
 
         // Resposta 201 uniforme (anti-enumeração de contas) — não revela se o e-mail existe.
-        // Se o e-mail já estiver cadastrado, ignoramos silenciosamente e retornamos
-        // um token para o usuário existente, sem diferenciar no frontend.
         $existingUser = AdminUser::where('email', $email)->first()
             ?: StudentUser::where('email', $email)->first();
 
         if ($existingUser) {
-            // Usuário existente: retorna token sem registrar falha de brute force
-            $token = $this->auth->issueToken($existingUser, $existingUser instanceof AdminUser ? 'admin' : 'student');
-            $this->storeTokenVersion($existingUser, $token, $existingUser instanceof AdminUser ? 'admin' : 'student');
+            // NUNCA emitir sessão sem conferir a senha: cadastrar com um e-mail já
+            // existente era um bypass completo de autenticação (takeover de
+            // qualquer conta, inclusive super admin, com qualquer senha).
+            $passwordMatches = AuthService::verifyPassword($data['password'], $existingUser->password_hash)
+                && (! $existingUser instanceof AdminUser || $existingUser->active);
+
+            if (! $passwordMatches) {
+                // Mesma resposta do cadastro bem-sucedido, sem cookie: não confirma
+                // a existência da conta nem cria novo usuário/token.
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Se este e-mail já tiver conta, faça login ou redefina a senha para continuar.',
+                ], 201);
+            }
+
+            // Senha confere: comporta-se como login (idempotente para quem
+            // "recadastra" com os dados corretos).
+            $type = $existingUser instanceof AdminUser ? 'admin' : 'student';
+            $token = $this->auth->issueToken($existingUser, $type);
+            $this->storeTokenVersion($existingUser, $token, $type);
 
             return response()->json(['success' => true, 'user' => $existingUser->toProfileArray()], 201)
                 ->withCookie(cookie('session_token', $token, 24 * 60, '/', null, (bool) config('session.secure'), true, false, 'Lax'));
